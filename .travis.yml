@@ -5,7 +5,7 @@ php:
   - '7.0'
 
 install: ./build/install_dotnetcore_ubuntu14.sh
-before_script:
+script:
   - dotnet restore
   - dotnet build
-script: ./tests/runtests.sh
+  - ./tests/runtests.sh
