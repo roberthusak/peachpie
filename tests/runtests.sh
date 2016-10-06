@@ -1,1 +1,1 @@
-php ./arrays/foreach_001.php
+php ./tests/arrays/foreach_001.php
