@@ -7,5 +7,5 @@ php:
 install: ./build/install_dotnetcore_ubuntu14.sh
 script:
   - dotnet restore
-  - dotnet build
+  - dotnet build ./src/Compiler/peach/project.json
   - ./tests/runtests.sh
