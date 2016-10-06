@@ -1,6 +1,11 @@
+sudo: required
+dist: trusty
 language: php
 php:
   - '7.0'
 
-install: true
+install: ./build/install_dotnetcore_ubuntu14.sh
+before_script:
+  - dotnet restore
+  - dotnet build
 script: ./tests/runtests.sh
