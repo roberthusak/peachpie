@@ -5,10 +5,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.Text.RegularExpressions;
-using System.Collections.Specialized; // case-insensitive hashtable
-using System.Runtime.Serialization;
-using System.Reflection;
 
 namespace Pchp.Syntax
 {

@@ -1,6 +1,9 @@
 ﻿{
+  "name": "Pchp.Syntax",
   "supports": {},
   "dependencies": {
+    "Peachpie.Microsoft.CodeAnalysis": "*",
+    "CoreCompat.System.CodeDOM": "4.2.3-beta002"
   },
   "frameworks": {
     ".NETPortable,Version=v4.5,Profile=Profile7": {},

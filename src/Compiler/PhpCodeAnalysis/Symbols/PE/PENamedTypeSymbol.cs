@@ -898,7 +898,8 @@ namespace Pchp.CodeAnalysis.Symbols
                                 fieldFlags = 0;
                             }
 
-                            if (ModuleExtensions.ShouldImportField(fieldFlags, moduleSymbol.ImportOptions))
+                            // Name collision with System.Reflection.ModuleExtensions when compiling by .NET Core
+                            if (Microsoft.CodeAnalysis.ModuleExtensions.ShouldImportField(fieldFlags, moduleSymbol.ImportOptions))
                             {
                                 var field = new PEFieldSymbol(moduleSymbol, this, fieldDef);
                                 members.Add(field);

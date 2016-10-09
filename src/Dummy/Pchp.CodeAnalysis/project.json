@@ -21,7 +21,7 @@
     },
     ".netcoreapp1.0": {
       "bin": {
-        "assembly": "../../Compiler/PhpCodeAnalysis/bin/Debug/Pchp.CodeAnalysis.dll"
+        "assembly": "../../Compiler/PhpCodeAnalysis/bin/Debug/netcoreapp1.0/Pchp.CodeAnalysis.dll"
       }
     }
   }

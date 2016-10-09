@@ -19,7 +19,7 @@
     },
     ".netcoreapp1.0": {
       "bin": {
-        "assembly": "../../Compiler/PhpCodeAnalysis/bin/Debug/Peachpie.Microsoft.CodeAnalysis.dll"
+        "assembly": "../../../lib/Microsoft.CodeAnalysis/Peachpie.Microsoft.CodeAnalysis.dll"
       }
     }
   }
