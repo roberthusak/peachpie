@@ -6,8 +6,9 @@ php:
 
 install: ./build/install_dotnetcore_ubuntu14.sh
 script:
-  - dotnet restore
+  - dotnet restore ./src
   - dotnet build -f .netcoreapp1.0 ./src/Compiler/PhpSyntax
   - dotnet build -f .netcoreapp1.0 ./src/Compiler/PhpCodeAnalysis
   - dotnet build -f .netcoreapp1.0 ./src/Peachpie.Compiler.Tools
+  - dotnet restore ./Samples
   - ./tests/runtests.sh
