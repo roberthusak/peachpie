@@ -2,7 +2,8 @@ php ./tests/arrays/foreach_001.php
 
 dotnet restore ./Samples/ConsoleApplication1
 
-# Diagnose the presence of particular nuget outputs in the filesystem
+# Diagnose the presence of various compilation and packaging outputs in the filesystem
+find ./src
 find ~/.nuget/packages/.tools
 find ~/.nuget/packages/Peachpie.Compiler.Tools
 cat  ~/.nuget/packages/Peachpie.Compiler.Tools/0.2.0-beta/lib/netcoreapp1.0/dotnet-compile-php.runtimeconfig.json
