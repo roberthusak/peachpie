@@ -11,5 +11,6 @@ script:
   - dotnet build -f .netcoreapp1.0 ./src/Compiler/PhpCodeAnalysis
   - dotnet build -f .netcoreapp1.0 ./src/Peachpie.Compiler.Tools
   - nuget pack ./src/Peachpie.Compiler.dotnetcore.nuspec -o ./.nugs -version 0.2.0-beta
+  - dotnet pack --no-build -c Debug -o ./.nugs --version-suffix beta ./src/Peachpie.Compiler.Tools/project.json
   - dotnet restore ./Samples
   - ./tests/runtests.sh
