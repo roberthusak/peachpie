@@ -4,8 +4,8 @@ language: php
 php:
   - '7.0'
 
-install: ./build/install_dependencies_ubuntu14.sh
-script:
+install:
+  - ./build/install_dependencies_ubuntu14.sh
   - dotnet restore ./src
   - dotnet build -f .netcoreapp1.0 ./src/Compiler/PhpSyntax
   - dotnet build -f .netcoreapp1.0 ./src/Compiler/PhpCodeAnalysis
@@ -13,4 +13,6 @@ script:
   - nuget pack ./src/Peachpie.Compiler.dotnetcore.nuspec -o ./.nugs -version 0.2.0-beta
   - dotnet pack --no-build -c Debug -o ./.nugs --version-suffix beta ./src/Peachpie.Compiler.Tools/project.json
   - dotnet restore ./Samples
-  - ./tests/runtests.sh
+  - dotnet run -f .netcoreapp1.0 -p ./Samples/ConsoleApplication1
+script:
+  - ./src/Tools/runtests_shell/runtests.sh
