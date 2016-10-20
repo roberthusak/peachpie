@@ -815,7 +815,7 @@ namespace Pchp.CodeAnalysis.Semantics
                         ytype.SpecialType == SpecialType.System_Int32 ||
                         ytype.SpecialType == SpecialType.System_Int64 ||
                         ytype.SpecialType == SpecialType.System_String ||
-                        ytype == cg.CoreTypes.PhpArray ||
+                        ytype.IsOfType(cg.CoreTypes.IPhpArray) ||
                         ytype == cg.CoreTypes.PhpString ||
                         ytype == cg.CoreTypes.Object)
                     {
@@ -855,8 +855,8 @@ namespace Pchp.CodeAnalysis.Semantics
                         ytype.SpecialType == SpecialType.System_Boolean ||
                         ytype.SpecialType == SpecialType.System_String ||
                         ytype.SpecialType == SpecialType.System_Double ||
+                        ytype.IsOfType(cg.CoreTypes.IPhpArray) ||
                         ytype == cg.CoreTypes.Object ||
-                        ytype == cg.CoreTypes.PhpArray ||
                         ytype == cg.CoreTypes.PhpString)
                     {
                         // i8 == something else => false
@@ -886,8 +886,8 @@ namespace Pchp.CodeAnalysis.Semantics
                         ytype.SpecialType == SpecialType.System_String ||
                         ytype.SpecialType == SpecialType.System_Int64 ||
                         ytype.SpecialType == SpecialType.System_Int32 ||
+                        ytype.IsOfType(cg.CoreTypes.IPhpArray) ||
                         ytype == cg.CoreTypes.Object ||
-                        ytype == cg.CoreTypes.PhpArray ||
                         ytype == cg.CoreTypes.PhpString)
                     {
                         // r8 == something else => false
@@ -1519,7 +1519,7 @@ namespace Pchp.CodeAnalysis.Semantics
 
                 case Operations.ArrayCast:
                     //Template: "(array)x"
-                    cg.EmitConvert(this.Operand, cg.CoreTypes.PhpArray);
+                    cg.EmitConvert(this.Operand, cg.CoreTypes.PhpArray);    // TODO: EmitArrayCast()
                     returned_type = cg.CoreTypes.PhpArray;
                     break;
                     
@@ -1708,8 +1708,8 @@ namespace Pchp.CodeAnalysis.Semantics
 
         void IBoundReference.EmitStore(CodeGenerator cg, TypeSymbol valueType)
         {
-            var rtype = cg.CoreTypes.PhpArray;
-            cg.EmitConvert(valueType, 0, rtype);    // TODO: to IPhpArrayOperators
+            var rtype = cg.CoreTypes.IPhpArray;
+            cg.EmitConvert(valueType, 0, rtype);
 
             var tmp = cg.GetTemporaryLocal(rtype);
             cg.Builder.EmitLocalStore(tmp);
@@ -1725,10 +1725,10 @@ namespace Pchp.CodeAnalysis.Semantics
                 var boundtarget = target.BindPlace(cg);
                 boundtarget.EmitStorePrepare(cg);
 
-                // LOAD Array.GetItemValue(IntStringKey{i})
+                // LOAD IPhpArray.GetItemValue(IntStringKey{i})
                 cg.Builder.EmitLocalLoad(tmp);
                 cg.EmitIntStringKey(i);
-                var itemtype = cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpArray.GetItemValue_IntStringKey);
+                var itemtype = cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.IPhpArray.GetItemValue_IntStringKey);
 
                 // STORE vars[i]
                 boundtarget.EmitStore(cg, itemtype);
@@ -1997,7 +1997,7 @@ namespace Pchp.CodeAnalysis.Semantics
 
             // TODO: overload for 2, 3, 4 parameters directly
 
-            // <PhpString>.Add(<expr>)
+            // <PhpString>.Append(<expr>)
             foreach (var x in this.ArgumentsInSourceOrder)
             {
                 var expr = x.Value;
@@ -2010,14 +2010,18 @@ namespace Pchp.CodeAnalysis.Semantics
                 var t = cg.Emit(expr);
                 if (t == cg.CoreTypes.PhpString)
                 {
+                    cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpString.Append_PhpString);
+                }
+                else if (t.SpecialType == SpecialType.System_String)
+                {
                     cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpString.Append_String);
                 }
                 else
                 {
-                    cg.EmitConvert(t, 0, cg.CoreTypes.String);
-                    cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpString.Append_String);
+                    cg.EmitConvert(t, 0, cg.CoreTypes.PhpValue);
+                    cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpString.Append_PhpValue);
                 }
-                
+
                 //
                 cg.Builder.EmitOpCode(ILOpCode.Nop);
             }
@@ -2588,7 +2592,7 @@ namespace Pchp.CodeAnalysis.Semantics
     {
         internal override IBoundReference BindPlace(CodeGenerator cg)
         {
-            this.Array.Access = this.Array.Access.WithRead(cg.CoreTypes.PhpArray);
+            this.Array.Access = this.Array.Access.WithRead(cg.CoreTypes.IPhpArray);
             _type = Access.IsReadRef ? cg.CoreTypes.PhpAlias : cg.CoreTypes.PhpValue;
             return this;
         }
@@ -2604,7 +2608,7 @@ namespace Pchp.CodeAnalysis.Semantics
         {
             InstanceCacheHolder.EmitInstance(instanceOpt, cg, Array);
 
-            if (Array.ResultType == cg.CoreTypes.PhpArray)
+            if (Array.ResultType.IsOfType(cg.CoreTypes.IPhpArray))
             {
                 // ok
             }
@@ -2635,23 +2639,25 @@ namespace Pchp.CodeAnalysis.Semantics
         {
             // Template: array[index]
 
+            // OPTIMIZATION: .call instead of .callvirt in case of known sealed array type (e.g. PhpArray instead of IPhpArray)
+
             if (Access.EnsureObject)
             {
                 // <array>.EnsureItemObject(<key>)
-                return cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpArray.EnsureItemObject_IntStringKey);
+                return cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.IPhpArray.EnsureItemObject_IntStringKey);
             }
             else if (Access.EnsureArray)
             {
-                return cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpArray.EnsureItemArray_IntStringKey);
+                return cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.IPhpArray.EnsureItemArray_IntStringKey);
             }
             else if (Access.IsReadRef)
             {
-                return cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpArray.EnsureItemAlias_IntStringKey);
+                return cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.IPhpArray.EnsureItemAlias_IntStringKey);
             }
             else
             {
                 Debug.Assert(Access.IsRead);
-                return cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpArray.GetItemValue_IntStringKey);
+                return cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.IPhpArray.GetItemValue_IntStringKey);
             }
         }
 
@@ -2683,12 +2689,12 @@ namespace Pchp.CodeAnalysis.Semantics
                 // .SetItemAlias(key, alias) or .AddValue(PhpValue.Create(alias))
                 if (this.Index != null)
                 {
-                    cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpArray.SetItemAlias_IntStringKey_PhpAlias);
+                    cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.IPhpArray.SetItemAlias_IntStringKey_PhpAlias);
                 }
                 else
                 {
                     cg.EmitCall(ILOpCode.Call, cg.CoreMethods.PhpValue.Create_PhpAlias);
-                    cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpArray.AddValue_PhpValue);
+                    cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.IPhpArray.AddValue_PhpValue);
                 }
             }
             else if (Access.IsUnset)
@@ -2697,7 +2703,7 @@ namespace Pchp.CodeAnalysis.Semantics
                     throw new InvalidOperationException();
 
                 // .RemoveKey(key)
-                cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpArray.RemoveKey_IntStringKey);
+                cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.IPhpArray.RemoveKey_IntStringKey);
             }
             else
             {
@@ -2708,11 +2714,11 @@ namespace Pchp.CodeAnalysis.Semantics
                 // .SetItemValue(key, value) or .AddValue(value)
                 if (this.Index != null)
                 {
-                    cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpArray.SetItemValue_IntStringKey_PhpValue);
+                    cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.IPhpArray.SetItemValue_IntStringKey_PhpValue);
                 }
                 else
                 {
-                    cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpArray.AddValue_PhpValue);
+                    cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.IPhpArray.AddValue_PhpValue);
                 }
             }
         }

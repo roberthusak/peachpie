@@ -114,6 +114,11 @@ namespace Pchp.Core
         public static PhpArray EnsureArray(ref PhpArray arr) => arr ?? (arr = new PhpArray());
 
         /// <summary>
+        /// Ensures given variable is not <c>null</c>.
+        /// </summary>
+        public static IPhpArray EnsureArray(ref IPhpArray arr) => arr ?? (arr = new PhpArray());
+
+        /// <summary>
         /// Implementation of PHP <c>isset</c> operator.
         /// </summary>
         public static bool IsSet(PhpValue value) => value.IsSet && !value.IsNull;
@@ -142,48 +147,5 @@ namespace Pchp.Core
         public static IPhpEnumerator GetForeachEnumerator(PhpValue value, bool aliasedValues, RuntimeTypeHandle caller) => value.GetForeachEnumerator(aliasedValues, caller);
 
         #endregion
-    }
-
-    /// <summary>
-    /// Common operations over arrays.
-    /// </summary>
-    public interface IPhpArrayOperators
-    {
-        /// <summary>
-        /// Gets value at given index.
-        /// Gets <c>void</c> value in case the key is not found.
-        /// </summary>
-        PhpValue GetItemValue(IntStringKey key);
-
-        /// <summary>
-        /// Sets value at specific index. Value must not be an alias.
-        /// </summary>
-        void SetItemValue(IntStringKey key, PhpValue value);
-
-        /// <summary>
-        /// Writes aliased value at given index.
-        /// </summary>
-        void SetItemAlias(IntStringKey key, PhpAlias alias);
-
-        /// <summary>
-        /// Add a value to the end of array.
-        /// Value can be an alias.
-        /// </summary>
-        void AddValue(PhpValue value);
-
-        /// <summary>
-        /// Ensures the item at given index is alias.
-        /// </summary>
-        PhpAlias EnsureItemAlias(IntStringKey key);
-
-        /// <summary>
-        /// Ensures the item at given index is class object.
-        /// </summary>
-        object EnsureItemObject(IntStringKey key);
-
-        /// <summary>
-        /// Ensures the item at given index is array.
-        /// </summary>
-        PhpArray EnsureItemArray(IntStringKey key);
     }
 }

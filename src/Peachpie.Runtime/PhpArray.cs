@@ -11,7 +11,7 @@ namespace Pchp.Core
     /// <summary>
     /// Implements ordered keyed array of <see cref="PhpValue"/> with PHP semantics.
     /// </summary>
-    public partial class PhpArray : PhpHashtable, IPhpConvertible, IPhpArrayOperators, IPhpComparable, IPhpEnumerable
+    public partial class PhpArray : PhpHashtable, IPhpConvertible, IPhpArray, IPhpComparable, IPhpEnumerable
     {
         /// <summary>
         /// Used in all PHP functions determining the type name. (var_dump, ...)
@@ -292,7 +292,7 @@ namespace Pchp.Core
 
         #endregion
 
-        #region IPhpArrayOperators
+        #region IPhpArray
 
         public PhpValue GetItemValue(IntStringKey key) => table._get(ref key);
 
@@ -316,7 +316,7 @@ namespace Pchp.Core
 
         public object EnsureItemObject(IntStringKey key) => table._ensure_item_object(ref key, this);
 
-        public PhpArray EnsureItemArray(IntStringKey key) => table._ensure_item_array(ref key, this);
+        public IPhpArray EnsureItemArray(IntStringKey key) => table._ensure_item_array(ref key, this);
 
         public void RemoveKey(IntStringKey key) => this.Remove(key);
 

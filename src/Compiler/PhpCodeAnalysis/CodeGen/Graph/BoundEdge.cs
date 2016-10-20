@@ -327,14 +327,15 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
 
             TypeSymbol enumeratorType;
 
-            if (enumereeType.IsEqualToOrDerivedFrom(cg.CoreTypes.PhpArray))
+            if (enumereeType.IsOfType(cg.CoreTypes.PhpArray))
             {
                 cg.Builder.EmitBoolConstant(_aliasedValues);
                 
                 // PhpArray.GetForeachtEnumerator(bool)
-                enumeratorType = cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpArray.GetForeachEnumerator_Boolean);
+                enumeratorType = cg.EmitCall(ILOpCode.Callvirt, cg.CoreMethods.PhpArray.GetForeachEnumerator_Boolean);  // TODO: IPhpArray
             }
             // TODO: IPhpEnumerable
+            // TODO: IPhpArray
             // TODO: Iterator
             else if (getEnumeratorMethod != null && getEnumeratorMethod.ParameterCount == 0 && enumereeType.IsReferenceType)
             {
