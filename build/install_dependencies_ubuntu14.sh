@@ -16,3 +16,8 @@ sudo apt-get install dotnet-dev-1.0.0-preview2-003131
 
 # Install nuget (together with Mono runtime and particular libraries)
 sudo apt-get install nuget
+
+# Install Python Pip and cdiff
+apt-get -y install python-pip
+pip -V
+pip install --upgrade cdiff

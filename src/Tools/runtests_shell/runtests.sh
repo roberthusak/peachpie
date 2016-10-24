@@ -13,13 +13,22 @@ awk "{print \"--reference:$NUGET_DIR/\" \$0}" $TOOL_DIR/references.rsp.tpl > $TO
 COMPILE_PHP_DLL="./src/Peachpie.Compiler.Tools/bin/Debug/netcoreapp1.0/dotnet-compile-php.dll"
 COMPILE_PHP="dotnet $COMPILE_PHP_DLL --temp-output:$OUTPUT_DIR --out:$OUTPUT_DIR/output.exe @$TOOL_DIR/common.rsp @$TOOL_DIR/references.rsp"
 
+PHP_TMP_FILE=$OUTPUT_DIR/php.out
+PEACH_TMP_FILE=$OUTPUT_DIR/peach.out
+CDIFF="/usr/local/bin/cdiff -s"
+
+COLOR_GREEN="\033[1;32m"
+COLOR_RED="\033[1;31m"
+COLOR_RESET="\033[0m"
+HR="----------------------------------------------------------------------------------------------------------------------------------------------------------------"
+
 # Compile and run every PHP file in ./tests and check the output against the one from the PHP interpreter
 for PHP_FILE in $(find ./tests -name *.php)
 do
-  echo "$PHP_FILE:"
+  echo -n "Testing $PHP_FILE..."
   COMPILE_OUTPUT="$($COMPILE_PHP $PHP_FILE 2>&1)"
   if [ $PIPESTATUS != 0 ] ; then
-    echo "Compilation error:"
+    echo -e $COLOR_RED"Compilation error"$COLOR_RESET
     echo "$COMPILE_OUTPUT"
     FAILURE="FAILURE"
   else
@@ -27,22 +36,28 @@ do
     PEACH_OUTPUT="$(dotnet $OUTPUT_DIR/output.exe)"
 
     if [ "$PHP_OUTPUT" = "$PEACH_OUTPUT" ] ; then
-      echo "OK"
+      echo -e $COLOR_GREEN"OK"$COLOR_RESET
     else
-      echo "FAIL: (expected result | actual result)"
-      diff -y -W 150 <(echo "$PHP_OUTPUT" ) <(echo "$PEACH_OUTPUT" )
+      echo -e $COLOR_RED"FAIL"$COLOR_RESET
+      echo "travis_fold:start:failed_test_comparison"
+      echo "Comparison of the expected and actual result:"
+      echo $HR
+      echo "$PHP_OUTPUT" > $PHP_TMP_FILE
+      echo "$PEACH_OUTPUT" > $PEACH_TMP_FILE
+      # TODO: Hide the whole comparison header (tail after the cdiff won't work)
+      git diff --no-index -- $PHP_TMP_FILE $PEACH_TMP_FILE | tail -n +3 | $CDIFF
+      echo $HR
+      echo "travis_fold:end:failed_test_comparison"
       FAILURE="FAILURE"
     fi
   fi
-
-  echo
 done
 
 # Fail if any of the tests failed
 if [ $FAILURE ] ; then
-  echo Tests failed
-  exit -1
+  echo -e $COLOR_RED"Tests failed"$COLOR_RESET
+  exit 1
 else
-  echo Tests passed
+  echo -e $COLOR_GREEN"Tests passed"$COLOR_RESET
   exit 0
 fi
