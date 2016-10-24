@@ -15,7 +15,6 @@ COMPILE_PHP="dotnet $COMPILE_PHP_DLL --temp-output:$OUTPUT_DIR --out:$OUTPUT_DIR
 
 PHP_TMP_FILE=$OUTPUT_DIR/php.out
 PEACH_TMP_FILE=$OUTPUT_DIR/peach.out
-CDIFF="/usr/local/bin/cdiff -s"
 
 COLOR_GREEN="\033[1;32m"
 COLOR_RED="\033[1;31m"
@@ -45,7 +44,7 @@ do
       echo "$PHP_OUTPUT" > $PHP_TMP_FILE
       echo "$PEACH_OUTPUT" > $PEACH_TMP_FILE
       # TODO: Hide the whole comparison header (tail after the cdiff won't work)
-      git diff --no-index -- $PHP_TMP_FILE $PEACH_TMP_FILE | tail -n +3 | $CDIFF
+      git diff --no-index -- $PHP_TMP_FILE $PEACH_TMP_FILE | tail -n +3 | cdiff -s
       echo $HR
       echo "travis_fold:end:failed_test_comparison"
       FAILURE="FAILURE"
