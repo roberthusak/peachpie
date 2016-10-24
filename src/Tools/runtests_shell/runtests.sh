@@ -1,3 +1,6 @@
+# WARNING: This script file manipulates with /bin/less command (see below), it is recommended to run it in a virtual sandbox 
+#          in order not to harm anything. The script was written for automated tests in Travis CI.
+
 # Prepare the files needed to compile and run the tests
 
 TOOL_DIR="./src/Tools/runtests_shell"
@@ -21,6 +24,11 @@ COLOR_RED="\033[1;31m"
 COLOR_RESET="\033[0m"
 HR="----------------------------------------------------------------------------------------------------------------------------------------------------------------"
 
+# A dirty hack to force cdiff to print the result in a non-interactive mode
+sudo cp /bin/less $TOOL_DIR/less_bck
+sudo rm /bin/less
+sudo ln $TOOL_DIR/cdiff_less_replacement.sh /bin/less
+
 # Compile and run every PHP file in ./tests and check the output against the one from the PHP interpreter
 for PHP_FILE in $(find ./tests -name *.php)
 do
@@ -38,19 +46,22 @@ do
       echo -e $COLOR_GREEN"OK"$COLOR_RESET
     else
       echo -e $COLOR_RED"FAIL"$COLOR_RESET
-      echo "travis_fold:start:failed_test_comparison"
-      echo "Comparison of the expected and actual result:"
+      echo "Differences between the expected and actual result:"
       echo $HR
       echo "$PHP_OUTPUT" > $PHP_TMP_FILE
       echo "$PEACH_OUTPUT" > $PEACH_TMP_FILE
       # TODO: Hide the whole comparison header (tail after the cdiff won't work)
       git diff --no-index -- $PHP_TMP_FILE $PEACH_TMP_FILE | tail -n +3 | cdiff -s
       echo $HR
-      echo "travis_fold:end:failed_test_comparison"
       FAILURE="FAILURE"
     fi
   fi
 done
+
+# Revert the hack of command less
+sudo rm /bin/less
+sudo cp $TOOL_DIR/less_bck /bin/less
+sudo rm $TOOL_DIR/less_bck
 
 # Fail if any of the tests failed
 if [ $FAILURE ] ; then
