@@ -1,5 +1,5 @@
 {
-  "version": "0.2.0-*",
+  "version": "0.3.0-*",
   "description": "Command line tool enabling 'php' project compilation.",
   "packOptions": {
     "tags": [
@@ -16,7 +16,7 @@
     "keyFile": "../../build/StrongKeys/core.snk"
   },
   "dependencies": {
-    "Peachpie.Compiler": "*",
+    "Peachpie.CodeAnalysis": "*",
     "Peachpie.App": "*"
   },
   "frameworks": {
@@ -36,10 +36,8 @@
   },
 
   "scripts": {
-    // for development purposes; installs the tool so dotnet-compile-php can be used as a tool
     "postcompile": [
-      "../../tools/nuget.exe pack ../Peachpie.Compiler.nuspec -o ../../.nugs -version 0.2.0-beta",
-      "dotnet pack --no-build -c %compile:Configuration% -o ../../.nugs --version-suffix beta"
+      "powershell -File ../../build/update_package.ps1 %project:Name% %project:Version% %compile:TargetFramework% %compile:Configuration%"
     ]
   }
 }

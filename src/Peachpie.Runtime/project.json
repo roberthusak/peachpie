@@ -1,5 +1,5 @@
 {
-  "version": "0.2.0-*",
+  "version": "0.3.0-*",
 
   "packOptions": {
     "tags": [
@@ -18,18 +18,18 @@
   },
 
   "dependencies": {
-    "System.Reflection.Emit.Lightweight": "4.0.*",
-    "System.Dynamic.Runtime": "4.0.*"
+    "System.Reflection.Emit.Lightweight": "4.0.1",
+    "System.Dynamic.Runtime": "4.0.11"
   },
   "frameworks": {
+    ".NETFramework,Version=v4.6": {
+      "buildOptions": { "define": [ "NET46" ] }
+    },
     "netstandard1.6": {
-      "imports": "dnxcore50",
+      "imports": [ "dnxcore50" ],
       "dependencies": {
         "NETStandard.Library": "1.6.0"
       }
-    },
-    ".NETFramework,Version=v4.6": {
-      "buildOptions": { "define": [ "NET46" ] }
     },
     ".netcoreapp1.0": {
       "dependencies": {
@@ -43,7 +43,7 @@
 
   "scripts": {
     "postcompile": [
-      "dotnet pack --no-build -c %compile:Configuration% -o ../../.nugs --version-suffix beta"
+      "powershell -File ../../build/update_package.ps1 %project:Name% %project:Version% %compile:TargetFramework% %compile:Configuration%"
     ]
   }
 }
