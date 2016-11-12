@@ -26,3 +26,6 @@ sudo apt-get install libunwind8 libicu52 -y
 wget https://github.com/PowerShell/PowerShell/releases/download/v6.0.0-alpha.11/powershell_6.0.0-alpha.11-1ubuntu1.14.04.1_amd64.deb
 sudo dpkg -i powershell_6.0.0-alpha.11-1ubuntu1.14.04.1_amd64.deb
 rm -f powershell_6.0.0-alpha.11-1ubuntu1.14.04.1_amd64.deb
+
+# Install colordiff (to pretty-print the test results)
+sudo apt-get install colordiff -y
