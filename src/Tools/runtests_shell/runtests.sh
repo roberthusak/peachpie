@@ -42,7 +42,7 @@ do
       echo $HR
       echo "$PHP_OUTPUT" > $PHP_TMP_FILE
       echo "$PEACH_OUTPUT" > $PEACH_TMP_FILE
-      icdiff --line-numbers --cols=160 $PHP_TMP_FILE $PEACH_TMP_FILE | tail -n +2
+      icdiff --line-numbers --cols=160 --no-headers --show-all-spaces  $PHP_TMP_FILE $PEACH_TMP_FILE
       echo $HR
       FAILURE="FAILURE"
     fi
