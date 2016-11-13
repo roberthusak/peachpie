@@ -42,7 +42,7 @@ do
       echo $HR
       echo "$PHP_OUTPUT" > $PHP_TMP_FILE
       echo "$PEACH_OUTPUT" > $PEACH_TMP_FILE
-      git diff --no-index -- $PHP_TMP_FILE $PEACH_TMP_FILE | colordiff -s | tail -n +7
+      icdiff --line-numbers --show-all-spaces $PHP_TMP_FILE $PEACH_TMP_FILE | tail -n +2
       echo $HR
       FAILURE="FAILURE"
     fi

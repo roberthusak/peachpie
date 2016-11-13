@@ -1,6 +1,7 @@
 # Install .NET Core (see https://www.microsoft.com/net/core#ubuntu),
-# Mono (http://www.mono-project.com/docs/getting-started/install/linux)
-# and Powershell (https://www.rootusers.com/how-to-install-powershell-on-linux)
+# Mono (http://www.mono-project.com/docs/getting-started/install/linux),
+# Powershell (https://www.rootusers.com/how-to-install-powershell-on-linux)
+# and icdiff (http://www.jefftk.com/icdiff)
 
 # Add the dotnet apt-get feed (for .NET Core)
 sudo sh -c 'echo "deb [arch=amd64] https://apt-mo.trafficmanager.net/repos/dotnet-release/ trusty main" > /etc/apt/sources.list.d/dotnetdev.list'
@@ -27,5 +28,7 @@ wget https://github.com/PowerShell/PowerShell/releases/download/v6.0.0-alpha.11/
 sudo dpkg -i powershell_6.0.0-alpha.11-1ubuntu1.14.04.1_amd64.deb
 rm -f powershell_6.0.0-alpha.11-1ubuntu1.14.04.1_amd64.deb
 
-# Install colordiff (to pretty-print the test results)
-sudo apt-get install colordiff -y
+# Install Python Pip and icdiff
+sudo apt-get -y install python-pip
+pip -V
+pip install --upgrade icdiff
