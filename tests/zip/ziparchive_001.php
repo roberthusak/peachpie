@@ -36,10 +36,12 @@ function list_entries($filename) {
 
   for ($i = 0; $i < $zip->numFiles; $i++) {
     $stats = $zip->statIndex($i);
+    print_r($stats);
     print_r(clear_stats($stats));
 
     $name = $zip->getNameIndex($i);
     $index = $zip->locateName($name);
+    print_r($zip->statName($name));
     $stats_eq = ($stats === $zip->statName($name));
     echo $i ."|". $name ."|". $index ."|". $stats_eq ."\n";
 
