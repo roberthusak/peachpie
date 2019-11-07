@@ -274,6 +274,10 @@ function Test3($server, $user_name, $user_pass){
         return false;
     }
 
+    if (ftp_pasv($conn_id, false)){
+        echo "pasv off\n";
+    }
+
     if (ftp_pasv($conn_id, true)){
         echo "pasv on\n";
     }
@@ -283,10 +287,6 @@ function Test3($server, $user_name, $user_pass){
         echo "File $testingFileClient was sent to server\n";
     } else {
         echo "File $testingFileClient was not sent to server\n";
-    }
-
-    if (ftp_pasv($conn_id, false)){
-    echo "pasv off\n";
     }
 
     // ftp_fget
