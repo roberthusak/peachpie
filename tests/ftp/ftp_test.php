@@ -504,27 +504,6 @@ function Test6($server, $user_name, $user_pass){
     exit(1);
     }
 
-    //Async interuption
-    $ret = ftp_nb_put($conn_id, $fileName1, $fileName, FTP_BINARY);
-    $ret = ftp_nb_get($conn_id, $fileName, $fileName, FTP_BINARY);
-    while ($ret == FTP_MOREDATA) {
-
-    // Do whatever you want
-    if (!$writeOnlyOnce)
-    {
-        echo "Async function in the background..\n";
-        $writeOnlyOnce = true;
-    }
-
-    // Continue downloading...
-    $ret = ftp_nb_continue($conn_id);
-    }
-
-    if ($ret != FTP_FINISHED) {
-    echo "There was an error downloading the file...";
-    exit(1);
-    }
-
     //Delete generated files
     ftp_delete($conn_id, $fileName);
     @ftp_delete($conn_id, $fileName1);
