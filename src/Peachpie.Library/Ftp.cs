@@ -1136,9 +1136,11 @@ namespace Pchp.Library
             if (startpos != 0) // There is no API for this parameter in FluentFTP Library.
                 PhpException.ArgumentValueNotSupported(nameof(startpos), startpos);
 
+            string localPath = FileSystemUtils.AbsolutePath(ctx, local_file);
+
             resource.PrepareForPendingOperation(mode);
-            
-            resource.PendingOperationTask = resource.Client.UploadFileAsync(local_file, remote_file, FtpExists.Overwrite, false, FtpVerify.None,null, resource.TokenSource.Token);
+
+            resource.PendingOperationTask = resource.Client.UploadFileAsync(localPath, remote_file, FtpExists.Overwrite, false, FtpVerify.None,null, resource.TokenSource.Token);
 
             return TasksGetInfo(resource);
         }
@@ -1199,9 +1201,11 @@ namespace Pchp.Library
             if (resumepos != 0) // There is no API for this parameter in FluentFTP Library.
                 PhpException.ArgumentValueNotSupported(nameof(resumepos), resumepos);
 
+            string localPath = FileSystemUtils.AbsolutePath(ctx, local_file);
+
             resource.PrepareForPendingOperation(mode);
 
-            resource.PendingOperationTask = resource.Client.DownloadFileAsync(local_file, remote_file, FtpLocalExists.Overwrite, FtpVerify.None, null, resource.TokenSource.Token);
+            resource.PendingOperationTask = resource.Client.DownloadFileAsync(localPath, remote_file, FtpLocalExists.Overwrite, FtpVerify.None, null, resource.TokenSource.Token);
 
             return TasksGetInfo(resource);
         }
