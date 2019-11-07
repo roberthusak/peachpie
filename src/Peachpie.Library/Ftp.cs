@@ -351,10 +351,8 @@ namespace Pchp.Library
             if (resource == null)
                 return null;
 
-            string workingDirectory = resource.Client.GetWorkingDirectory();
-
             if (FtpCommand(directory, resource.Client.CreateDirectory))
-                return $"{workingDirectory.TrimEndSeparator()}/{directory}";
+                return directory;
             else
                 return null;
         }
