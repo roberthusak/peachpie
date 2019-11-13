@@ -20,6 +20,11 @@ namespace Pchp.Library
     [PhpExtension("ftp")]
     public static class Ftp
     {
+        static Ftp()
+        {
+            FtpTrace.LogToFile = "ftp_log.txt";
+        }
+
         #region Constants
 
         public const int FTP_ASCII = 1;
