@@ -73,7 +73,7 @@ namespace Pchp.Library
 
             public FtpClient Client { get; }
 
-            public bool UsePASVAddress { get; set; }
+            public bool UsePASVAddress { get; set; } = true;
 
             public bool Autoseek { get; set; }
 
