@@ -91,7 +91,7 @@ function Login($server,$user_name,$user_pass) {
 }
 
 function Test1($server, $user_name, $user_pass) {
-    //Testing ftp_connect, ftp_login, ftp_close, ftp_pwd, ftp_get_option, ftp_size, ftp_rawlist, ftp_nlist, ftp_delete
+    //Testing ftp_connect, ftp_login, ftp_close, ftp_pwd, ftp_get_option, ftp_size, ftp_delete
     // Variables
     $ftp_fakeServer = '	0.0.0.0';
     $wrong_user_name = 'someNamewhichprobablydoesntexistonserverforthistest';
@@ -130,14 +130,6 @@ function Test1($server, $user_name, $user_pass) {
 
     // ftp_delete
     ftp_delete($conn_right,$testingFileServer);
-
-    // ftp_rawlist
-    print_r(ftp_rawlist($conn_right,$pwd,true));
-    echo "\n";
-
-    // ftp_nlist
-    print_r(ftp_nlist($conn_right,$pwd));
-    echo "\n";
 
     // Close the connection
     if (!ftp_close($conn_right)){
@@ -414,6 +406,14 @@ function Test5($server, $user_name, $user_pass){
             return false;
         }
     }
+
+    // ftp_rawlist
+    print_r(ftp_rawlist($conn_id, '/', true));
+    echo "\n";
+
+    // ftp_nlist
+    print_r(ftp_nlist($conn_id, '/'));
+    echo "\n";
 
     if (ftp_mkdir($conn_id, $directory)){
         echo "Created directory: " .  $directory . "\n";
