@@ -31,7 +31,7 @@ if (!Test3($server, $user_name, $user_pass)){
 
 echo "Test3 passed\n";
 
-//Test4($server, $user_name, $user_pass);
+Test4($server, $user_name, $user_pass);
 
 Test5($server, $user_name, $user_pass);
 
@@ -381,7 +381,10 @@ function Test4($server, $user_name, $user_pass){
     $conn_id = ftp_ssl_connect($server);
 
     if (ftp_login($conn_id, $user_name, $user_pass)){
-        echo ftp_pwd($conn_id);
+        echo "SSL-FTP connection successful\n";
+        echo "Working directory: ". ftp_pwd($conn_id) ."\n";
+    } else {
+        echo "Error in establishing  SSL-FTP connection\n";
     }
 
     ftp_close($conn_id);
