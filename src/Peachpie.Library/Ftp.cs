@@ -567,7 +567,7 @@ namespace Pchp.Library
                 return false;
 
             resource.Client.DataConnectionType = pasv
-                ? (resource.UsePASVAddress ? FtpDataConnectionType.AutoPassive : FtpDataConnectionType.PASVEX)
+                ? (resource.UsePASVAddress ? FtpDataConnectionType.PASV : FtpDataConnectionType.PASVEX)
                 : FtpDataConnectionType.AutoActive;
 
             return true;
