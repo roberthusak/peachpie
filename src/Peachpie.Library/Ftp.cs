@@ -145,6 +145,7 @@ namespace Pchp.Library
 
             client.Port = port;
             client.Credentials = null; // Disable anonymous login
+            client.DataConnectionType = FtpDataConnectionType.AutoActive;   // PHP uses active connection by default
 
             var resource = new FtpResource(client, timeout * 1000);
 
@@ -447,7 +448,7 @@ namespace Pchp.Library
                 /* Ignore the IP address returned by the FTP server in response to the PASV command 
                  * and instead use the IP address that was supplied in the ftp_connect() */
                 case FTP_USEPASVADDRESS:
-                    return resource.Client.DataConnectionType != FtpDataConnectionType.PASVEX;
+                    return resource.UsePASVAddress;
                 default:
                     PhpException.Throw(PhpError.Warning, Resources.Resources.arg_invalid_value, option.ToString(), nameof(option));
                     return PhpValue.False;
@@ -756,16 +757,16 @@ namespace Pchp.Library
         /// <returns>Returns TRUE on success or FALSE on failure.</returns>
         public static bool ftp_fget(PhpResource ftp_stream, PhpResource handle, string remotefile, int mode = FTP_IMAGE, int resumepos = 0)
         {
-            // Check file resource
-            var stream = PhpStream.GetValid(handle);
-            if (stream == null)
+            // Check ftp_stream resource
+            var resource = ValidateFtpResource(ftp_stream);
+            if (resource == null)
             {
                 return false;
             }
 
-            // Check ftp_stream resource
-            var resource = ValidateFtpResource(ftp_stream);
-            if (resource == null)
+            // Check file resource
+            var stream = PhpStream.GetValid(handle);
+            if (stream == null)
             {
                 return false;
             }
@@ -1226,16 +1227,16 @@ namespace Pchp.Library
         /// <returns>Returns FTP_FAILED or FTP_FINISHED or FTP_MOREDATA.</returns>
         public static int ftp_nb_fget(PhpResource ftp_stream, PhpResource handle, string remote_file, int mode = FTP_BINARY, int resumepos = 0)
         {
-            // Check file resource
-            var stream = PhpStream.GetValid(handle);
-            if (stream == null)
+            // Check ftp_stream resource
+            var resource = ValidateFtpResource(ftp_stream);
+            if (resource == null)
             {
                 return FTP_FAILED;
             }
 
-            // Check ftp_stream resource
-            var resource = ValidateFtpResource(ftp_stream);
-            if (resource == null)
+            // Check file resource
+            var stream = PhpStream.GetValid(handle);
+            if (stream == null)
             {
                 return FTP_FAILED;
             }
