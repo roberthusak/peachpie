@@ -85,7 +85,9 @@ namespace Pchp.Library
             {
                 Client.DownloadDataType = (mode == FTP_ASCII) ? FtpDataType.ASCII : FtpDataType.Binary;
 
-                if (PendingOperationTask != null) // Cancel current function and start new
+                // Cancel current function and start new
+                if (PendingOperationTask != null
+                    && !PendingOperationTask.IsCompleted && !PendingOperationTask.IsCanceled && !PendingOperationTask.IsFaulted)
                 {
                     // CancellationTokenSource cannot be reset and cancelled again
                     TokenSource.Cancel();
@@ -95,10 +97,11 @@ namespace Pchp.Library
                         // Wait for task is canceled in other to dispose TokenSource
                         PendingOperationTask.Wait();
                     }
-                    catch(AggregateException ex) 
+                    catch (TaskCanceledException)
                     {
-                        if (!(ex.InnerException is TaskCanceledException))
-                            throw;
+                    }
+                    catch(AggregateException ex) when (ex.InnerException is TaskCanceledException)
+                    {
                     }
 
                     PendingOperationTask = null;
@@ -777,7 +780,9 @@ namespace Pchp.Library
 
             try
             {
-                return resource.Client.Download(stream.RawStream, remotefile, resumepos);
+                // Use the async version to prevent calling Write on the output stream, as it might be not allowed
+                // (e.g. in Kestrel)
+                return resource.Client.DownloadAsync(stream.RawStream, remotefile, resumepos).Result;
             }
             catch (FtpException ex)
             {
