@@ -61,8 +61,8 @@ namespace Peachpie.Library.XmlDom
         {
             get
             {
-                XmlDocumentType doc_type = XmlDocument.DocumentType;
-                return (doc_type == null ? null : (DOMDocumentType)DOMNode.Create(doc_type));
+                var doc_type = XmlDocument.DocumentType;
+                return (DOMDocumentType)DOMNode.Create(doc_type);
             }
         }
 
@@ -79,7 +79,7 @@ namespace Peachpie.Library.XmlDom
             get
             {
                 XmlElement root = XmlDocument.DocumentElement;
-                return (root != null ? (DOMElement)Create(root) : null);
+                return (DOMElement)Create(root);
             }
         }
 
@@ -100,14 +100,16 @@ namespace Peachpie.Library.XmlDom
         {
             get
             {
-                XmlDeclaration decl = GetXmlDeclaration();
-                if (decl != null) return decl.Encoding;
-                return null;
+                var decl = GetXmlDeclaration();
+                return decl?.Encoding;
             }
             set
             {
-                XmlDeclaration decl = GetXmlDeclaration();
-                if (decl != null) decl.Encoding = value;
+                var decl = GetXmlDeclaration();
+                if (decl != null)
+                {
+                    decl.Encoding = value;
+                }
                 else
                 {
                     decl = XmlDocument.CreateXmlDeclaration("1.0", value, null);
@@ -139,8 +141,11 @@ namespace Peachpie.Library.XmlDom
             {
                 string stand = (value ? "yes" : "no");
 
-                XmlDeclaration decl = GetXmlDeclaration();
-                if (decl != null) decl.Standalone = stand;
+                var decl = GetXmlDeclaration();
+                if (decl != null)
+                {
+                    decl.Standalone = stand;
+                }
                 else
                 {
                     decl = XmlDocument.CreateXmlDeclaration("1.0", null, stand);
@@ -268,10 +273,7 @@ namespace Peachpie.Library.XmlDom
 
         public DOMDocument(string version = null, string encoding = null)
         {
-            this.XmlDocument = new XmlDocument()
-            {
-                PreserveWhitespace = true,
-            };
+            this.XmlDocument = PhpXmlDocument.Create();
 
             __construct(version, encoding);
         }
@@ -281,7 +283,7 @@ namespace Peachpie.Library.XmlDom
             this.XmlDocument = xmlDocument;
         }
 
-        protected override DOMNode CloneObjectInternal(bool deepCopyFields) => new DOMDocument(XmlDocument);
+        private protected override DOMNode CloneObjectInternal(bool deepCopyFields) => new DOMDocument(XmlDocument);
 
         public virtual void __construct(string version = null, string encoding = null)
         {
@@ -476,11 +478,14 @@ namespace Peachpie.Library.XmlDom
         }
 
         /// <summary>
-        /// Not yet implemented.
+        /// Gets the first element with the matching ID attribute.
         /// </summary>
+        /// <param name="elementId">The attribute ID to match.</param>
+        /// <returns>A <see cref="DOMElement"/>.</returns>
         public virtual DOMElement getElementById(string elementId)
         {
-            throw new NotImplementedException();
+            XmlElement element = XmlDocument.GetElementById(elementId);
+            return element != null ? new DOMElement(element) : null;
         }
 
         #endregion
@@ -684,14 +689,17 @@ namespace Peachpie.Library.XmlDom
         /// <returns>The number of bytes written or <B>false</B> on error.</returns>
         public virtual PhpValue save(Context ctx, string fileName, int options = 0)
         {
-            using (PhpStream stream = PhpStream.Open(ctx, fileName, "wt"))
+            using (PhpStream stream = PhpStream.Open(ctx, fileName, StreamOpenMode.WriteText))
             {
                 if (stream == null) return PhpValue.Create(false);
 
                 try
                 {
                     // direct stream write indents
-                    if (_formatOutput) XmlDocument.Save(stream.RawStream);
+                    if (_formatOutput)
+                    {
+                        XmlDocument.Save(stream.RawStream);
+                    }
                     else
                     {
                         var settings = new XmlWriterSettings()
@@ -756,10 +764,14 @@ namespace Peachpie.Library.XmlDom
         {
             XmlNode xml_node;
 
-            if (node == null) xml_node = XmlDocument;
+            if (node == null)
+            {
+                xml_node = XmlDocument;
+            }
             else
             {
                 xml_node = node.XmlNode;
+
                 if (xml_node.OwnerDocument != XmlDocument && xml_node != XmlNode)
                 {
                     DOMException.Throw(ExceptionCode.WrongDocument);
@@ -772,6 +784,7 @@ namespace Peachpie.Library.XmlDom
                 NewLineHandling = NewLineHandling.None,
                 Encoding = Utils.GetNodeEncoding(ctx, xml_node),
                 Indent = _formatOutput,
+                ConformanceLevel = node == null ? ConformanceLevel.Document : ConformanceLevel.Fragment,
                 OmitXmlDeclaration = omitXmlDeclaration
             };
 
@@ -841,7 +854,10 @@ namespace Peachpie.Library.XmlDom
         public virtual bool loadHTML(Context ctx, string source, int options = 0)
         {
             if (string.IsNullOrEmpty(source))
+            {
+                PhpException.InvalidArgument(nameof(source), Pchp.Library.Resources.Resources.arg_null_or_empty);
                 return false;
+            }
 
             return loadHTML(ctx, new StringReader(source), null);
         }
@@ -865,7 +881,7 @@ namespace Peachpie.Library.XmlDom
         /// <summary>
         /// Load HTML DOM from given <paramref name="stream"/>.
         /// </summary>
-        private bool loadHTML(Context ctx, TextReader stream, string filename, int options = 0)
+        private protected bool loadHTML(Context ctx, TextReader stream, string filename, int options = 0)
         {
             HtmlAgilityPack.HtmlDocument htmlDoc = new HtmlAgilityPack.HtmlDocument();
 
@@ -882,14 +898,17 @@ namespace Peachpie.Library.XmlDom
 
             CheckHtmlErrors(ctx, htmlDoc, filename);
 
-            // save to string as XML
-            using (var sw = new StringWriter())
-            {
-                htmlDoc.Save(sw);
+            //// save to string as XML
+            //using (var sw = new StringWriter())
+            //{
+            //    htmlDoc.Save(sw);
 
-                // load as XML
-                return loadXMLInternal(ctx, sw.ToString(), 0, true);
-            }
+            //    // load as XML
+            //    return loadXMLInternal(ctx, sw.ToString(), 0, true);
+            //}
+
+            this.XmlDocument.LoadHtml(htmlDoc);
+            return true;
         }
 
         /// <summary>
@@ -903,7 +922,13 @@ namespace Peachpie.Library.XmlDom
         {
             using (var ms = new MemoryStream())
             {
-                OutputHtmlDoctype(ms);
+                if (node == null && XmlDocument?.DocumentType == null)
+                {
+                    // we are saving the whole document and there is no DOCTYPE,
+                    // output the default DOCTYPE:
+                    OutputDefaultHtmlDoctype(ms);
+                }
+
                 SaveXMLInternal(ctx, ms, node, omitXmlDeclaration: true);
 
                 return new PhpString(ms.ToArray());
@@ -919,9 +944,16 @@ namespace Peachpie.Library.XmlDom
         {
             using (PhpStream stream = PhpStream.Open(ctx, file, "wt"))
             {
-                if (stream == null) return PhpValue.Create(false);
+                if (stream == null)
+                {
+                    return PhpValue.False;
+                }
 
-                OutputHtmlDoctype(stream.RawStream);
+                if (XmlDocument?.DocumentType == null)
+                {
+                    OutputDefaultHtmlDoctype(stream.RawStream);
+                }
+
                 SaveXMLInternal(ctx, stream.RawStream, null, omitXmlDeclaration: true);
 
                 // TODO:
@@ -929,11 +961,12 @@ namespace Peachpie.Library.XmlDom
             }
         }
 
-        private void OutputHtmlDoctype(Stream outStream)
+        private void OutputDefaultHtmlDoctype(Stream outStream)
         {
             using (var sw = new StreamWriter(outStream, Encoding.ASCII, bufferSize: 128, leaveOpen: true))
             {
-                sw.WriteLine("<!DOCTYPE html PUBLIC \" -//W3C//DTD HTML 4.0 Transitional//EN\" \"http://www.w3.org/TR/REC-html40/loose.dtd\">");
+                // HTML 4.01 Transitional
+                sw.WriteLine("<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\" \"http://www.w3.org/TR/REC-html40/loose.dtd\">");
                 sw.Flush();
             }
         }

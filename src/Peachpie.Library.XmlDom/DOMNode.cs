@@ -1,18 +1,49 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Xml;
 using Pchp.Core;
+using Pchp.Core.Reflection;
 
 namespace Peachpie.Library.XmlDom
 {
     [PhpType(PhpTypeAttribute.InheritName), PhpExtension("dom")]
-    public class DOMNode
+    public class DOMNode : IPhpPrintable
     {
         #region Fields and Properties
 
-        private XmlNode _xmlNode;
-        internal XmlNode XmlNode
+        /// <summary>
+        /// Overrides default debug print behavior.
+        /// </summary>
+        IEnumerable<KeyValuePair<string, PhpValue>> IPhpPrintable.Properties
+        {
+            get
+            {
+                // only public properties
+                // remove duplicates
+                // ignore properties referring to another DOMNode (https://github.com/peachpiecompiler/peachpie/issues/658)
+
+                var set = new HashSet<string>();
+
+                var fields = TypeMembersUtils.EnumerateInstanceFields(
+                    instance: this,
+                    keyFormatter: TypeMembersUtils.s_propertyName,
+                    keyFormatter2: TypeMembersUtils.s_keyToString,
+                    predicate: p => p.IsPublic && set.Add(p.PropertyName) && !typeof(DOMNode).IsAssignableFrom(p.PropertyType)
+                );
+
+                // TODO: properties containing DOMNode should be listed, but with a dummy value "(object value omitted)"
+
+                return fields;
+            }
+        }
+
+        [PhpHidden]
+        private protected XmlNode _xmlNode;
+
+        [PhpHidden]
+        internal protected XmlNode XmlNode
         {
             get
             {
@@ -25,7 +56,8 @@ namespace Peachpie.Library.XmlDom
             }
         }
 
-        internal bool IsAssociated => _xmlNode != null;
+        [PhpHidden]
+        internal protected bool IsAssociated => _xmlNode != null;
 
         /// <summary>
         /// Returns the name of the node (exact meaning depends on the particular subtype).
@@ -165,7 +197,11 @@ namespace Peachpie.Library.XmlDom
         {
             get
             {
-                if (!IsAssociated && GetType() != typeof(DOMNode)) return null;
+                if (!IsAssociated && GetType() != typeof(DOMNode))
+                {
+                    return null;
+                }
+
                 return Create(XmlNode.NextSibling);
             }
         }
@@ -201,13 +237,14 @@ namespace Peachpie.Library.XmlDom
             {
                 if (IsAssociated) return XmlNode.Prefix;
 
-                string prefix, local_name;
-                Utils.ParseQualifiedName(nodeName, out prefix, out local_name);
+                Utils.ParseQualifiedName(nodeName, out var prefix, out _);
 
                 return prefix;
             }
             set
-            { XmlNode.Prefix = value; }
+            {
+                XmlNode.Prefix = value;
+            }
         }
 
         /// <summary>
@@ -217,10 +254,12 @@ namespace Peachpie.Library.XmlDom
         {
             get
             {
-                if (IsAssociated) return XmlNode.LocalName;
+                if (IsAssociated)
+                {
+                    return XmlNode.LocalName;
+                }
 
-                string prefix, local_name;
-                Utils.ParseQualifiedName(nodeName, out prefix, out local_name);
+                Utils.ParseQualifiedName(nodeName, out _, out var local_name);
 
                 return local_name;
             }
@@ -233,7 +272,11 @@ namespace Peachpie.Library.XmlDom
         {
             get
             {
-                if (!IsAssociated && GetType() != typeof(DOMNode)) return null;
+                if (!IsAssociated && GetType() != typeof(DOMNode))
+                {
+                    return null;
+                }
+
                 return XmlNode.BaseURI;
             }
         }
@@ -251,7 +294,8 @@ namespace Peachpie.Library.XmlDom
 
         #region Construction
 
-        internal static DOMNode Create(XmlNode xmlNode)
+        [PhpHidden]
+        internal protected static DOMNode Create(XmlNode xmlNode)
         {
             if (xmlNode == null) return null;
             switch (xmlNode.NodeType)
@@ -278,7 +322,7 @@ namespace Peachpie.Library.XmlDom
         }
 
         [PhpHidden]
-        protected virtual DOMNode CloneObjectInternal(bool deepCopyFields)
+        private protected virtual DOMNode CloneObjectInternal(bool deepCopyFields)
         {
             DOMException.Throw(ExceptionCode.InvalidState);
             return null;
@@ -318,15 +362,18 @@ namespace Peachpie.Library.XmlDom
 
         #region Hierarchy
 
-        internal virtual void Associate(XmlDocument/*!*/ document)
-        { }
+        [PhpHidden]
+        internal protected virtual void Associate(XmlDocument/*!*/ document)
+        {
+        }
 
-        private delegate XmlNode NodeAction(DOMNode/*!*/ newNode, DOMNode auxNode);
+        private protected delegate XmlNode NodeAction(DOMNode/*!*/ newNode, DOMNode auxNode);
 
         /// <summary>
         /// Performs a child-adding action with error checks.
         /// </summary>
-        private XmlNode CheckedChildOperation(DOMNode/*!*/ newNode, DOMNode auxNode, NodeAction/*!*/ action)
+        [PhpHidden]
+        private protected XmlNode CheckedChildOperation(DOMNode/*!*/ newNode, DOMNode auxNode, NodeAction/*!*/ action)
         {
             newNode.Associate(XmlNode.OwnerDocument != null ? XmlNode.OwnerDocument : (XmlDocument)XmlNode);
 

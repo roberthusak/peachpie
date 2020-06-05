@@ -14,15 +14,12 @@ using Pchp.CodeAnalysis.Symbols;
 using Devsense.PHP.Syntax.Ast;
 using Peachpie.CodeAnalysis.Utilities;
 using Pchp.CodeAnalysis.Semantics.TypeRef;
-using System.Text.RegularExpressions;
 using Devsense.PHP.Syntax;
 
 namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
 {
     internal partial class DiagnosticWalker<T> : GraphExplorer<T>
     {
-        private static readonly Regex PrintfSpecsRegex = new Regex(@"%(?:(\d)+\$)?[+-]?(?:[ 0]|'.{1})?-?\d*(?:\.\d+)?[bcdeEufFgGosxX]");
-
         private readonly DiagnosticBag _diagnostics;
         private SourceRoutineSymbol _routine;
 
@@ -31,40 +28,6 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
         PhpCompilation DeclaringCompilation => _routine.DeclaringCompilation;
 
         TypeRefContext TypeCtx => _routine.TypeRefContext;
-
-        #region Scope
-
-        struct Scope
-        {
-            public enum Kind
-            {
-                Try, Catch, Finally,
-            }
-
-            public bool Contains(BoundBlock b) => b != null && b.Ordinal >= From && b.Ordinal < To;
-
-            public bool IsTryCatch => ScopeKind == Kind.Try || ScopeKind == Kind.Catch || ScopeKind == Kind.Finally;
-
-            public int From, To;
-            public Kind ScopeKind;
-        }
-
-        List<Scope> _lazyScopes = null;
-
-        /// <summary>
-        /// Stores a scope (range) of blocks.
-        /// </summary>
-        void WithScope(Scope scope)
-        {
-            if (_lazyScopes == null) _lazyScopes = new List<Scope>();
-            _lazyScopes.Add(scope);
-        }
-
-        bool IsInScope(Scope.Kind kind) => _lazyScopes != null && _lazyScopes.Any(s => s.ScopeKind == kind && s.Contains(_currentBlock));
-
-        bool IsInTryCatchScope() => _lazyScopes != null && _lazyScopes.Any(s => s.IsTryCatch && s.Contains(_currentBlock));
-
-        #endregion
 
         void CheckMissusedPrimitiveType(IBoundTypeRef tref)
         {
@@ -147,6 +110,14 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Determines if both identifiers differ only in casing.
+        /// </summary>
+        static bool IsLetterCasingMismatch(string str1, string str2)
+        {
+            return str1 != str2 && string.Equals(str1, str2, StringComparison.InvariantCultureIgnoreCase);
         }
 
         private void CheckParams()
@@ -348,12 +319,12 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
 
                 if (ct.Type.Kind != SymbolKind.ErrorType)
                 {
-                    string symbolName = ct.Type.Name;
+                    var symbolName = ct.Type.Name;
 
-                    if (refName != symbolName && refName.Equals(symbolName, StringComparison.InvariantCultureIgnoreCase))
+                    if (IsLetterCasingMismatch(refName, symbolName))
                     {
                         // Wrong class name case
-                        _diagnostics.Add(_routine, typeRef.PhpSyntax, ErrorCode.INF_ClassNameWrongCase, refName, symbolName);
+                        _diagnostics.Add(_routine, typeRef.PhpSyntax, ErrorCode.INF_TypeNameCaseMismatch, refName, symbolName);
                     }
                 }
             }
@@ -425,12 +396,6 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
                     // A void function must not return a value
                     _diagnostics.Add(_routine, x.PhpSyntax, ErrorCode.ERR_VoidFunctionCannotReturnValue);
                 }
-            }
-
-            // do not allow return from "finally" block, not allowed in CLR
-            if (x.PhpSyntax != null && IsInScope(Scope.Kind.Finally))
-            {
-                _diagnostics.Add(_routine, x.PhpSyntax, ErrorCode.ERR_NotYetImplemented, "return from 'finally' block");
             }
 
             //
@@ -573,7 +538,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
             if (x.Name.IsDirect)
             {
                 CheckObsoleteSymbol(x.PhpSyntax, x.TargetMethod, isMemberCall: false);
-                CheckGlobalFunctionUsage(x);
+                CheckGlobalFunctionCall(x);
             }
             else
             {
@@ -840,7 +805,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
 
         static string GetMemberNameForDiagnostic(Symbol target, bool isMemberName)
         {
-            string name = target.Name;
+            string name = target.PhpName();
 
             if (isMemberName)
             {
@@ -943,101 +908,14 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
             }
         }
 
-        private void CheckGlobalFunctionUsage(BoundGlobalFunctionCall call)
-        {
-            if (!AnalysisFacts.HasSimpleName(call, out string name))
-            {
-                return;
-            }
-
-            switch (name)
-            {
-                case "printf":
-                case "sprintf":
-                    // Check that the number of arguments matches the format string
-                    if (!call.ArgumentsInSourceOrder.IsEmpty && call.ArgumentsInSourceOrder[0].Value.ConstantValue.TryConvertToString(out string format))
-                    {
-                        int posSpecCount = 0;
-                        int numSpecMax = 0;
-                        foreach (Match match in PrintfSpecsRegex.Matches(format))
-                        {
-                            var numSpecStr = match.Groups[1].Value;
-                            if (numSpecStr == string.Empty)
-                            {
-                                // %d
-                                posSpecCount++;
-                            }
-                            else
-                            {
-                                // %2$d
-                                int numSpec = int.Parse(numSpecStr);
-                                numSpecMax = Math.Max(numSpec, numSpecMax);
-                            }
-                        }
-
-                        int expectedArgCount = 1 + Math.Max(posSpecCount, numSpecMax);
-
-                        if (call.ArgumentsInSourceOrder.Length != expectedArgCount)
-                        {
-                            // Wrong number of arguments with respect to the format string
-                            _diagnostics.Add(_routine, call.PhpSyntax, ErrorCode.WRN_FormatStringWrongArgCount, name);
-                        }
-                    }
-                    break;
-            }
-        }
-
         public override T VisitCFGTryCatchEdge(TryCatchEdge x)
         {
-            // remember scopes,
-            // .Accept() on BodyBlocks traverses not only the try block but also the rest of the code
-
-            WithScope(new Scope
-            {
-                ScopeKind = Scope.Kind.Try,
-                From = x.BodyBlock.Ordinal,
-                To = x.NextBlock.Ordinal
-            });
-
-            for (int i = 0; i < x.CatchBlocks.Length; i++)
-            {
-                WithScope(new Scope
-                {
-                    ScopeKind = Scope.Kind.Catch,
-                    From = x.CatchBlocks[i].Ordinal,
-                    To = ((i + 1 < x.CatchBlocks.Length) ? x.CatchBlocks[i + 1] : x.FinallyBlock ?? x.NextBlock).Ordinal,
-                });
-            }
-
-            if (x.FinallyBlock != null)
-            {
-                WithScope(new Scope
-                {
-                    ScopeKind = Scope.Kind.Finally,
-                    From = x.FinallyBlock.Ordinal,
-                    To = x.NextBlock.Ordinal
-                });
-            }
-
-            // visit:
-
             return base.VisitCFGTryCatchEdge(x);
         }
 
         public override T VisitStaticStatement(BoundStaticVariableStatement x)
         {
             return base.VisitStaticStatement(x);
-        }
-
-        public override T VisitYieldStatement(BoundYieldStatement boundYieldStatement)
-        {
-            if (IsInTryCatchScope())
-            {
-                // TODO: Start supporting yielding from exception handling constructs.
-                _diagnostics.Add(_routine, boundYieldStatement.PhpSyntax, ErrorCode.ERR_NotYetImplemented, "Yielding from an exception handling construct (try, catch, finally)");
-            }
-
-            return default;
         }
 
         public override T VisitCFGForeachEnumereeEdge(ForeachEnumereeEdge x)

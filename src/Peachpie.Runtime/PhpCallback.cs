@@ -1,4 +1,5 @@
 ﻿using Pchp.Core.Reflection;
+using Pchp.Core.Resources;
 using Pchp.Core.Utilities;
 using System;
 using System.Collections.Generic;
@@ -49,6 +50,24 @@ namespace Pchp.Core
     /// </summary>
     public abstract class PhpCallback : IPhpCallable
     {
+        [Flags]
+        enum CallbackFlags
+        {
+            Default = 0,
+
+            /// <summary>
+            /// The callback has been marked as invalid.
+            /// </summary>
+            IsInvalid = 1,
+
+            /// <summary>
+            /// When invalid is invoked, exception is thrown.
+            /// </summary>
+            InvalidThrowsException = 2,
+        }
+
+        CallbackFlags _flags = CallbackFlags.Default;
+
         /// <summary>
         /// Resolved routine to be invoked.
         /// </summary>
@@ -60,11 +79,25 @@ namespace Pchp.Core
         public virtual bool IsValid => true;
 
         /// <summary>
+        /// Gets value indicating the callback has been already resolved.
+        /// </summary>
+        public bool IsResolved => _lazyResolved != null;
+
+        /// <summary>
         /// Tries to bind the callback and checks if the callback is valid.
         /// </summary>
         internal bool IsValidBound(Context ctx)
         {
-            return IsValid && Bind(ctx) != InvokeError;
+            if (IsValid)
+            {
+                // ensure the callback is bound
+                Bind(ctx);
+
+                // check flags
+                return (_flags & CallbackFlags.IsInvalid) == 0;
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -119,9 +152,8 @@ namespace Pchp.Core
 
             protected override PhpValue InvokeError(Context ctx, PhpValue[] arguments)
             {
-                Debug.WriteLine($"Function '{_function}' is not defined!");
-                // TODO: ctx.Error.CallToUndefinedFunction(_function)
-                return PhpValue.False;
+                PhpException.UndefinedFunctionCalled(_function);
+                return PhpValue.Null;
             }
 
             public override bool Equals(PhpCallback other) => base.Equals(other) || Equals(other as FunctionCallback);
@@ -174,10 +206,13 @@ namespace Pchp.Core
                     }
                 }
 
-                Debug.WriteLine($"Method '{_class}::{_method}' is not defined!");
-                // TODO: ctx.Error.CallToUndefinedMethod(_function)
-
                 return null;
+            }
+
+            protected override PhpValue InvokeError(Context ctx, PhpValue[] arguments)
+            {
+                PhpException.UndefinedMethodCalled(_class, _method);
+                return PhpValue.Null;
             }
 
             PhpTypeInfo ResolveType(Context ctx) => ctx.ResolveType(_class, _callerCtx, true);
@@ -236,6 +271,19 @@ namespace Pchp.Core
                     }
 
                     var routine = (PhpMethodInfo)tinfo.GetVisibleMethod(_method, _callerCtx);
+
+                    // [$b, "A::foo"] or [$this, "parent::foo"]
+                    int colIndex;
+                    if (routine == null && (colIndex = _method.IndexOf("::", StringComparison.Ordinal)) > 0)
+                    {
+                        var methodTypeInfo = ctx.ResolveType(_method.Substring(0, colIndex), _callerCtx, true);
+                        if (methodTypeInfo != null && methodTypeInfo.Type.IsAssignableFrom(tinfo.Type))
+                        {
+                            tinfo = methodTypeInfo;
+                            routine = (PhpMethodInfo)methodTypeInfo.GetVisibleMethod(_method.Substring(colIndex + 2), _callerCtx);
+                        }
+                    }
+
                     if (routine != null)
                     {
                         if (target != null)
@@ -254,7 +302,7 @@ namespace Pchp.Core
                                 // CONSIDER: compiler (and this binder) creates dummy instance of self;
                                 // can we create a special singleton instance marked as "null" so use of $this inside the method will fail ?
                                 // TODO: use caller instance or warning (calling instance method statically)
-                                return routine.PhpInvokable.Bind(tinfo.GetUninitializedInstance(ctx));
+                                return routine.PhpInvokable.Bind(tinfo.CreateUninitializedInstance(ctx));
                             }
                         }
                     }
@@ -274,6 +322,21 @@ namespace Pchp.Core
                 }
 
                 return null;
+            }
+
+            protected override PhpValue InvokeError(Context ctx, PhpValue[] arguments)
+            {
+                ResolveType(ctx, out var tinfo, out _);
+                if (tinfo != null)
+                {
+                    PhpException.UndefinedMethodCalled(tinfo.Name, _method);
+                }
+                else
+                {
+                    throw PhpException.ClassNotFoundException(_obj.ToString(ctx));
+                }
+
+                return PhpValue.Null;
             }
 
             void ResolveType(Context ctx, out PhpTypeInfo tinfo, out object target)
@@ -425,7 +488,14 @@ namespace Pchp.Core
         /// <returns>Instance to the delegate. Cannot be <c>null</c>.</returns>
         private PhpCallable BindNew(Context ctx)
         {
-            var resolved = BindCore(ctx) ?? InvokeError;
+            var resolved = BindCore(ctx);
+            if (resolved == null)
+            {
+                _flags |= CallbackFlags.IsInvalid;
+                resolved = InvokeError;
+            }
+
+            //
 
             _lazyResolved = resolved;
 
@@ -437,8 +507,7 @@ namespace Pchp.Core
         /// </summary>
         protected virtual PhpValue InvokeError(Context ctx, PhpValue[] arguments)
         {
-            // TODO: ctx.Errors.InvalidCallback();
-            return PhpValue.False;
+            throw PhpException.ErrorException(ErrResources.invalid_callback);
         }
 
         /// <summary>
@@ -462,7 +531,7 @@ namespace Pchp.Core
         public PhpValue Invoke(Context ctx, params PhpValue[] arguments) => Bind(ctx)(ctx, arguments);
 
         /// <summary>
-        /// Gets value representing the calleback.
+        /// Gets value representing the callback.
         /// Used for human readable representation of the callback.
         /// </summary>
         public abstract PhpValue ToPhpValue();

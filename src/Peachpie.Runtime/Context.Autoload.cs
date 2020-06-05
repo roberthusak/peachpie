@@ -1,4 +1,6 @@
-﻿using Pchp.Core.Reflection;
+﻿#nullable enable
+
+using Pchp.Core.Reflection;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -17,20 +19,28 @@ namespace Pchp.Core
         /// </summary>
         /// <param name="fullName">Full class, interface or trait name.</param>
         /// <returns>Type descriptor or a <c>null</c> reference if the process couldn't resolve the type.</returns>
-        PhpTypeInfo AutoloadTypeByName(string fullName);
+        PhpTypeInfo? AutoloadTypeByName(string fullName);
     }
 
     partial class Context : IPhpAutoloadService
     {
         /// <summary>
+        /// Invokes scripts marked as to be autoloaded.
+        /// </summary>
+        protected void AutoloadFiles()
+        {
+            ScriptsMap.AutoloadFiles(this);
+        }
+
+        /// <summary>
         /// Default implementation of PHP autoload.
         /// </summary>
-        PhpTypeInfo IPhpAutoloadService.AutoloadTypeByName(string fullName) => DefaultAutoloadTypeByName(fullName) ?? ImplicitAutoloadTypeByName(fullName);
+        PhpTypeInfo? IPhpAutoloadService.AutoloadTypeByName(string fullName) => DefaultAutoloadTypeByName(fullName) ?? ImplicitAutoloadTypeByName(fullName);
 
         /// <summary>
         /// Default implementation of PHP autoload looks for <c>__autoload</c> global function and calls it.
         /// </summary>
-        PhpTypeInfo DefaultAutoloadTypeByName(string fullName)
+        PhpTypeInfo? DefaultAutoloadTypeByName(string fullName)
         {
             var autoload = _lazyAutoloadRoutine;
             if (autoload == null)
@@ -67,35 +77,30 @@ namespace Pchp.Core
         }
 
         /// <summary>
-        /// Implicit autoload mechanism working through CLR reflection.
-        /// This ensures when even the caller does not define PHP class autoloading, we allows seamless use of PHP classes and PHP program.
-        /// This mechanism gets enabled by default, disabled only when SPL autoload gets initiated (or anything that sets own <see cref="Context.AutoloadService"/>).
+        /// Performs autoload from class map which is constructed in build time from specified class map and psr-4 schemas.
         /// </summary>
-        PhpTypeInfo ImplicitAutoloadTypeByName(string fullName)
+        public PhpTypeInfo? AutoloadByTypeNameFromClassMap(string fullName, bool onlyAllowed)
         {
-            if (EnableImplicitAutoload)
-            {
-                var types = s_assClassMap.LookupTypes(fullName);
-                if (types != null)
-                {
-                    ScriptInfo script = default;
+            if (fullName == null) throw new ArgumentNullException(nameof(fullName));
 
-                    for (int i = 0; i < types.Length; i++)
-                    {
-                        var rpath = types[i].RelativePath;
-                        if (script.IsValid)
-                        {
-                            if (script.Path != rpath)
-                            {
-                                Trace.WriteLine("Type '" + fullName + "' cannot be autoloaded. Ambiguous declarations in " + script.Path + " and " + rpath);
-                                return null; // ambiguity
-                            }
-                        }
-                        else
-                        {
-                            script = ScriptsMap.GetDeclaredScript(rpath);
-                        }
-                    }
+            Debug.Assert(fullName.Length != 0 && fullName[0] != '\\');
+
+            if (s_typeMap.TryGetType(fullName, out var tinfo, out var autoload) && tinfo != null)
+            {
+                if (onlyAllowed && autoload == 0)
+                {
+                    // type was not marked as to be autoloaded
+                    return null;
+                }
+
+                if (autoload == PhpTypeAttribute.AutoloadAllowNoSideEffect)
+                {
+                    _types.DeclareType(tinfo);
+                    return tinfo;
+                }
+                else
+                {
+                    var script = ScriptsMap.GetDeclaredScript(tinfo.RelativePath);
 
                     // pretend we are PHP and include the script:
 
@@ -103,7 +108,7 @@ namespace Pchp.Core
                     {
                         script.Evaluate(this, this.Globals, null);
 
-                        return GetDeclaredType(fullName, autoload: false); // TODO: can we return types[0] directly in some cases?
+                        return GetDeclaredType(fullName, autoload: false);
                     }
                 }
             }
@@ -112,9 +117,19 @@ namespace Pchp.Core
         }
 
         /// <summary>
-        /// Helper class containing PHP types declared in PHP assemblies.
+        /// Implicit autoload mechanism working through CLR reflection.
+        /// This ensures when even the caller does not define PHP class autoloading, we allows seamless use of PHP classes and PHP program.
+        /// This mechanism gets enabled by default, disabled only when SPL autoload gets initiated (or anything that sets own <see cref="Context.AutoloadService"/>).
         /// </summary>
-        static readonly AssemblyClassMap s_assClassMap = new AssemblyClassMap();
+        PhpTypeInfo? ImplicitAutoloadTypeByName(string fullName)
+        {
+            return AutoloadByTypeNameFromClassMap(fullName, onlyAllowed: !EnableImplicitAutoload);
+        }
+
+        /// <summary>
+        /// Map of all PHP types in loaded assemblies.
+        /// </summary>
+        static readonly AutoloadClassMap s_typeMap = new AutoloadClassMap();
 
         /// <summary>
         /// Default autoload function in PHP to be used when there is no autoload service.

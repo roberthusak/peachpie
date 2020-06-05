@@ -29,12 +29,13 @@ namespace Pchp.Core.Dynamic
     /// <summary>
     /// Wraps an argument passed to callsite denotating a special meaning of the value.
     /// </summary>
-    public struct ContextParam : ISpecialParamHolder
+    [DebuggerNonUserCode]
+    public readonly struct ContextParam : ISpecialParamHolder
     {
         /// <summary>
         /// Runtime context.
         /// </summary>
-        public Context Value;
+        public readonly Context Value;
 
         bool ISpecialParamHolder.IsImplicit => true;
 
@@ -50,12 +51,13 @@ namespace Pchp.Core.Dynamic
     /// <summary>
     /// Wraps an argument passed to callsite denotating a function or property name.
     /// </summary>
-    public struct NameParam<T> : ISpecialParamHolder
+    [DebuggerNonUserCode]
+    public readonly struct NameParam<T> : ISpecialParamHolder
     {
         /// <summary>
         /// The invoked member, <c>callable</c>.
         /// </summary>
-        public T Value;
+        public readonly T Value;
 
         bool ISpecialParamHolder.IsImplicit => true;
 
@@ -84,12 +86,13 @@ namespace Pchp.Core.Dynamic
     /// <summary>
     /// Wraps an argument passed to callsite denotating target type of a static invocation operation (call, static field, class const).
     /// </summary>
-    public struct TargetTypeParam : ISpecialParamHolder
+    [DebuggerNonUserCode]
+    public readonly struct TargetTypeParam : ISpecialParamHolder
     {
         /// <summary>
         /// Target type.
         /// </summary>
-        public PhpTypeInfo Value;
+        public readonly PhpTypeInfo Value;
 
         bool ISpecialParamHolder.IsImplicit => true;
 
@@ -106,14 +109,37 @@ namespace Pchp.Core.Dynamic
     }
 
     /// <summary>
+    /// Wraps an argument passed to callsite denotating late static type of a method call through self:: or parent::.
+    /// </summary>
+    [DebuggerNonUserCode]
+    public readonly struct LateStaticTypeParam : ISpecialParamHolder
+    {
+        /// <summary>
+        /// Target type.
+        /// </summary>
+        public readonly PhpTypeInfo Value;
+
+        bool ISpecialParamHolder.IsImplicit => true;
+
+        void ISpecialParamHolder.Process(CallSiteContext info, Expression valueExpr)
+        {
+            info.LateStaticType = valueExpr;
+        }
+
+        /// <summary>Initializes the structure.</summary>
+        public LateStaticTypeParam(PhpTypeInfo value) => Value = value;
+    }
+
+    /// <summary>
     /// Wraps an argument passed to callsite denotating a generic argument.
     /// </summary>
-    public struct GenericParam : ISpecialParamHolder
+    [DebuggerNonUserCode]
+    public readonly struct GenericParam : ISpecialParamHolder
     {
         /// <summary>
         /// A generic argument.
         /// </summary>
-        public PhpTypeInfo Value;
+        public readonly PhpTypeInfo Value;
 
         bool ISpecialParamHolder.IsImplicit => true;
 
@@ -129,12 +155,13 @@ namespace Pchp.Core.Dynamic
     /// <summary>
     /// Wraps an argument passed to callsite denotating a caller type.
     /// </summary>
-    public struct CallerTypeParam : ISpecialParamHolder
+    [DebuggerNonUserCode]
+    public readonly struct CallerTypeParam : ISpecialParamHolder
     {
         /// <summary>
         /// Caller type context.
         /// </summary>
-        public RuntimeTypeHandle Value;
+        public readonly RuntimeTypeHandle Value;
 
         bool ISpecialParamHolder.IsImplicit => true;
 
@@ -151,9 +178,10 @@ namespace Pchp.Core.Dynamic
     /// <summary>
     /// Wraps the argument unpacking.
     /// </summary>
-    public struct UnpackingParam<T> : ISpecialParamHolder
+    [DebuggerNonUserCode]
+    public readonly struct UnpackingParam<T> : ISpecialParamHolder
     {
-        public T Value;
+        public readonly T Value;
 
         bool ISpecialParamHolder.IsImplicit => false;
 

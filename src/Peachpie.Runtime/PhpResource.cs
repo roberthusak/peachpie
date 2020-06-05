@@ -1,4 +1,6 @@
-﻿using Pchp.Core;
+﻿#nullable enable
+
+using Pchp.Core;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -14,7 +16,7 @@ namespace Pchp.Core
 	/// When printing a resource variable in PHP, "Resource id #x" prints out.
 	/// </summary>
     [DebuggerDisplay("resource id='{Id}' type='{TypeName,nq}'")]
-    public class PhpResource : IDisposable, IPhpConvertible
+    public class PhpResource : IDisposable, IPhpConvertible, IPhpPrintable
     {
         /// <summary>The name of this variable type.</summary>
 		public const string PhpTypeName = "resource";
@@ -153,6 +155,11 @@ namespace Pchp.Core
         /// <summary>false if the resource has been already disposed</summary>
         public bool IsValid => !_disposed;
 
+        /// <summary>
+        /// Explicitly provide empty set of properties to be printed by var_dump or print_r.
+        /// </summary>
+        IEnumerable<KeyValuePair<string, PhpValue>> IPhpPrintable.Properties => Array.Empty<KeyValuePair<string, PhpValue>>();
+
         /// <summary>Unique resource identifier (even for internal resources, odd for external ones).</summary>
         /// <remarks>
         /// Internal resources are given even numbers while resources
@@ -191,8 +198,6 @@ namespace Pchp.Core
         }
 
         string IPhpConvertible.ToString(Context ctx) => ToString();
-
-        string IPhpConvertible.ToStringOrThrow(Context ctx) => ToString();
 
         object IPhpConvertible.ToClass() => new stdClass(PhpValue.FromClass(this));
 

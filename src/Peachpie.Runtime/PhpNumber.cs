@@ -1,4 +1,6 @@
-﻿using System;
+﻿#nullable enable
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -12,7 +14,7 @@ namespace Pchp.Core
     [DebuggerDisplay("{GetDebuggerValue,nq}", Type = "{GetDebuggerType,nq}")]
     [DebuggerNonUserCode, DebuggerStepThrough]
     [StructLayout(LayoutKind.Explicit)]
-    public struct PhpNumber : IComparable<PhpNumber>, IComparable<long>, IComparable<double>, IEquatable<PhpNumber>, IPhpConvertible
+    public readonly struct PhpNumber : IComparable<PhpNumber>, IComparable<long>, IComparable<double>, IEquatable<PhpNumber>, IPhpConvertible
     {
         #region nested enum: NumberType
 
@@ -1360,8 +1362,6 @@ namespace Pchp.Core
         {
             return IsLong ? _long.ToString() : Convert.ToString(_double, ctx);
         }
-
-        public string ToStringOrThrow(Context ctx) => ToString(ctx);
 
         public object ToClass() => ToObject();
 

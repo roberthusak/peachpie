@@ -8,48 +8,52 @@ namespace Peachpie.Library.PDO
 {
     partial class PDO
     {
-        /// <summary>
-        /// 
-        /// </summary>
-        [PhpHidden]
+        /// <summary></summary>
         public enum PARAM
         {
             /// <summary>
-            /// 
+            /// The value is NULL.
             /// </summary>
             PARAM_NULL = 0,
+
             /// <summary>
             /// int as in long (the php native int type)
             /// </summary>
             PARAM_INT = 1,
+
             /// <summary>
             /// get_col ptr should point to start of the string buffer
             /// </summary>
             PARAM_STR = 2,
+
             /// <summary>
             /// The pdo parameter lob
             /// </summary>
             PARAM_LOB = 3,
+
             /// <summary>
             /// The pdo parameter statement
             /// </summary>
             PARAM_STMT = 4,
+
             /// <summary>
             /// The pdo parameter bool
             /// </summary>
             PARAM_BOOL = 5,
+
             /// <summary>
             /// The pdo parameter zval
             /// </summary>
             PARAM_ZVAL = 6,
+
             /// <summary>
             /// The pdo parameter input output
             /// </summary>
-            PARAM_INPUT_OUTPUT = -1 // 0x80000000
+            PARAM_INPUT_OUTPUT = int.MinValue, // 0x80000000
         }
 
         /// <summary>
-        /// 
+        /// The value is NULL.
         /// </summary>
         public const int PARAM_NULL = (int)PARAM.PARAM_NULL;
         /// <summary>
@@ -80,5 +84,25 @@ namespace Peachpie.Library.PDO
         /// magic flag to denote a parameter as being input/output
         /// </summary>
         public const int PARAM_INPUT_OUTPUT = (int)PARAM.PARAM_INPUT_OUTPUT;
+
+        ///<summary></summary>
+        public const int PARAM_STR_NATL = 1 << 30;
+        ///<summary></summary>
+        public const int PARAM_STR_CHAR = 1 << 29;
+
+        ///<summary></summary>
+        public const int PARAM_EVT_ALLOC = 0;
+        ///<summary></summary>
+        public const int PARAM_EVT_FREE = 1;
+        ///<summary></summary>
+        public const int PARAM_EVT_EXEC_PRE = 2;
+        ///<summary></summary>
+        public const int PARAM_EVT_EXEC_POST = 3;
+        ///<summary></summary>
+        public const int PARAM_EVT_FETCH_PRE = 4;
+        ///<summary></summary>
+        public const int PARAM_EVT_FETCH_POST = 5;
+        ///<summary></summary>
+        public const int PARAM_EVT_NORMALIZE = 6;
     }
 }

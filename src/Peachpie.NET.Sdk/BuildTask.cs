@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using Microsoft.Build.Framework;
@@ -34,8 +35,10 @@ namespace Peachpie.NET.Sdk.Tools
         /// <summary></summary>
         public string NetFrameworkPath { get; set; }
 
-        /// <summary></summary>
-        public bool Optimize { get; set; } = true;
+        /// <summary>
+        /// Optimization level.
+        /// Can be a boolean value (true/false), an integer specifying the level(0-9), or an optimization name (debug, release).</summary>
+        public string Optimization { get; set; } = bool.TrueString;
 
         /// <summary></summary>
         public string DebugType { get; set; }
@@ -50,7 +53,10 @@ namespace Peachpie.NET.Sdk.Tools
         public string Version { get; set; }
 
         /// <summary></summary>
-        public bool EmitEntryPoint { get; set; }
+        public string OutputType { get; set; }
+
+        /// <summary></summary>
+        public bool GenerateFullPaths { get; set; }
 
         /// <summary></summary>
         public string EntryPoint { get; set; }
@@ -96,6 +102,18 @@ namespace Peachpie.NET.Sdk.Tools
         /// <summary></summary>
         public ITaskItem[] Resources { get; set; }
 
+        /// <summary>Autoload PSR-4 map. Each item provides properties:<br/>
+        /// - Prefix<br/>
+        /// - Path<br/>
+        /// </summary>
+        public ITaskItem[] Autoload_PSR4 { get; set; }
+
+        /// <summary>Set of files to be included in autoload class-map.</summary>
+        public string[] Autoload_ClassMap { get; set; }
+
+        /// <summary>Set of files to be autoloaded (included) on each request.</summary>
+        public string[] Autoload_Files { get; set; }
+
         /// <summary>
         /// Used for debugging purposes.
         /// If enabled a debugger is attached to the current process upon the task execution.
@@ -120,8 +138,9 @@ namespace Peachpie.NET.Sdk.Tools
             var args = new List<string>(1024)
             {
                 "/output-name:" + OutputName,
-                "/target:" + (EmitEntryPoint ? "exe" : "library"),
-                Optimize ? "/o+" : "/o-",
+                "/target:" + (string.IsNullOrEmpty(OutputType) ? "library" : OutputType),
+                "/o:" + Optimization,
+                "/fullpaths:" + GenerateFullPaths.ToString(),
             };
 
             if (HasDebugPlus)
@@ -184,6 +203,31 @@ namespace Peachpie.NET.Sdk.Tools
                 }
             }
 
+            if (Autoload_PSR4 != null)
+            {
+                foreach (var psr4map in Autoload_PSR4)
+                {
+                    //args.Add(FormatArgFromItem(psr4map, "autoload", "Prefix", "Path")); // Prefix can be empty!
+                    args.Add($"/autoload:psr-4,{psr4map.GetMetadata("Prefix")},{psr4map.GetMetadata("Path")}");
+                }
+            }
+
+            if (Autoload_ClassMap != null)
+            {
+                foreach (var fname in Autoload_ClassMap.Distinct())
+                {
+                    args.Add("/autoload:classmap," + fname);
+                }
+            }
+
+            if (Autoload_Files != null)
+            {
+                foreach (var fname in Autoload_Files.Distinct())
+                {
+                    args.Add("/autoload:files," + fname);
+                }
+            }
+
             // sources at the end:
             if (Compile != null)
             {
@@ -193,6 +237,7 @@ namespace Peachpie.NET.Sdk.Tools
                 }
             }
 
+#if DEBUG
             //
             // save the arguments as .rsp file for debugging purposes:
             try
@@ -203,6 +248,7 @@ namespace Peachpie.NET.Sdk.Tools
             {
                 this.Log.LogWarningFromException(ex);
             }
+#endif
 
             //
             // run the compiler:

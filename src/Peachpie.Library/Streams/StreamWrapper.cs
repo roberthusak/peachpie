@@ -206,8 +206,11 @@ namespace Pchp.Library.Streams
                 case 'r':
                     // flags = 0;
                     // fileMode is already set to Open
-                    fileAccess = FileAccess.Read;
+                    fileAccess = (mode.Length > 1 && mode[1] == 'w')
+                        ? FileAccess.ReadWrite  // rw
+                        : FileAccess.Read;      // r
                     //accessOptions |= findFile;
+
                     break;
 
                 case 'w':
@@ -915,6 +918,8 @@ namespace Pchp.Library.Streams
         public override StatStruct Stat(string path, StreamStatOptions options, StreamContext context, bool streamStat)
         {
             Debug.Assert(path != null);
+
+            // TODO: no cache here
 
             // Note: path is already absolute w/o the scheme, the permissions have already been checked.
             return PhpPath.HandleFileSystemInfo(StatStruct.Invalid, path, (p) =>
@@ -1628,6 +1633,10 @@ namespace Pchp.Library.Streams
 
         #endregion
 
+        public static bool IsStdIn(PhpStream stream) => stream is NativeStream && stream.OpenedPath == "php://stdin";
+        public static bool IsStdOut(PhpStream stream) => stream is NativeStream && stream.OpenedPath == "php://stdout";
+        public static bool IsStdErr(PhpStream stream) => stream is NativeStream && stream.OpenedPath == "php://stderr";
+
         /// <summary>
         /// Represents the console input stream (alias php://stdin).
         /// </summary>
@@ -1675,7 +1684,7 @@ namespace Pchp.Library.Streams
 
         // EX: cache this as a persistent stream
         static Lazy<PhpStream> s_stderr = new Lazy<PhpStream>(() => new NativeStream(
-            Utf8EncodingProvider.Instance, Console.OpenStandardInput(), null,
+            Utf8EncodingProvider.Instance, Console.OpenStandardError(), null,
             StreamAccessOptions.Write | StreamAccessOptions.UseText | StreamAccessOptions.Persistent,
             "php://stderr", StreamContext.Default)
         {

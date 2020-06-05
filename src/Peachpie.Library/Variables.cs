@@ -541,14 +541,16 @@ namespace Pchp.Library
         {
             switch (variable.TypeCode)
             {
-                case PhpTypeCode.Int32:
                 case PhpTypeCode.Long:
                 case PhpTypeCode.Double:
                     return true;
 
                 case PhpTypeCode.String:
                 case PhpTypeCode.MutableString:
-                    return (variable.ToNumber(out _) & Core.Convert.NumberInfo.IsNumber) != 0;
+                    return (variable.ToNumber(out _) & (Core.Convert.NumberInfo.IsNumber | Core.Convert.NumberInfo.IsHexadecimal)) == Core.Convert.NumberInfo.IsNumber;
+
+                case PhpTypeCode.Alias:
+                    return is_numeric(variable.Alias.Value);
 
                 default:
                     return false;
@@ -652,7 +654,7 @@ namespace Pchp.Library
             }
 
             var result = new PhpArray(names.Length);
-            
+
             for (int i = 0; i < names.Length; i++)
             {
                 string name;
@@ -865,7 +867,7 @@ namespace Pchp.Library
 
         #endregion
 
-        #region print_r, var_export, var_dump
+        #region print_r, var_export, var_dump, debug_zval_dump
 
         abstract class FormatterVisitor : PhpVariableVisitor, IPhpVariableFormatter
         {
@@ -877,7 +879,7 @@ namespace Pchp.Library
 
             protected const string RECURSION = "*RECURSION*";
 
-            protected FormatterVisitor(Context ctx, string newline)
+            protected FormatterVisitor(Context ctx, string newline = "\n")
             {
                 Debug.Assert(ctx != null);
                 _ctx = ctx;
@@ -939,7 +941,7 @@ namespace Pchp.Library
                 }
             }
 
-            public PrintFormatter(Context ctx, string newline)
+            public PrintFormatter(Context ctx, string newline = "\n")
                 : base(ctx, newline)
             {
             }
@@ -998,7 +1000,7 @@ namespace Pchp.Library
                 Accept(entry.Value);
                 _indent--;
 
-                _output.Append(_nl);
+                NewLine();
             }
 
             public override void AcceptObject(object obj)
@@ -1036,14 +1038,11 @@ namespace Pchp.Library
                     _indent++;
 
                     // object members
-                    foreach (var fld in TypeMembersUtils.EnumerateInstanceFieldsForPrint(obj))
+                    var flds = (obj is IPhpPrintable printable ? printable.Properties : TypeMembersUtils.EnumerateInstanceFieldsForPrint(obj)).ToList();
+                    foreach (var fld in flds)
                     {
-                        OutputIndent();
-                        _output.Append("[" + fld.Key + "] => ");
-                        _indent++;
-                        Accept(fld.Value);
-                        _indent--;
-                        NewLine();
+                        // [name] => value
+                        AcceptArrayItem(new KeyValuePair<IntStringKey, PhpValue>(fld.Key, fld.Value));
                     }
 
                     _indent--;
@@ -1078,7 +1077,7 @@ namespace Pchp.Library
                 }
             }
 
-            public ExportFormatter(Context ctx, string newline)
+            public ExportFormatter(Context ctx, string newline = "\n")
                 : base(ctx, newline)
             {
             }
@@ -1264,6 +1263,11 @@ namespace Pchp.Library
         {
             const int IndentSize = 2;
 
+            /// <summary>
+            /// Enables verbose dump.
+            /// </summary>
+            bool Verbose { get; }
+
             void OutputIndent()
             {
                 if (_indent > 0)
@@ -1272,9 +1276,10 @@ namespace Pchp.Library
                 }
             }
 
-            public DumpFormatter(Context ctx, string newline)
+            public DumpFormatter(Context ctx, string newline = "\n", bool verbose = false)
                 : base(ctx, newline)
             {
+                this.Verbose = verbose;
             }
 
             public override PhpString Serialize(PhpValue value)
@@ -1351,7 +1356,7 @@ namespace Pchp.Library
                 // (size=COUNT)
                 // {
                 _output.Append($"({obj.Count}) {{");
-                _output.Append(_nl);
+                NewLine();
 
                 _indent++;
 
@@ -1373,10 +1378,10 @@ namespace Pchp.Library
 
                 _output.Append("[" + (entry.Key.IsString ? $"\"{entry.Key.String}\"" : entry.Key.Integer.ToString()) + "]");
                 _output.Append("=>");
-                _output.Append(_nl);
+                NewLine();
                 OutputIndent();
                 Accept(entry.Value);
-                _output.Append(_nl);
+                NewLine();
             }
 
             public override void AcceptObject(object obj)
@@ -1399,7 +1404,7 @@ namespace Pchp.Library
 
                 if (Enter(obj))
                 {
-                    var flds = TypeMembersUtils.EnumerateInstanceFieldsForDump(obj).ToList();
+                    var flds = (obj is IPhpPrintable printable ? printable.Properties : TypeMembersUtils.EnumerateInstanceFieldsForDump(obj)).ToList();
 
                     // Template: class NAME#ID (COUNT) {
                     _output.Append($"class {obj.GetPhpTypeInfo().Name}#{unchecked((uint)obj.GetHashCode())} ({flds.Count}) {{");
@@ -1452,7 +1457,7 @@ namespace Pchp.Library
         /// <returns>A string representation or <c>true</c> if <paramref name="returnString"/> is <c>false</c>.</returns>
         public static PhpValue print_r(Context ctx, PhpValue value, bool returnString = false)
         {
-            var output = (new PrintFormatter(ctx, "\n")).Serialize(value);
+            var output = (new PrintFormatter(ctx)).Serialize(value);
 
             if (returnString)
             {
@@ -1474,7 +1479,22 @@ namespace Pchp.Library
         /// <param name="variables">Variables to be dumped.</param>
         public static void var_dump(Context ctx, params PhpValue[] variables)
         {
-            var formatter = new DumpFormatter(ctx, "\n"); // TODO: HtmlDumpFormatter
+            var formatter = new DumpFormatter(ctx); // TODO: HtmlDumpFormatter
+            for (int i = 0; i < variables.Length; i++)
+            {
+                ctx.Echo(formatter.Serialize(variables[i].GetValue()));
+            }
+        }
+
+        /// <summary>
+        /// Dumps a more detailed string representation of value.
+        /// </summary>
+        /// <param name="ctx">Current runtime context.</param>
+        /// <param name="variables">Variables to be dumped.</param>
+        public static void debug_zval_dump(Context ctx, params PhpValue[] variables)
+        {
+            var formatter = new DumpFormatter(ctx, verbose: true);
+
             for (int i = 0; i < variables.Length; i++)
             {
                 ctx.Echo(formatter.Serialize(variables[i].GetValue()));
@@ -1490,7 +1510,7 @@ namespace Pchp.Library
         /// <returns>A string representation or a <c>null</c> reference if <paramref name="returnString"/> is <c>false</c>.</returns>
         public static string var_export(Context ctx, PhpValue variable, bool returnString = false)
         {
-            var output = (new ExportFormatter(ctx, "\n")).Serialize(variable);
+            var output = (new ExportFormatter(ctx)).Serialize(variable);
 
             if (returnString)
             {

@@ -28,8 +28,8 @@ namespace Pchp.CodeAnalysis.CommandLine
     {
         internal const string ResponseFileName = "php.rsp";
 
-        private readonly DiagnosticFormatter _diagnosticFormatter = new DiagnosticFormatter();
-        private readonly string _tempDirectory;
+        readonly DiagnosticFormatter _diagnosticFormatter;
+        readonly string _tempDirectory;
 
         protected internal new PhpCommandLineArguments Arguments { get { return (PhpCommandLineArguments)base.Arguments; } }
 
@@ -37,6 +37,7 @@ namespace Pchp.CodeAnalysis.CommandLine
             : base(parser, responseFile, args, buildPaths, additionalReferenceDirectories, analyzerLoader)
         {
             _tempDirectory = buildPaths.TempDirectory;
+            _diagnosticFormatter = new CommandLineDiagnosticFormatter(buildPaths.WorkingDirectory, Arguments.PrintFullPaths);
         }
 
         public override DiagnosticFormatter DiagnosticFormatter => _diagnosticFormatter;
@@ -211,7 +212,7 @@ namespace Pchp.CodeAnalysis.CommandLine
 
                     if (entry.IsCompileEntry())
                     {
-                        var tree = PhpSyntaxTree.ParseCode(SourceText.From(entry.Code, Encoding.UTF8), parseOptions, scriptParseOptions, prefix + "/" + entryName);
+                        var tree = PhpSyntaxTree.ParseCode(SourceText.From(entry.Code, Encoding.UTF8), parseOptions, scriptParseOptions, $"{prefix}/{entryName}");
                         tree.PharStubFile = stub;
                         trees.Add(tree);
                     }
@@ -248,7 +249,7 @@ namespace Pchp.CodeAnalysis.CommandLine
                 // single source file
 
                 var diagnosticInfos = new List<DiagnosticInfo>();
-                var content = TryReadFileContent(file, diagnosticInfos);
+                var content = TryReadFileContent(file, diagnosticInfos, out var normalizedFilePath);
 
                 if (diagnosticInfos.Count != 0)
                 {
@@ -260,7 +261,7 @@ namespace Pchp.CodeAnalysis.CommandLine
 
                 if (content != null)
                 {
-                    result = PhpSyntaxTree.ParseCode(content, parseOptions, scriptParseOptions, file.Path);
+                    result = PhpSyntaxTree.ParseCode(content, parseOptions, scriptParseOptions, normalizedFilePath);
                 }
 
                 if (result != null && result.Diagnostics.HasAnyErrors())
@@ -298,7 +299,7 @@ namespace Pchp.CodeAnalysis.CommandLine
             }
 
             // ignore __HALT_COMPILER and following
-            var halt = stub.LastIndexOf("__HALT_COMPILER", StringComparison.Ordinal);
+            var halt = stub.LastIndexOf("__HALT_COMPILER", StringComparison.OrdinalIgnoreCase);
             if (halt >= 0)
             {
                 stub = stub.Remove(halt);

@@ -24,6 +24,8 @@ namespace Pchp.CodeAnalysis.Symbols
         readonly SourceTypeSymbol _type;
         readonly MethodDecl/*!*/_syntax;
 
+        Microsoft.CodeAnalysis.Text.TextSpan NameSpan => _syntax.Name.Span.ToTextSpan();
+
         MethodSymbol _lazyOverridenMethod;
 
         public SourceMethodSymbol(SourceTypeSymbol/*!*/type, MethodDecl/*!*/syntax)
@@ -92,7 +94,7 @@ namespace Pchp.CodeAnalysis.Symbols
                 }
                 else if (name.IsDestructName)    // __destruct()
                 {
-                    diagnostic.Add(this, _syntax.Name.Span.ToTextSpan(), Errors.ErrorCode.INF_DestructDiscouraged);
+                    diagnostic.Add(this, NameSpan, Errors.ErrorCode.INF_DestructDiscouraged);
 
                     if (_syntax.Signature.FormalParams.Length != 0)
                     {
@@ -239,6 +241,12 @@ namespace Pchp.CodeAnalysis.Symbols
                 }
             }
 
+            // overriden method name letter case mismatch:
+            if (OverriddenMethod != null && Name != OverriddenMethod.Name && string.Equals(Name, OverriddenMethod.Name, StringComparison.InvariantCultureIgnoreCase))
+            {
+                diagnostic.Add(this, NameSpan, Errors.ErrorCode.INF_OverrideNameCaseMismatch, Name, OverriddenMethod.Name);
+            }
+
             //
             base.GetDiagnostics(diagnostic);
         }
@@ -253,14 +261,16 @@ namespace Pchp.CodeAnalysis.Symbols
         {
             get
             {
-                if (_syntax.Modifiers == PhpMemberAttributes.Private && _syntax.Name.Name.IsConstructName)
+                var accessibility = _syntax.Modifiers.GetAccessibility();                
+                if (accessibility == Accessibility.Private && _syntax.Name.Name.IsConstructName)
                 {
                     // workaround for `private` __construct()
-                    // we have to be able to call __construct even from derived class
-                    return Accessibility.Protected;
+                    // we have to be able to call __construct even from a derived class
+                    accessibility = Accessibility.Protected;
                 }
 
-                return _syntax.Modifiers.GetAccessibility();
+                //
+                return accessibility;
             }
         }
 

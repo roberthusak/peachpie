@@ -14,6 +14,7 @@ namespace Pchp.Core.Dynamic
     /// <summary>
     /// Helper class for method overload resolution and binding to an <see cref="Expression"/>.
     /// </summary>
+    [DebuggerNonUserCode]
     internal static class OverloadBinder
     {
         #region Helpers
@@ -95,7 +96,7 @@ namespace Pchp.Core.Dynamic
             return Expression.Or(expr1, expr2, or_method);
         }
 
-        static Expression CombineCosts(IList<Expression> ops) => BinaryOr<ConversionCost>(ops, CostOf.Or, typeof(CostOf).GetMethod("Or", typeof(ConversionCost), typeof(ConversionCost)));
+        static Expression CombineCosts(IList<Expression> ops) => BinaryOr<ConversionCost>(ops, CostOf.Or, Cache.Operators.Or_ConversionCost_ConversionCost);
 
         /// <summary>
         /// Gets array of parameters indexes that have different type in provided methods.
@@ -289,14 +290,13 @@ namespace Pchp.Core.Dynamic
                 var key = new TmpVarKey() { Priority = 100, ArgIndex = srcarg, TargetTypeOpt = ptype, Prefix = "costOf" + (ismandatory ? "" : "Opt") };
 
                 // lookup cache
-                TmpVarValue value;
-                if (!_tmpvars.TryGetValue(key, out value))
+                if (!_tmpvars.TryGetValue(key, out var value))
                 {
                     // bind cost expression
                     value = new TmpVarValue();
 
                     var expr_cost = ignorecost ? Expression.Constant(ConversionCost.Pass) : ConvertExpression.BindCost(BindArgument(srcarg), ptype);
-                    if (expr_cost is ConstantExpression)
+                    if (expr_cost is ConstantExpression && BindArgsCount() is ConstantExpression)
                     {
                         value.Expression = expr_cost;
                     }
@@ -322,16 +322,14 @@ namespace Pchp.Core.Dynamic
                 var key = new TmpVarKey() { Priority = 100, ArgIndex = expectedargs, Prefix = "istoomany" };
 
                 // lookup cache
-                TmpVarValue value;
-                if (!_tmpvars.TryGetValue(key, out value))
+                if (!_tmpvars.TryGetValue(key, out var value))
                 {
                     // bind cost expression
                     value = new TmpVarValue();
 
                     var expr_argc = BindArgsCount();
-                    if (expr_argc is ConstantExpression)
+                    if ((expr_argc as ConstantExpression)?.Value is int argc)
                     {
-                        var argc = (int)((ConstantExpression)expr_argc).Value;
                         value.Expression = Expression.Constant((argc > expectedargs) ? ConversionCost.TooManyArgs : ConversionCost.Pass);
                     }
                     else
@@ -474,8 +472,7 @@ namespace Pchp.Core.Dynamic
                     // cache the argument value
 
                     var key = new TmpVarKey() { Priority = 0 /*first*/, ArgIndex = srcarg, Prefix = "arg" };
-                    TmpVarValue value;
-                    if (!_tmpvars.TryGetValue(key, out value))
+                    if (!_tmpvars.TryGetValue(key, out var value))
                     {
                         value = new TmpVarValue();
 
@@ -494,6 +491,8 @@ namespace Pchp.Core.Dynamic
                         // create specialized variable with default value
                         if (targetparam.HasDefaultValue || (defaultValueAttr = targetparam.GetCustomAttribute<DefaultValueAttribute>()) != null)
                         {
+                            Debug.Assert(!targetparam.ParameterType.IsByRef);   // parameter with a default value cannot be byref (at least we don't expect it)
+
                             // just for debugging purposes:
                             var defaultValueStr = defaultValueAttr != null
                                 ? defaultValueAttr.FieldName
@@ -503,11 +502,10 @@ namespace Pchp.Core.Dynamic
                             var defaultValueExpr = defaultValueAttr != null
                                 ? BindDefaultValue(targetparam.Member.DeclaringType, defaultValueAttr)
                                 : Expression.Constant(targetparam.DefaultValue);
-                            
+
                             //
                             var key2 = new TmpVarKey() { Priority = 1 /*after key*/, ArgIndex = srcarg, Prefix = "default(" + defaultValueStr + ")" };
-                            TmpVarValue value2;
-                            if (!_tmpvars.TryGetValue(key2, out value2))
+                            if (!_tmpvars.TryGetValue(key2, out var value2))
                             {
                                 value2 = new TmpVarValue();
 
@@ -523,9 +521,22 @@ namespace Pchp.Core.Dynamic
                         }
                     }
 
-                    return (targetparam == null)
-                        ? value.Expression
-                        : ConvertExpression.Bind(value.Expression, targetparam.ParameterType, _ctx);
+                    if (targetparam == null)
+                    {
+                        return value.Expression;
+                    }
+                    else
+                    {
+                        var ptype = targetparam.ParameterType;
+
+                        // TODO: ptype.IsByRef -> implement write-back after the invocation
+                        if (ptype.IsByRef)
+                        {
+                            ptype = ptype.GetElementType(); // LINQ will create a local variable for it implicitly
+                        }
+
+                        return ConvertExpression.Bind(value.Expression, ptype, _ctx);
+                    }
                 }
 
                 public override Expression BindParams(int fromarg, Type element_type)
@@ -545,7 +556,7 @@ namespace Pchp.Core.Dynamic
                     var var_array = Expression.Variable(element_type.MakeArrayType(), "params_array");
 
                     //
-                    Expression expr_emptyarr = Expression.NewArrayInit(element_type);
+                    Expression expr_emptyarr = BinderHelpers.EmptyArray(element_type);
                     Expression expr_newarr = Expression.Assign(var_array, Expression.NewArrayBounds(element_type, var_length));  // array = new [length];
 
                     if (element_type == _argsarray.Type.GetElementType())
@@ -627,6 +638,11 @@ namespace Pchp.Core.Dynamic
                 /// </summary>
                 readonly Type _classContext;
 
+                /// <summary>
+                /// Lazily initialized variable with arguments count.
+                /// </summary>
+                ConstantExpression _lazyArgc = null;
+
                 public ArgsBinder(Expression ctx, Expression[] args, Type classContext)
                     : base(ctx)
                 {
@@ -636,17 +652,22 @@ namespace Pchp.Core.Dynamic
 
                 public override Expression BindArgsCount()
                 {
-                    int count = 0;
-                    foreach (var x in _args)
+                    if (_lazyArgc == null)
                     {
-                        if (!BinderHelpers.IsRuntimeChain(x.Type))
+                        int count = 0;
+                        foreach (var x in _args)
                         {
-                            count++;
+                            if (!BinderHelpers.IsRuntimeChain(x.Type))
+                            {
+                                count++;
+                            }
                         }
+
+                        //
+                        _lazyArgc = Expression.Constant(count, typeof(int));
                     }
 
-                    //
-                    return Expression.Constant(count, typeof(int));
+                    return _lazyArgc;
                 }
 
                 int MapToArgsIndex(int srcarg)
@@ -745,7 +766,7 @@ namespace Pchp.Core.Dynamic
 
                         // return static singleton with empty array
                         // Template: Array.Empty<element_type>()
-                        return Expression.Call(typeof(Array), "Empty", new[] { element_type });
+                        return BinderHelpers.EmptyArray(element_type);
                     }
 
                     var values = new List<Expression>(count);
@@ -754,7 +775,7 @@ namespace Pchp.Core.Dynamic
                     {
                         values.Add(expr);
                     }
-                    
+
                     return Expression.NewArrayInit(element_type, values);
                 }
 
@@ -828,15 +849,29 @@ namespace Pchp.Core.Dynamic
                     // for (int o = io + nmandatory; o < argc; o++) result |= CostOf(argv[o], p.ElementType)
                     if (argc_opt.HasValue)
                     {
-                        for (; im < argc_opt.Value; im++)
+                        if (im < argc_opt.Value)
                         {
-                            expr_costs.Add(args.BindCostOf(im, element_type, false, false));
+                            // remmeber this overload has some overhead:
+                            expr_costs.Add(Expression.Constant(ConversionCost.PassCostly));
+
+                            // cost of remaining arguments:
+                            for (; im < argc_opt.Value; im++)
+                            {
+                                expr_costs.Add(args.BindCostOf(im, element_type, false, false));
+                            }
                         }
                     }
                     else
                     {
-                        // just return DefaultValue (which is greater than Warning), for performance reasons
-                        expr_costs.Add(Expression.Constant(ConversionCost.DefaultValue));
+                        // (argc >= nmandatory + noptional) ? (PassCostly | DefaultValue) : Pass
+                        // NOTE: DefaultValue is greater than Warning, least prefered overload
+
+                        var cost = Expression.Condition(
+                            test: Expression.GreaterThanOrEqual(expr_argc, Expression.Constant(nmandatory + noptional)),
+                            ifTrue: Expression.Constant(ConversionCost.DefaultValue | ConversionCost.PassCostly),
+                            ifFalse: Expression.Constant(ConversionCost.Pass));
+
+                        expr_costs.Add(cost);
                     }
 
                     break;
@@ -862,28 +897,28 @@ namespace Pchp.Core.Dynamic
             return CombineCosts(expr_costs);
         }
 
-        public static Expression BindOverloadCall(Type treturn, Expression target, MethodBase[] methods, Expression ctx, Expression argsarray, bool isStaticCallSyntax, PhpTypeInfo lateStaticType = null)
+        public static Expression BindOverloadCall(Type treturn, Expression target, MethodBase[] methods, Expression ctx, Expression argsarray, bool isStaticCallSyntax, object lateStaticType = null)
         {
-            Expression result = null;
-
-            while (result == null)
+            for (; ; )
             {
-                result = BindOverloadCall(treturn, target, ref methods, ctx, new ArgumentsBinder.ArgsArrayBinder(ctx, argsarray), isStaticCallSyntax, lateStaticType);
+                var result = BindOverloadCall(treturn, target, ref methods, ctx, new ArgumentsBinder.ArgsArrayBinder(ctx, argsarray), isStaticCallSyntax, lateStaticType);
+                if (result != null)
+                {
+                    return result;
+                }
             }
-
-            return result;
         }
 
-        public static Expression BindOverloadCall(Type treturn, Expression target, MethodBase[] methods, Expression ctx, Expression[] args, bool isStaticCallSyntax, PhpTypeInfo lateStaticType = null, Type classContext = null)
+        public static Expression BindOverloadCall(Type treturn, Expression target, MethodBase[] methods, Expression ctx, Expression[] args, bool isStaticCallSyntax, object lateStaticType = null, Type classContext = null)
         {
-            Expression result = null;
-
-            while (result == null)
+            for (; ; )
             {
-                result = BindOverloadCall(treturn, target, ref methods, ctx, new ArgumentsBinder.ArgsBinder(ctx, args, classContext), isStaticCallSyntax, lateStaticType);
+                var result = BindOverloadCall(treturn, target, ref methods, ctx, new ArgumentsBinder.ArgsBinder(ctx, args, classContext), isStaticCallSyntax, lateStaticType);
+                if (result != null)
+                {
+                    return result;
+                }
             }
-
-            return result;
         }
 
         #region MethodCostInfo
@@ -912,6 +947,11 @@ namespace Pchp.Core.Dynamic
             /// Minimal cost known in compile time.
             /// </summary>
             public ConversionCost MinimalCost;
+
+            ///// <summary>
+            ///// Parameters count.
+            ///// </summary>
+            //public int ParametersCount => Method.GetParameters().Length;
         }
 
         /// <summary>
@@ -920,20 +960,24 @@ namespace Pchp.Core.Dynamic
         /// </summary>
         sealed class MethodCostInfoComparer : IComparer<MethodCostInfo>
         {
-            public static readonly IComparer<MethodCostInfo> Instance = new MethodCostInfoComparer();
-
             int IComparer<MethodCostInfo>.Compare(MethodCostInfo x, MethodCostInfo y)
             {
                 var xps = x.Method.GetParameters();
                 var yps = y.Method.GetParameters();
 
                 // shorter signature first:
-                if (xps.Length < yps.Length) return -1;
-                if (xps.Length > yps.Length) return +1;
+                if (xps.Length != yps.Length)
+                {
+                    return xps.Length - yps.Length;
+                }
 
-                // less cost first:
-                if (x.MinimalCost < y.MinimalCost) return -1;
-                if (x.MinimalCost > y.MinimalCost) return +1;
+                if (xps.Length != 0)
+                {
+                    // less cost first:
+                    if (x.MinimalCost < y.MinimalCost) return -1;
+                    if (x.MinimalCost > y.MinimalCost) return +1;
+                }
+
                 return 0;
             }
         }
@@ -951,7 +995,7 @@ namespace Pchp.Core.Dynamic
         /// <param name="isStaticCallSyntax">Whether the call is in form of a static method call (TYPE::METHOD()).</param>
         /// <param name="lateStaticType">Optional type used to statically invoke the method (late static type).</param>
         /// <returns>Expression representing overload call with resolution or <c>null</c> in case binding should be restarted with updated array of <paramref name="methods"/>.</returns>
-        static Expression BindOverloadCall(Type treturn, Expression target, ref MethodBase[] methods, Expression ctx, ArgumentsBinder args, bool isStaticCallSyntax, PhpTypeInfo lateStaticType = null)
+        static Expression BindOverloadCall(Type treturn, Expression target, ref MethodBase[] methods, Expression ctx, ArgumentsBinder args, bool isStaticCallSyntax, object lateStaticType = null)
         {
             if (methods == null || args == null)
                 throw new ArgumentNullException();
@@ -999,8 +1043,8 @@ namespace Pchp.Core.Dynamic
                     if (mincost >= ConversionCost.NoConversion)
                         continue;   // we don't have to try this overload
 
-                    var const_cost = expr_cost as ConstantExpression;
                     var cost_var = Expression.Variable(typeof(ConversionCost), "cost" + list.Count);
+                    var const_cost = expr_cost as ConstantExpression;
 
                     if (const_cost == null)
                     {
@@ -1075,7 +1119,7 @@ namespace Pchp.Core.Dynamic
 
                 // order methods (most probable call first, less args first)
                 // handles case of two candidates with the same cost:
-                list.Sort(MethodCostInfoComparer.Instance);
+                list.Sort(new MethodCostInfoComparer());
 
                 // switch over method costs
                 for (int i = list.Count - 1; i >= 0; i--)
@@ -1093,6 +1137,8 @@ namespace Pchp.Core.Dynamic
 
             //
             body.Add(invoke);
+
+            // TODO: write-back of byref variables
 
             // return Block { ... ; invoke; }
             return Expression.Block(treturn, locals, body);
@@ -1125,7 +1171,7 @@ namespace Pchp.Core.Dynamic
                     // Template: test = !x.IsDefault
                     test = Expression.Not(Expression.Property(assign, Cache.PhpString.IsDefault));
                 }
-                else if (expr.Type.GetTypeInfo().IsValueType == false)  // reference type
+                else if (expr.Type.IsValueType == false)  // reference type
                 {
                     // Template: test = x != null
                     test = Expression.ReferenceNotEqual(assign, Expression.Constant(null, assign.Type));

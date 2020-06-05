@@ -1,4 +1,6 @@
-﻿using System;
+﻿#nullable enable
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -13,6 +15,7 @@ namespace Pchp.Core.Reflection
     /// Runtime information about a function.
     /// </summary>
     [DebuggerDisplay("{Name,nq}")]
+    [DebuggerNonUserCode]
     public abstract class RoutineInfo : IPhpCallable, ICloneable
     {
         /// <summary>
@@ -42,7 +45,7 @@ namespace Pchp.Core.Reflection
         /// <summary>
         /// Invokes the routine.
         /// </summary>
-        public virtual PhpValue Invoke(Context ctx, object target, params PhpValue[] arguments) => PhpCallable(ctx, arguments);
+        public virtual PhpValue Invoke(Context ctx, object? target, params PhpValue[] arguments) => PhpCallable(ctx, arguments);
 
         //ulong _aliasedParams; // bit field corresponding to parameters that are passed by reference
         //_routineFlags;    // routine requirements, accessibility
@@ -58,10 +61,10 @@ namespace Pchp.Core.Reflection
         /// Gets the method declaring type.
         /// Might get <c>null</c> if the routine represents a global function or a delegate.
         /// </summary>
-        public abstract PhpTypeInfo DeclaringType { get; }
+        public abstract PhpTypeInfo? DeclaringType { get; }
 
         /// <summary>Target instance when binding the MethodInfo call.</summary>
-        internal virtual object Target => null;
+        internal virtual object? Target => null;
 
         protected RoutineInfo(int index, string name)
         {
@@ -99,17 +102,18 @@ namespace Pchp.Core.Reflection
 
         PhpValue IPhpCallable.Invoke(Context ctx, params PhpValue[] arguments) => Invoke(ctx, Target, arguments);
 
-        PhpValue IPhpCallable.ToPhpValue() => PhpValue.Void;
+        PhpValue IPhpCallable.ToPhpValue() => PhpValue.Null;
 
         #endregion
 
         object ICloneable.Clone() => this;
     }
 
+    [DebuggerNonUserCode]
     internal class PhpRoutineInfo : RoutineInfo
     {
         readonly RuntimeMethodHandle _handle;
-        PhpCallable _lazyDelegate;
+        PhpCallable? _lazyDelegate;
 
         /// <summary>
         /// CLR method handle.
@@ -120,7 +124,7 @@ namespace Pchp.Core.Reflection
 
         public override MethodInfo[] Methods => new[] { (MethodInfo)MethodBase.GetMethodFromHandle(_handle) };
 
-        public override PhpTypeInfo DeclaringType => null;
+        public override PhpTypeInfo? DeclaringType => null;
 
         public override PhpCallable PhpCallable => _lazyDelegate ?? BindDelegate();
 
@@ -176,6 +180,7 @@ namespace Pchp.Core.Reflection
     }
 
     /// <summary>Represents anonymous function with special <see cref="Closure"/> parameter.</summary>
+    [DebuggerNonUserCode]
     internal sealed class PhpAnonymousRoutineInfo : PhpRoutineInfo
     {
         public PhpAnonymousRoutineInfo(string name, RuntimeMethodHandle handle)
@@ -184,10 +189,11 @@ namespace Pchp.Core.Reflection
         }
     }
 
+    [DebuggerNonUserCode]
     internal class DelegateRoutineInfo : RoutineInfo
     {
         readonly Delegate _delegate;
-        PhpInvokable _lazyInvokable;
+        PhpInvokable? _lazyInvokable;
 
         /// <summary>
         /// Cache of already bound methods,
@@ -197,7 +203,7 @@ namespace Pchp.Core.Reflection
 
         public override MethodInfo[] Methods => new[] { _delegate.GetMethodInfo() };
 
-        public override PhpTypeInfo DeclaringType => null;
+        public override PhpTypeInfo? DeclaringType => null;
 
         internal override object Target => _delegate.Target;
 
@@ -223,7 +229,7 @@ namespace Pchp.Core.Reflection
 
         public override PhpCallable PhpCallable => (ctx, args) => Invoke(ctx, Target, args);
 
-        public override PhpValue Invoke(Context ctx, object target, params PhpValue[] arguments) => PhpInvokable(ctx, target, arguments);
+        public override PhpValue Invoke(Context ctx, object? target, params PhpValue[] arguments) => PhpInvokable(ctx, target, arguments);
 
         public DelegateRoutineInfo(string name, Delegate @delegate)
             : base(0, name)
@@ -232,15 +238,16 @@ namespace Pchp.Core.Reflection
         }
     }
 
+    [DebuggerNonUserCode]
     internal class ClrRoutineInfo : RoutineInfo
     {
-        PhpCallable _lazyDelegate;
+        PhpCallable? _lazyDelegate;
 
         MethodInfo[] _methods;
 
         public override MethodInfo[] Methods => _methods;
 
-        public override PhpTypeInfo DeclaringType => null;
+        public override PhpTypeInfo? DeclaringType => null;
 
         public override PhpCallable PhpCallable => _lazyDelegate ?? BindDelegate();
 
@@ -271,20 +278,19 @@ namespace Pchp.Core.Reflection
     /// <summary>
     /// PHP routine representing class methods.
     /// </summary>
+    [DebuggerNonUserCode]
     internal class PhpMethodInfo : RoutineInfo
     {
         #region PhpMethodInfoWithBoundType
 
         sealed class PhpMethodInfoWithBoundType : PhpMethodInfo
         {
-            public override PhpTypeInfo LateStaticType => _lateStaticType;
-            readonly PhpTypeInfo _lateStaticType;
+            public override PhpTypeInfo LateStaticType { get; }
 
             public PhpMethodInfoWithBoundType(int index, string name, MethodInfo[] methods, PhpTypeInfo lateStaticType)
                 : base(index, name, methods)
             {
-                Debug.Assert(lateStaticType != null);
-                _lateStaticType = lateStaticType;
+                LateStaticType = lateStaticType ?? throw new ArgumentNullException(nameof(lateStaticType));
             }
         }
 
@@ -293,7 +299,7 @@ namespace Pchp.Core.Reflection
         /// <summary>
         /// Creates instance of <see cref="PhpMethodInfo"/>.
         /// </summary>
-        public static PhpMethodInfo Create(int index, string name, MethodInfo[] methods, PhpTypeInfo callertype = null)
+        public static PhpMethodInfo Create(int index, string name, MethodInfo[] methods, PhpTypeInfo? callertype = null)
         {
             if (callertype != null)
             {
@@ -325,7 +331,7 @@ namespace Pchp.Core.Reflection
             return true;
         }
 
-        PhpInvokable _lazyDelegate;
+        PhpInvokable? _lazyDelegate;
 
         /// <summary>
         /// Array of CLR methods. Cannot be <c>null</c> or empty.
@@ -336,7 +342,7 @@ namespace Pchp.Core.Reflection
         public override PhpTypeInfo DeclaringType => _methods[0].DeclaringType.GetPhpTypeInfo();
 
         /// <summary>Optional. Bound static type.</summary>
-        public virtual PhpTypeInfo LateStaticType => null;
+        public virtual PhpTypeInfo? LateStaticType => null;
 
         protected PhpMethodInfo(int index, string name, MethodInfo[] methods)
             : base(index, name)
@@ -360,6 +366,6 @@ namespace Pchp.Core.Reflection
             }
         }
 
-        public override PhpValue Invoke(Context ctx, object target, params PhpValue[] arguments) => PhpInvokable(ctx, target, arguments);
+        public override PhpValue Invoke(Context ctx, object? target, params PhpValue[] arguments) => PhpInvokable(ctx, target, arguments);
     }
 }

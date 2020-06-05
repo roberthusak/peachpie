@@ -36,17 +36,25 @@ namespace Pchp.Library.Spl
 
         private Throwable previous;
 
+        /// <summary>
+        /// Initializes the file and line fields from <see cref="_stacktrace"/>.
+        /// </summary>
+        internal protected void InitializeInternal()
+        {
+            this.file = _stacktrace.GetFilename();
+            this.line = _stacktrace.GetLine();
+        }
+
         [PhpFieldsOnlyCtor]
         protected Error()
         {
+            InitializeInternal();
         }
 
         public Error(string message = "", long code = 0, Throwable previous = null)
             : base(message, previous as System.Exception)
         {
-            this.file = _stacktrace.GetFilename();
-            this.line = _stacktrace.GetLine();
-
+            InitializeInternal();
             __construct(message, code, previous);
         }
 
@@ -55,7 +63,7 @@ namespace Pchp.Library.Spl
         /// </summary>
         public override string Message => this.message ?? string.Empty;
 
-        public virtual void __construct(string message = "", long code = 0, Throwable previous = null)
+        public void __construct(string message = "", long code = 0, Throwable previous = null)
         {
             this.message = message;
             this.code = code;
@@ -69,7 +77,7 @@ namespace Pchp.Library.Spl
 
         public virtual int getLine() => line;
 
-        public virtual string getMessage() => message;
+        public virtual string getMessage() => this.message ?? string.Empty;
 
         public virtual Throwable getPrevious() => previous ?? this.InnerException as Throwable;
 
@@ -79,9 +87,39 @@ namespace Pchp.Library.Spl
 
         public void __wakeup() => throw new NotImplementedException();
 
-        public virtual string __toString() => _stacktrace.FormatExceptionString(this.GetPhpTypeInfo().Name, getMessage());   // TODO: _trace
+        public virtual string __toString() => _stacktrace.FormatExceptionString(this.GetPhpTypeInfo().Name, this.Message);   // TODO: _trace
 
         public sealed override string ToString() => __toString();
+    }
+
+    /// <summary>
+    /// Thrown when an error occurs while performing mathematical operations.
+    /// </summary>
+    [PhpType(PhpTypeAttribute.InheritName), PhpExtension("Core")]
+    public class ArithmeticError : Error
+    {
+        [PhpFieldsOnlyCtor]
+        protected ArithmeticError() : base() { }
+
+        public ArithmeticError(string message = "", long code = 0, Throwable previous = null)
+            : base(message, code, previous)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Thrown when an attempt is made to divide a number by zero.
+    /// </summary>
+    [PhpType(PhpTypeAttribute.InheritName), PhpExtension("Core")]
+    public class DivisionByZeroError : ArithmeticError
+    {
+        [PhpFieldsOnlyCtor]
+        protected DivisionByZeroError() : base() { }
+
+        public DivisionByZeroError(string message = "", long code = 0, Throwable previous = null)
+            : base(message, code, previous)
+        {
+        }
     }
 
     /// <summary>
@@ -91,7 +129,7 @@ namespace Pchp.Library.Spl
     public class AssertionError : Error
     {
         [PhpFieldsOnlyCtor]
-        protected AssertionError() { }
+        protected AssertionError() : base() { }
 
         public AssertionError(string message = "", long code = 0, Throwable previous = null)
             : base(message, code, previous)
@@ -103,9 +141,45 @@ namespace Pchp.Library.Spl
     public class TypeError : Error
     {
         [PhpFieldsOnlyCtor]
-        protected TypeError() { }
+        protected TypeError() : base() { }
 
         public TypeError(string message = "", long code = 0, Throwable previous = null)
+            : base(message, code, previous)
+        {
+        }
+    }
+
+    [PhpType(PhpTypeAttribute.InheritName), PhpExtension("Core")]
+    public class ArgumentCountError : TypeError
+    {
+        [PhpFieldsOnlyCtor]
+        protected ArgumentCountError() : base() { }
+
+        public ArgumentCountError(string message = "", long code = 0, Throwable previous = null)
+            : base(message, code, previous)
+        {
+        }
+    }
+
+    [PhpType(PhpTypeAttribute.InheritName), PhpExtension("Core")]
+    public class CompileError : Error
+    {
+        [PhpFieldsOnlyCtor]
+        protected CompileError() : base() { }
+
+        public CompileError(string message = "", long code = 0, Throwable previous = null)
+            : base(message, code, previous)
+        {
+        }
+    }
+
+    [PhpType(PhpTypeAttribute.InheritName), PhpExtension("Core")]
+    public class ParseError : CompileError
+    {
+        [PhpFieldsOnlyCtor]
+        protected ParseError() : base() { }
+
+        public ParseError(string message = "", long code = 0, Throwable previous = null)
             : base(message, code, previous)
         {
         }

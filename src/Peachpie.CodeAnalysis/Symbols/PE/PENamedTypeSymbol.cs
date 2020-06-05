@@ -15,6 +15,7 @@ using System.Threading;
 using Devsense.PHP.Syntax;
 using System.Globalization;
 using Pchp.CodeAnalysis.DocumentationComments;
+using Peachpie.CodeAnalysis.Symbols;
 
 namespace Pchp.CodeAnalysis.Symbols
 {
@@ -112,7 +113,23 @@ namespace Pchp.CodeAnalysis.Symbols
         /// <summary>
         /// Optional. A <c>.ctor</c> that ensures the initialization of the class without calling the type PHP constructor.
         /// </summary>
-        public IMethodSymbol InstanceConstructorFieldsOnly => InstanceConstructors.Where(MethodSymbolExtensions.IsFieldsOnlyConstructor).SingleOrDefault();
+        public IMethodSymbol InstanceConstructorFieldsOnly => InstanceConstructors.Where(ctor => ctor.IsInitFieldsOnly).SingleOrDefault();
+
+        public abstract bool IsTrait { get; }
+
+        public byte AutoloadFlag
+        {
+            get
+            {
+                if (this.TryGetPhpTypeAttribute(out _, out _, out var autoload))
+                {
+                    return autoload;
+                }
+
+                // not applicable:
+                return 0;
+            }
+        }
 
         #endregion
 
@@ -187,6 +204,8 @@ namespace Pchp.CodeAnalysis.Symbols
                 }
             }
 
+            public override bool IsTrait => false; // trait is always a generic class
+
             internal override bool MangleName
             {
                 get
@@ -219,6 +238,20 @@ namespace Pchp.CodeAnalysis.Symbols
             private readonly ushort _arity;
             private readonly bool _mangleName;
             private ImmutableArray<TypeParameterSymbol> _lazyTypeParameters;
+            private byte _istraitflag;
+
+            public override bool IsTrait
+            {
+                get
+                {
+                    if (_istraitflag == 0)
+                    {
+                        _istraitflag = AttributeHelpers.HasPhpTraitAttribute(Handle, ContainingPEModule) ? (byte)1 : (byte)2;
+                    }
+
+                    return _istraitflag == 1;
+                }
+            }
 
             internal PENamedTypeSymbolGeneric(
                     PEModuleSymbol moduleSymbol,
@@ -874,8 +907,6 @@ namespace Pchp.CodeAnalysis.Symbols
         //}
 
         internal sealed override bool IsInterface => _flags.IsInterface();
-
-        public bool IsTrait => this.GetAttributes().Any(attr => attr.AttributeClass.Name == "PhpTraitAttribute");
 
         ImmutableArray<NamedTypeSymbol> MakeAcyclicInterfaces()
         {

@@ -63,7 +63,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
             }
             else if (IsLoop) // perf
             {
-                cg.Builder.DefineHiddenSequencePoint();
+                cg.EmitHiddenSequencePoint();
                 cg.Builder.EmitBranch(ILOpCode.Br, condition);
 
                 // {
@@ -71,9 +71,12 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
                 // }
 
                 // if (Condition)
-                cg.EmitSequencePoint(this.Condition.PhpSyntax);
+                cg.EmitHiddenSequencePoint();
                 cg.Builder.MarkLabel(condition);
+
+                cg.EmitSequencePoint(this.Condition.PhpSyntax);
                 cg.EmitConvert(condition, cg.CoreTypes.Boolean);
+
                 cg.Builder.EmitBranch(isnegation ? ILOpCode.Brfalse : ILOpCode.Brtrue, TrueTarget);
             }
             else
@@ -81,6 +84,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
                 // if (Condition)
                 cg.EmitSequencePoint(this.Condition.PhpSyntax);
                 cg.EmitConvert(condition, cg.CoreTypes.Boolean);
+
                 cg.Builder.EmitBranch(isnegation ? ILOpCode.Brtrue : ILOpCode.Brfalse, FalseTarget);
 
                 // {
@@ -94,6 +98,13 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
 
     partial class TryCatchEdge
     {
+        /// <summary>
+        /// Whether to emit catch and finally bodies outside the TryCatchFinally scope.
+        /// This allows to branch inside catch or finally from outside,
+        /// or branch outside of try without calling finally (required for yield and return functionality).
+        /// </summary>
+        public bool EmitCatchFinallyOutsideScope { get; internal set; }
+
         internal override void Generate(CodeGenerator cg)
         {
             EmitTryStatement(cg);
@@ -107,12 +118,19 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
             // Stack must be empty at beginning of try block.
             cg.Builder.AssertStackEmpty();
 
+            // mark label before "try" block,
+            // used by generator state maching and awaits eventually
+            cg.Builder.MarkLabel(this);
+
             // IL requires catches and finally block to be distinct try
             // blocks so if the source contained both a catch and
             // a finally, nested scopes are emitted.
             bool emitNestedScopes = (!emitCatchesOnly &&
-                //(_catchBlocks.Length != 0) &&
-                (_finallyBlock != null));
+                //(_catchBlocks.Length != 0) && // always true; there is at least one "catch" block (ScriptDiedException)
+                (_finallyBlock != null && !EmitCatchFinallyOutsideScope));
+
+            // finally block not handled by CLR
+            var nextExtraFinallyBlock = cg.ExtraFinallyBlock;
 
             cg.Builder.OpenLocalScope(ScopeType.TryCatchFinally);
 
@@ -128,11 +146,28 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
             }
             else
             {
+                // jump table for nested yield or await
+                EmitJumpTable(cg);
+
+                // remember finally block
+                if (_finallyBlock != null && EmitCatchFinallyOutsideScope)
+                {
+                    cg.ExtraFinallyBlock = _finallyBlock;
+                    cg.ExtraFinallyStateVariable ??= cg.GetTemporaryLocal(cg.CoreTypes.Int32, longlive: true, immediateReturn: false);
+                    cg.ExceptionToRethrowVariable ??= cg.GetTemporaryLocal(cg.CoreTypes.Exception, longlive: true, immediateReturn: false);
+                }
+
+                // try body
                 cg.GenerateScope(_body, (_finallyBlock ?? NextBlock).Ordinal);
 
-                if (NextBlock?.FlowState != null)
+                //
+                if (NextBlock != null && NextBlock.FlowState != null) // => next is reachable
                 {
-                    cg.Builder.EmitBranch(ILOpCode.Br, NextBlock);
+                    cg.Builder.EmitBranch(ILOpCode.Br,
+                        (_finallyBlock != null && EmitCatchFinallyOutsideScope)
+                        ? _finallyBlock // goto finally
+                        : NextBlock     // goto next
+                    );
                 }
             }
 
@@ -149,9 +184,13 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
                 {
                     EmitCatchBlock(cg, catchBlock);
                 }
+
+                // emit default catch block that continues to "finally" before rethrow;
+                // only if EmitCatchFinallyOutsideScope
+                EmitDefaultCatchBlock(cg);
             }
 
-            if (!emitCatchesOnly && _finallyBlock != null)
+            if (!emitCatchesOnly && _finallyBlock != null && !EmitCatchFinallyOutsideScope)
             {
                 cg.Builder.OpenLocalScope(ScopeType.Finally);
                 cg.GenerateScope(_finallyBlock, NextBlock.Ordinal);
@@ -162,6 +201,53 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
 
             // close the whole try statement scope
             cg.Builder.CloseLocalScope();
+
+            // emit catch and finally blocks outside the try scope:
+            if (!emitNestedScopes && EmitCatchFinallyOutsideScope)
+            {
+                var nextBlockOrExit = NextBlock?.FlowState != null ? NextBlock : cg.ExitBlock.GetReturnLabel();
+                var continuewith = _finallyBlock ?? nextBlockOrExit;
+
+                cg.Builder.EmitBranch(ILOpCode.Br, continuewith);
+
+                //
+                foreach (var catchBlock in _catchBlocks)
+                {
+                    cg.GenerateScope(catchBlock, NextBlock.Ordinal);
+                    cg.Builder.EmitBranch(ILOpCode.Br, continuewith);
+                }
+
+                // forget finally block
+                cg.ExtraFinallyBlock = nextExtraFinallyBlock;
+                Debug.Assert(cg.ExtraFinallyStateVariable != null);
+
+                //
+                if (_finallyBlock != null)
+                {
+                    // emit finally block
+                    cg.GenerateScope(_finallyBlock, NextBlock.Ordinal);
+
+                    // several "finally" states (cg.ExtraFinallyStateVariable):
+                    // - 0: none; continue to NextBlock
+                    // - 1: return; continue to nextExtraFinallyBlock, eventually EmitRet
+                    // - 2: exception; rethrow exception (cg.ExceptionToRethrowVariable)
+
+                    var stateloc = cg.GetTemporaryLocal(cg.ExtraFinallyStateVariable.EmitLoad(cg.Builder), immediateReturn: true);
+                    cg.Builder.EmitLocalStore(stateloc);
+                    Debug.Assert(stateloc.Type.TypeCode == Microsoft.Cci.PrimitiveTypeCode.Int32);
+                    
+                    cg.Builder.EmitIntegerSwitchJumpTable(
+                        new[]
+                        {
+                            new KeyValuePair<ConstantValue, object>(ConstantValue.Create((int)CodeGenerator.ExtraFinallyState.None), nextBlockOrExit),
+                            new KeyValuePair<ConstantValue, object>(ConstantValue.Create((int)CodeGenerator.ExtraFinallyState.Return), nextExtraFinallyBlock ?? cg.ExitBlock.GetReturnLabel()),
+                            //new KeyValuePair<ConstantValue, object>(ConstantValue.Create((int)CodeGenerator.ExtraFinallyState.Exception), nextExtraFinallyBlock ?? cg.ExitBlock.GetRethrowLabel()),
+                        },
+                        nextExtraFinallyBlock ?? cg.ExitBlock.GetRethrowLabel(), // ExtraFinallyState.Exception
+                        stateloc,
+                        Microsoft.Cci.PrimitiveTypeCode.Int32);
+                }
+            }
         }
 
         void EmitScriptDiedBlock(CodeGenerator cg)
@@ -174,6 +260,39 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
 
             il.OpenLocalScope(ScopeType.Catch, cg.CoreTypes.ScriptDiedException.Symbol);
             il.EmitThrow(true);
+            il.CloseLocalScope();
+        }
+
+        void EmitDefaultCatchBlock(CodeGenerator cg)
+        {
+            if (!EmitCatchFinallyOutsideScope || _finallyBlock == null)
+            {
+                return;
+            }
+
+            // emit default catch block that continues to "finally" before rethrow;
+            
+            var il = cg.Builder;
+
+            // Template: 
+            // catch (Exception ex) {
+            //   ExceptionToRethrow = ex;
+            //   ExtraFinallyState = 2;
+            //   goto _finally;
+            // }
+
+            il.OpenLocalScope(ScopeType.Catch, cg.CoreTypes.Exception.Symbol);
+
+            // ExceptionToRethrow = ex;
+            cg.ExceptionToRethrowVariable.EmitStore();
+
+            // ExtraFinallyState = 2;
+            il.EmitIntConstant((int)CodeGenerator.ExtraFinallyState.Exception); // rethrow state
+            cg.ExtraFinallyStateVariable.EmitStore();
+
+            // goto _finally;
+            il.EmitBranch(ILOpCode.Br, _finallyBlock);
+
             il.CloseLocalScope();
         }
 
@@ -288,33 +407,86 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
             }
 
             // STACK : extype
+            if (catchBlock.Variable != null)
+            {
+                cg.EmitSequencePoint(catchBlock.Variable.PhpSyntax);
 
-            // <tmp> = <ex>
-            cg.EmitSequencePoint(catchBlock.Variable.PhpSyntax);
-            var tmploc = cg.GetTemporaryLocal(extype);
-            il.EmitLocalStore(tmploc);
+                // <tmp> = <ex>
+                var tmploc = cg.GetTemporaryLocal(extype);
+                il.EmitLocalStore(tmploc);
 
-            var varplace = catchBlock.Variable.BindPlace(cg);
-            Debug.Assert(varplace != null);
-
-            // $x = <tmp>
-            varplace.EmitStore(cg, tmploc, BoundAccess.Write);
+                // $x = <tmp>
+                var varplace = catchBlock.Variable.BindPlace(cg);
+                varplace.EmitStore(cg, tmploc, catchBlock.Variable.TargetAccess());
+                cg.ReturnTemporaryLocal(tmploc);
+            }
+            else
+            {
+                il.EmitOpCode(ILOpCode.Pop);
+            }
 
             //
-            cg.ReturnTemporaryLocal(tmploc);
-            tmploc = null;
-
-            //
-            cg.GenerateScope(catchBlock, NextBlock.Ordinal);
+            if (EmitCatchFinallyOutsideScope)
+            {
+                // .br
+                cg.Builder.EmitBranch(ILOpCode.Br, catchBlock);
+            }
+            else
+            {
+                // { .. }
+                cg.GenerateScope(catchBlock, NextBlock.Ordinal);
+            }
 
             //
             il.CloseLocalScope();
+        }
+
+        void EmitJumpTable(CodeGenerator cg)
+        {
+            var yields = cg.Routine.ControlFlowGraph.Yields;
+            if (yields.IsDefaultOrEmpty)
+            {
+                return;
+            }
+
+            // local <state> = g._state that is switched on (can't switch on remote field)
+            Debug.Assert(cg.GeneratorStateLocal != null);
+
+            // create label for situation when state doesn't correspond to continuation: 0 -> didn't run to first yield
+            var noContinuationLabel = new NamedLabel("noStateContinuation");
+
+            // prepare jump table from yields
+            var yieldExLabels = new List<KeyValuePair<ConstantValue, object>>();
+            foreach (var yield in yields)
+            {
+                // only applies to yields inside this "try" block
+                var node = yield.ContainingTryScopes.First;
+                while (node != null && node.Value != this)
+                {
+                    node = node.Next;
+                }
+                if (node == null) continue;
+
+                // jump to next nested "try" or inside "yield" itself
+                var target = (object)node.Next?.Value/*next try block*/ ?? yield/*inside yield*/;
+
+                // case YieldIndex: goto target;
+                yieldExLabels.Add(new KeyValuePair<ConstantValue, object>(ConstantValue.Create(yield.YieldIndex), target));
+            }
+
+            if (yieldExLabels.Count != 0)
+            {
+                // emit switch table that based on g._state jumps to appropriate continuation label
+                cg.Builder.EmitIntegerSwitchJumpTable(yieldExLabels.ToArray(), noContinuationLabel, cg.GeneratorStateLocal, Microsoft.Cci.PrimitiveTypeCode.Int32);
+
+                cg.Builder.MarkLabel(noContinuationLabel);
+            }
         }
     }
 
     partial class ForeachEnumereeEdge
     {
-        CodeGenerator.TemporaryLocalDefinition _enumeratorLoc;
+        CodeGenerator.TemporaryLocalDefinition _enumeratorLoc, _synthesizedIndexLoc;
         LocalDefinition _aliasedValueLoc;
         MethodSymbol _moveNextMethod, _disposeMethod, _currentValue, _currentKey, _current, _iterator_next;
 
@@ -387,7 +559,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
                 {
                     // .EnsureAlias()
                     cg.EmitPhpValueAddr();
-                    t = cg.EmitCall(ILOpCode.Call, cg.CoreMethods.PhpValue.EnsureAlias);
+                    t = cg.EmitCall(ILOpCode.Call, cg.CoreMethods.Operators.EnsureAlias_PhpValueRef);
                 }
                 else
                 {
@@ -417,6 +589,39 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
                 cg.Builder.EmitNullConstant();
                 cg.Builder.EmitLocalStore(_aliasedValueLoc);
             }
+
+            var nextedge = NextBlock.NextEdge as ForeachMoveNextEdge;
+            if (_currentKey == null && nextedge.KeyVariable != null && !IsAPairValue(_current.ReturnType, out _, out _))
+            {
+                // KeyVariable will be iterated from 1
+                _synthesizedIndexLoc = cg.GetTemporaryLocal(cg.CoreTypes.Long, true, immediateReturn: false);
+
+                // Template: KeyVariable = 0;
+                cg.Builder.EmitLongConstant(0L);
+                _synthesizedIndexLoc.EmitStore();
+            }
+        }
+
+        static bool IsAPairValue(TypeSymbol type, out Symbol key, out Symbol value)
+        {
+            key = value = default;
+
+            if (type.IsValueType)
+            {
+                if (type.Name == "ValueTuple" && ((NamedTypeSymbol)type).Arity == 2)
+                {
+                    key = type.GetMembers("Item1").Single();
+                    value = type.GetMembers("Item2").Single();
+                }
+                else if (type.Name == "KeyValuePair" && ((NamedTypeSymbol)type).Arity == 2)
+                {
+                    key = type.GetMembers("Key").Single();
+                    value = type.GetMembers("Value").Single();
+                }
+            }
+
+            //
+            return key != null && value != null; ;
         }
 
         internal void EmitGetCurrent(CodeGenerator cg, BoundReferenceExpression valueVar, BoundReferenceExpression keyVar)
@@ -430,45 +635,57 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
                 // PhpArray enumerator or Iterator
 
                 cg.EmitSequencePoint(valueVar.PhpSyntax);
-                valueVar.BindPlace(cg).EmitStore(cg, () => EmitGetCurrentHelper(cg), valueVar.Access);
+                valueVar.BindPlace(cg).EmitStore(cg, () => EmitGetCurrentHelper(cg), valueVar.TargetAccess());
 
                 if (keyVar != null)
                 {
                     cg.EmitSequencePoint(keyVar.PhpSyntax);
-                    keyVar.BindPlace(cg).EmitStore(cg, () => VariableReferenceExtensions.EmitLoadValue(cg, _currentKey, _enumeratorLoc), keyVar.Access);
+                    keyVar.BindPlace(cg).EmitStore(cg, () => VariableReferenceExtensions.EmitLoadValue(cg, _currentKey, _enumeratorLoc), keyVar.TargetAccess());
                 }
             }
             else
             {
-                Debug.Assert(_current != null);
+                if (_current == null)
+                {
+                    throw Roslyn.Utilities.ExceptionUtilities.UnexpectedValue(_current);
+                }
 
                 var valuetype = _current.ReturnType;
 
-                // ValueTuple (key, value)
-                // TODO: KeyValuePair<key, value> // the same
-                if (valuetype.Name == "ValueTuple" && valuetype.IsValueType && ((NamedTypeSymbol)valuetype).Arity == 2)
+                // ValueTuple<T1, T2> (Item1, Item2)
+                // KeyValuePair<TKey, TValue> (Key, Value)
+                if (IsAPairValue(valuetype, out var skey, out var svalue))
                 {
                     // tmp = current;
                     var tmp = cg.GetTemporaryLocal(valuetype);
                     VariableReferenceExtensions.EmitLoadValue(cg, _current, _enumeratorLoc);
                     cg.Builder.EmitLocalStore(tmp);
 
-                    // TODO: ValueTuple Helper
-                    var item1 = valuetype.GetMembers("Item1").Single() as FieldSymbol;
-                    var item2 = valuetype.GetMembers("Item2").Single() as FieldSymbol;
+                    var tmploc = new LocalPlace(tmp);
 
-                    var item1place = new FieldPlace(new LocalPlace(tmp), item1, cg.Module);
-                    var item2place = new FieldPlace(new LocalPlace(tmp), item2, cg.Module);
+                    var keyplace = skey switch
+                    {
+                        FieldSymbol fld => (IPlace)new FieldPlace(tmploc, fld, cg.Module),
+                        PropertySymbol prop => new PropertyPlace(tmploc, prop, cg.Module),
+                        _ => throw Roslyn.Utilities.ExceptionUtilities.Unreachable,
+                    };
+
+                    var valueplace = svalue switch
+                    {
+                        FieldSymbol fld => (IPlace)new FieldPlace(tmploc, fld, cg.Module),
+                        PropertySymbol prop => new PropertyPlace(tmploc, prop, cg.Module),
+                        _ => throw Roslyn.Utilities.ExceptionUtilities.Unreachable,
+                    };
 
                     // value = tmp.Item2;
                     cg.EmitSequencePoint(valueVar.PhpSyntax);
-                    valueVar.BindPlace(cg).EmitStore(cg, item2place, valueVar.Access);
+                    valueVar.BindPlace(cg).EmitStore(cg, valueplace, valueVar.TargetAccess());
 
                     // key = tmp.Item1;
                     if (keyVar != null)
                     {
                         cg.EmitSequencePoint(keyVar.PhpSyntax);
-                        keyVar.BindPlace(cg).EmitStore(cg, item1place, keyVar.Access);
+                        keyVar.BindPlace(cg).EmitStore(cg, keyplace, keyVar.TargetAccess());
                     }
 
                     //
@@ -478,11 +695,24 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
                 else
                 {
                     cg.EmitSequencePoint(valueVar.PhpSyntax);
-                    valueVar.BindPlace(cg).EmitStore(cg, () => EmitGetCurrentHelper(cg), valueVar.Access);
+                    valueVar.BindPlace(cg).EmitStore(cg, () => EmitGetCurrentHelper(cg), valueVar.TargetAccess());
 
                     if (keyVar != null)
                     {
-                        throw new InvalidOperationException();
+                        Debug.Assert(_synthesizedIndexLoc != null);
+
+                        cg.EmitSequencePoint(keyVar.PhpSyntax);
+
+                        // key = LOAD KeyVariable
+                        keyVar.BindPlace(cg).EmitStore(cg, () => _synthesizedIndexLoc.EmitLoad(cg.Builder), keyVar.TargetAccess());
+
+                        // KeyVariable ++
+                        _synthesizedIndexLoc.EmitLoad(cg.Builder); // Key
+                        cg.Builder.EmitLongConstant(1L);           // 1
+
+                        cg.Builder.EmitOpCode(ILOpCode.Add);
+
+                        _synthesizedIndexLoc.EmitStore();
                     }
                 }
             }
@@ -520,6 +750,12 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
             {
                 cg.ReturnTemporaryLocal(_aliasedValueLoc);
                 _aliasedValueLoc = null;
+            }
+
+            if (_synthesizedIndexLoc != null)
+            {
+                cg.ReturnTemporaryLocal(_synthesizedIndexLoc);
+                _synthesizedIndexLoc = null;
             }
 
             cg.ReturnTemporaryLocal(_enumeratorLoc);
@@ -689,7 +925,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
             var lblBody = new object();
 
             //
-            cg.Builder.DefineHiddenSequencePoint();
+            cg.EmitHiddenSequencePoint();
             cg.Builder.EmitBranch(ILOpCode.Br, lblMoveNext);
             cg.Builder.MarkLabel(lblBody);
 
@@ -701,10 +937,14 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
             // }
 
             // if (enumerator.MoveNext())
-            cg.EmitSequencePoint(_moveSpan);
+            cg.EmitHiddenSequencePoint();
             cg.Builder.MarkLabel(lblMoveNext);
             this.EnumereeEdge.EmitIteratorNext(cg); // Iterator.next() : void (only if we are enumerating the Iterator directly)
+
+            cg.EmitHiddenSequencePoint();
             cg.Builder.MarkLabel(this.EnumereeEdge._lbl_MoveNext);
+
+            cg.EmitSequencePoint(MoveNextSpan);
             this.EnumereeEdge.EmitMoveNext(cg); // bool
             cg.Builder.EmitBranch(ILOpCode.Brtrue, lblBody);
 

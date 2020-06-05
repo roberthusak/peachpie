@@ -101,9 +101,10 @@ namespace Pchp.Core
         static string PeachpieLibraryAssembly => "Peachpie.Library";
         static string ErrorClass => "Pchp.Library.Spl.Error";
         static string TypeErrorClass => "Pchp.Library.Spl.TypeError";
+        static string ArgumentCountErrorClass => "Pchp.Library.Spl.ArgumentCountError";
         static string AssertionErrorClass => "Pchp.Library.Spl.AssertionError";
 
-        static Type _Error, _TypeError, _AssertionError;
+        static Type _Error, _TypeError, _AssertionError, _ArgumentCountError;
 
         static Exception Exception(ref Type _type, string _typename, string message)
         {
@@ -129,6 +130,8 @@ namespace Pchp.Core
         public static Exception TypeErrorException() => TypeErrorException(string.Empty);
 
         public static Exception TypeErrorException(string message) => Exception(ref _TypeError, TypeErrorClass, message);
+
+        public static Exception ArgumentCountErrorException(string message) => Exception(ref _ArgumentCountError, ArgumentCountErrorClass, message);
 
         public static Exception AssertionErrorException(string message) => Exception(ref _AssertionError, AssertionErrorClass, message);
 
@@ -227,6 +230,22 @@ namespace Pchp.Core
         }
 
         /// <summary>
+        /// Outputs warning: Illegal offset type.
+        /// </summary>
+        public static void IllegalOffsetType()
+        {
+            Throw(PhpError.Warning, ErrResources.illegal_offset_type);
+        }
+
+        /// <summary>
+        /// Outputs error: Undefined offset ({0}).
+        /// </summary>
+        public static void UndefinedOffset(IntStringKey key)
+        {
+            Throw(PhpError.Error, string.Format(ErrResources.undefined_offset, key.ToString()));
+        }
+
+        /// <summary>
         /// Argument type mismatch error.
         /// </summary>
         public static void ThrowIfArgumentNull(object value, int arg)
@@ -237,6 +256,18 @@ namespace Pchp.Core
 
                 // throw new TypeError
                 throw TypeErrorException(string.Format(ErrResources.argument_null, arg));
+            }
+        }
+
+        public static void ThrowIfArgumentNotCallable(Context ctx, RuntimeTypeHandle callerCtx, PhpValue value, bool nullAllowed, int arg)
+        {
+            if (nullAllowed && value.IsNull)
+                return;
+
+            var callable = value.AsCallable(callerCtx);
+            if (callable == null || (callable is PhpCallback phpcallback && !phpcallback.IsValidBound(ctx)))
+            {
+                throw TypeErrorException(string.Format(ErrResources.argument_not_callable, arg, PhpVariable.GetTypeName(value)));
             }
         }
 
@@ -417,6 +448,15 @@ namespace Pchp.Core
         {
             Throw(PhpError.Error, ErrResources.self_used_out_of_class);
             throw new ArgumentException(ErrResources.self_used_out_of_class);
+        }
+
+        /// <summary>
+        /// Internal warning when new element cannot be added to array because there are no more free keys.
+        /// </summary>
+        internal static void NextArrayKeyUnavailable()
+        {
+            // Warning: Cannot add element to the array as the next element is already occupied
+            Throw(PhpError.Warning, ErrResources.next_array_key_unavailable);
         }
     }
 

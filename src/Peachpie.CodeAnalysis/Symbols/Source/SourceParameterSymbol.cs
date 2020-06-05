@@ -37,6 +37,12 @@ namespace Pchp.CodeAnalysis.Symbols
         public override BoundExpression Initializer => _initializer;
         readonly BoundExpression _initializer;
 
+        /// <summary>
+        /// Whether the parameter needs to be copied when passed by value.
+        /// Can be set to <c>false</c> by analysis (e.g. unused parameter or only delegation to another method).
+        /// </summary>
+        public bool CopyOnPass { get; set; } = true;
+
         public override FieldSymbol DefaultValueField
         {
             get
@@ -158,7 +164,7 @@ namespace Pchp.CodeAnalysis.Symbols
         /// Gets value indicating that if the parameters type is a reference type,
         /// it is not allowed to pass a null value.
         /// </summary>
-        public bool IsNotNull
+        public override bool HasNotNull
         {
             get
             {
@@ -298,7 +304,7 @@ namespace Pchp.CodeAnalysis.Symbols
             }
 
             // [NotNull]
-            if (IsNotNull && Type.IsReferenceType)
+            if (HasNotNull && Type.IsReferenceType)
             {
                 yield return DeclaringCompilation.CreateNotNullAttribute();
             }

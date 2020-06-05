@@ -188,7 +188,7 @@ namespace Pchp.CodeAnalysis.Errors
         WRN_CloneNonObject,
         /// <summary>Using non-iterable type in foreach: {0}.</summary>
         WRN_ForeachNonIterable,
-        /// <summary>Wrong number of arguments in {0}.</summary>
+        /// <summary>Call to '{0}()' expects {1} argument(s), {2} given.</summary>
         WRN_FormatStringWrongArgCount,
         /// <summary>Missing the call of parent::__construct from {0}::__construct.</summary>
         WRN_ParentCtorNotCalled,
@@ -200,6 +200,8 @@ namespace Pchp.CodeAnalysis.Errors
         WRN_ToStringMustReturnString,
         /// <summary>Argument has no value, parameter will be always NULL</summary>
         WRN_ArgumentVoid,
+        /// <summary>PCRE pattern parse error: {0} at offset {1}</summary>
+        WRN_PCRE_Pattern_Error,
 
         //
         // Visible information
@@ -207,9 +209,11 @@ namespace Pchp.CodeAnalysis.Errors
         INF_UnableToLoadSomeTypesInAnalyzer = 6000,
         INF_EvalDiscouraged,
         INF_RedundantCast,
-        /// <summary>Wrong case in class name '{0}', expected '{1}'.</summary>
-        INF_ClassNameWrongCase,
+        /// <summary>Name '{0}' does not match the expected name '{1}', letter casing mismatch.</summary>
+        INF_TypeNameCaseMismatch,
         /// <summary></summary>
         INF_DestructDiscouraged,
+        /// <summary>Overriden function name '{0}' does not match it's parent name '{1}', letter casing mismatch.</summary>
+        INF_OverrideNameCaseMismatch,
     }
 }

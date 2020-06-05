@@ -100,24 +100,23 @@ namespace Pchp.Library
         [return: CastToFalse]
         public static string get_class([ImportValue(ImportValueAttribute.ValueSpec.CallerClass)]string tctx, PhpValue obj)
         {
-            if (obj.IsSet)
+            if (obj.IsNull)
             {
-                if (obj.IsObject)
-                {
-                    return obj.Object.GetPhpTypeInfo().Name;
-                }
-                else if (obj.IsAlias)
-                {
-                    return get_class(tctx, obj.Alias.Value);
-                }
-                else
-                {
-                    // TODO: E_WARNING
-                    throw new ArgumentException(nameof(obj));
-                }
+                return tctx;
             }
-
-            return tctx;
+            else if (obj.IsObject)
+            {
+                return obj.Object.GetPhpTypeInfo().Name;
+            }
+            else if (obj.IsAlias)
+            {
+                return get_class(tctx, obj.Alias.Value);
+            }
+            else
+            {
+                // TODO: E_WARNING
+                throw new ArgumentException(nameof(obj));
+            }
         }
 
         /// <summary>
@@ -197,19 +196,6 @@ namespace Pchp.Library
         }
 
         /// <summary>
-		/// Tests whether <paramref name="obj"/>'s class is derived from a class given by <paramref name="class_name"/>.
-		/// </summary>
-        /// <param name="ctx">Runtime context.</param>
-        /// <param name="obj">The object to test.</param>
-		/// <param name="class_name">The name of the class.</param>
-        /// <returns><B>true</B> if the object <paramref name="obj"/> belongs to <paramref name="class_name"/> class or
-		/// a class which is a subclass of <paramref name="class_name"/>, <B>false</B> otherwise.</returns>
-        public static bool is_a(Context ctx, object obj, string class_name)
-        {
-            return obj != null && Core.Convert.IsInstanceOf(obj, ctx.GetDeclaredType(class_name));  // double check (obj!=null) for performance reasons
-        }
-
-        /// <summary>
 		/// Tests whether <paramref name="value"/>'s class is derived from a class given by <paramref name="class_name"/>.
 		/// </summary>
         /// <param name="ctx">Runtime context.</param>
@@ -218,7 +204,7 @@ namespace Pchp.Library
         /// <param name="allow_string">If this parameter set to FALSE, string class name as object is not allowed. This also prevents from calling autoloader if the class doesn't exist.</param>
         /// <returns><B>true</B> if the object <paramref name="value"/> belongs to <paramref name="class_name"/> class or
 		/// a class which is a subclass of <paramref name="class_name"/>, <B>false</B> otherwise.</returns>
-        public static bool is_a(Context ctx, PhpValue value, string class_name, bool allow_string)
+        public static bool is_a(Context ctx, PhpValue value, string class_name, bool allow_string = false)
         {
             // first load type of {value}
             PhpTypeInfo tvalue = TypeNameOrObjectToType(ctx, value, autoload: true, allowName: allow_string);
@@ -250,6 +236,11 @@ namespace Pchp.Library
                 // optimization for stdClass:
                 var arr = ((stdClass)obj).GetRuntimeFields();
                 return (arr != null) ? arr.DeepCopy() : PhpArray.NewEmpty();
+            }
+            else if (obj is PhpResource || obj is __PHP_Incomplete_Class)
+            {
+                PhpException.InvalidArgument(nameof(obj));
+                return null;
             }
             else
             {
@@ -301,12 +292,23 @@ namespace Pchp.Library
             var tinfo = ctx.GetDeclaredType(class_name, true);
             if (tinfo != null)
             {
+                if (tinfo.IsInterface)
+                {
+                    // interfaces cannot have properties:
+                    return PhpArray.NewEmpty();
+                }
+                else if (tinfo.IsTrait && tinfo.Type.IsGenericTypeDefinition)
+                {
+                    // construct the generic trait class with <object>
+                    tinfo = tinfo.Type.MakeGenericType(typeof(object)).GetPhpTypeInfo();
+                }
+
                 var result = new PhpArray();
                 var callerType = Type.GetTypeFromHandle(caller);
 
                 // the class has to be instantiated in order to discover default instance property values
                 // (the constructor will initialize default properties, user defined constructor will not be called)
-                var instanceOpt = tinfo.GetUninitializedInstance(ctx);
+                var instanceOpt = tinfo.CreateUninitializedInstance(ctx);
 
                 foreach (var prop in tinfo.GetDeclaredProperties())
                 {
@@ -317,7 +319,7 @@ namespace Pchp.Library
                             ? prop.GetValue(ctx, null)
                             : (instanceOpt != null)
                                 ? prop.GetValue(ctx, instanceOpt)
-                                : PhpValue.Void;
+                                : PhpValue.Null;
 
                         //
                         result[prop.PropertyName] = value.DeepCopy();
@@ -372,10 +374,14 @@ namespace Pchp.Library
             }
 
             var instance = classNameOrObject.AsObject();
-            if (instance != null && tinfo.GetRuntimeProperty(propertyName, instance) != null)
+            if (instance != null)
             {
-                // RT property found
-                return true;
+                var rt = tinfo.GetRuntimeFields(instance);
+                if (rt != null && rt.ContainsKey(propertyName))
+                {
+                    // RT property found
+                    return true;
+                }
             }
 
             //
@@ -521,4 +527,50 @@ namespace Pchp.Library
             return result;
         }
     }
+
+    #region class WeakReference
+
+    /// <summary>
+    /// Weak references allow to retain a reference to an object
+    /// which does not prevent the object from being garbage collected.
+    /// </summary>
+    [PhpType(PhpTypeAttribute.PhpTypeName.NameOnly), PhpExtension("Core")]
+    public sealed class WeakReference
+    {
+        [PhpHidden]
+        readonly WeakReference<object> _value;
+
+        private WeakReference(object value)
+        {
+            _value = new WeakReference<object>(value);
+        }
+
+        /// <summary>
+        /// Private ctor.
+        /// </summary>
+        private void __construct()
+        {
+            throw new NotSupportedException();
+        }
+
+        /// <summary>
+        /// Create a weak reference
+        /// </summary>
+        public static WeakReference create(object referent)
+        {
+            return new WeakReference(referent);
+        }
+
+        /// <summary>
+        /// Gets a weakly referenced object.
+        /// If the object has already been garbage collected, <c>NULL</c> is returned.
+        /// </summary>
+        public object get()
+        {
+            _value.TryGetTarget(out var value);
+            return value;
+        }
+    }
+
+    #endregion
 }

@@ -89,39 +89,39 @@ namespace Pchp.CodeAnalysis.Symbols
         readonly PhpCompilation _compilation;
 
         /// <summary>
-        /// Name of attribute class representing an extension library.
+        /// Root namespace for Peachpie Runtime types.
         /// </summary>
-        public const string PhpExtensionAttributeFullName = "Pchp.Core.PhpExtensionAttribute";
+        public const string PeachpieRuntimeNamespace = "Pchp.Core";
 
         /// <summary>
-        /// Name of attribute <c>PhpRwAttribute</c> class.
+        /// Name of attribute class representing an extension library.
         /// </summary>
-        public const string PhpRwAttributeFullName = "Pchp.Core.PhpRwAttribute";
+        public const string PhpExtensionAttributeFullName = PeachpieRuntimeNamespace + ".PhpExtensionAttribute";
 
         /// <summary>
         /// Name of attribute class representing a PHP type descriptor.
         /// </summary>
-        public const string PhpTypeAttributeFullName = "Pchp.Core.PhpTypeAttribute";
+        public const string PhpTypeAttributeFullName = PeachpieRuntimeNamespace + ".PhpTypeAttribute";
 
         /// <summary>
         /// Name of attribute class representing a script type.
         /// </summary>
-        public const string PhpScriptAttributeFullName = "Pchp.Core.ScriptAttribute";
+        public const string PhpScriptAttributeFullName = PeachpieRuntimeNamespace + ".ScriptAttribute";
 
         /// <summary>
         /// Name of attribute class representing a PHAR archive script type.
         /// </summary>
-        public const string PharAttributeFullName = "Pchp.Core.PharAttribute";
+        public const string PharAttributeFullName = PeachpieRuntimeNamespace + ".PharAttribute";
 
         /// <summary>
         /// Name of attribute class representing target PHP language specification.
         /// </summary>
-        public const string TargetPhpLanguageAttributeFullName = "Pchp.Core.TargetPhpLanguageAttribute";
+        public const string TargetPhpLanguageAttributeFullName = PeachpieRuntimeNamespace + ".TargetPhpLanguageAttribute";
 
         /// <summary>
         /// Full name of Context+DllLoader&lt;&gt;.
         /// </summary>
-        public const string Context_DllLoader_T = "Pchp.Core.Context+DllLoader`1";
+        public const string Context_DllLoader_T = PeachpieRuntimeNamespace + ".Context+DllLoader`1";
 
         /// <summary>
         /// Name of attribute class annotating trait declaration.
@@ -139,17 +139,17 @@ namespace Pchp.CodeAnalysis.Symbols
         public const string PhpMemberVisibilityAttributeName = "PhpMemberVisibilityAttribute";
 
         public readonly CoreType
-            Context, Operators, Convert, Comparison, StrictComparison, PhpException,
+            Context, Operators, Convert, StrictConvert, Comparison, StrictComparison, PhpException,
             ScriptAttribute, PhpTraitAttribute, PharAttribute, PhpTypeAttribute, PhpHiddenAttribute, PhpFieldsOnlyCtorAttribute, NotNullAttribute, DefaultValueAttribute, PhpMemberVisibilityAttribute, PhpStaticLocalAttribute,
             ScriptDiedException,
             IStaticInit, RoutineInfo, IndirectLocal,
             BinderFactory, GetClassConstBinder, GetFieldBinder, SetFieldBinder, AccessMask,
-            Dynamic_NameParam_T, Dynamic_TargetTypeParam, Dynamic_CallerTypeParam, Dynamic_UnpackingParam_T,
+            Dynamic_NameParam_T, Dynamic_TargetTypeParam, Dynamic_LateStaticTypeParam, Dynamic_CallerTypeParam, Dynamic_UnpackingParam_T,
             RuntimeChain_ChainEnd, RuntimeChain_Value_T, RuntimeChain_Property_T, RuntimeChain_ArrayItem_T, RuntimeChain_ArrayNewItem_T,
             PhpTypeInfoExtension, PhpTypeInfo, CommonPhpArrayKeys,
             PhpNumber, PhpValue, PhpAlias, PhpString, PhpArray, PhpResource, IPhpArray, IPhpEnumerable, IPhpCallable, IPhpConvertible, PhpString_Blob,
             IntStringKey, PhpHashtable, ImportValueAttribute, DummyFieldsOnlyCtor,
-            Void, Object, Int32, Long, Double, Boolean, String, Exception,
+            Void, Object, Byte, Int32, Long, Double, Boolean, String, Exception,
             RuntimeTypeHandle, RuntimeMethodHandle,
             stdClass, ArrayAccess, Closure, Generator, Iterator, Traversable, GeneratorStateMachineDelegate, MainDelegate, IntPtr;
 
@@ -161,6 +161,7 @@ namespace Pchp.CodeAnalysis.Symbols
 
             Void = Create(SpecialType.System_Void);
             Object = Create(SpecialType.System_Object);
+            Byte = Create(SpecialType.System_Byte);
             Int32 = Create(SpecialType.System_Int32);
             Long = Create(SpecialType.System_Int64);
             Double = Create(SpecialType.System_Double);
@@ -189,6 +190,7 @@ namespace Pchp.CodeAnalysis.Symbols
             Comparison = Create("Comparison");
             StrictComparison = Create("StrictComparison");
             Convert = Create("Convert");
+            StrictConvert = Create("StrictConvert");
             PhpException = Create("PhpException");
             ScriptAttribute = Create("ScriptAttribute");
             PhpTraitAttribute = Create(PhpTraitAttributeName);
@@ -216,6 +218,7 @@ namespace Pchp.CodeAnalysis.Symbols
 
             Dynamic_NameParam_T = Create("Dynamic.NameParam`1");
             Dynamic_TargetTypeParam = Create("Dynamic.TargetTypeParam");
+            Dynamic_LateStaticTypeParam = Create("Dynamic.LateStaticTypeParam");
             Dynamic_CallerTypeParam = Create("Dynamic.CallerTypeParam");
             Dynamic_UnpackingParam_T = Create("Dynamic.UnpackingParam`1");
 
@@ -244,7 +247,7 @@ namespace Pchp.CodeAnalysis.Symbols
         readonly Dictionary<TypeSymbol, CoreType> _typetable = new Dictionary<TypeSymbol, CoreType>();
         //readonly Dictionary<SpecialType, CoreType> _specialTypes = new Dictionary<SpecialType, CoreType>();
 
-        CoreType Create(string name) => CreateFromFullName("Pchp.Core." + name);
+        CoreType Create(string name) => CreateFromFullName(PeachpieRuntimeNamespace + "." + name);
 
         CoreType Create(SpecialType type) => CreateFromFullName(SpecialTypes.GetMetadataName(type));
 

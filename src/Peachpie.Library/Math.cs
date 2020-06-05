@@ -58,6 +58,9 @@ namespace Pchp.Library
         public const double NAN = double.NaN;
         public const double INF = double.PositiveInfinity;
 
+        public const int MT_RAND_MT19937 = 0;
+        public const int MT_RAND_PHP = 1;
+
         #endregion
 
         #region Absolutize Range
@@ -235,7 +238,7 @@ namespace Pchp.Library
             {
                 throw new ArgumentOutOfRangeException();
             }
-            
+
             // TODO: use mcrypt, int64
             return rand((int)min, (int)max);
         }
@@ -278,6 +281,15 @@ namespace Pchp.Library
         }
 
         /// <summary>
+        /// <see cref="mt_srand(int, MtMode)"/> mode.
+        /// </summary>
+        public enum MtMode : int
+        {
+            MT19937 = MT_RAND_MT19937,
+            PHP = MT_RAND_PHP,
+        }
+
+        /// <summary>
         /// Seed the better random number generator.
         /// No return value.
         /// </summary>
@@ -294,6 +306,22 @@ namespace Pchp.Library
         public static void mt_srand(int seed)
         {
             MTGenerator.Seed(unchecked((uint)seed));
+        }
+
+        /// <summary>
+        /// Seed the better random number generator.
+        /// No return value.
+        /// </summary>
+        /// <param name="seed">Optional seed value.</param>
+        /// <param name="mode">Seed algorithm implementation.</param>
+        public static void mt_srand(int seed, MtMode mode = MtMode.MT19937)
+        {
+            if (mode != MtMode.MT19937)
+            {
+                PhpException.ArgumentValueNotSupported(nameof(mode), mode.ToString());
+            }
+
+            mt_srand(seed);
         }
 
         #endregion
@@ -342,7 +370,7 @@ namespace Pchp.Library
         {
             // Trim the number to the lower 32 binary digits.
             uint temp = unchecked((uint)number);
-            return DoubleToBase(temp, 2);
+            return DoubleToBase(temp, 2) ?? "0";
         }
 
         ///// <summary>
@@ -448,16 +476,14 @@ namespace Pchp.Library
         {
             if (number == null)
             {
-                //PhpException.ArgumentNull("number");
-                //return 0.0;
-                throw new ArgumentException();
+                PhpException.ArgumentNull(nameof(number));
+                return 0.0;
             }
 
             if (fromBase < 2 || fromBase > 36)
             {
-                //PhpException.InvalidArgument("toBase", LibResources.GetString("arg_out_of_bounds"));
-                //return 0.0;
-                throw new ArgumentException();
+                PhpException.InvalidArgument(nameof(fromBase), Resources.Resources.arg_out_of_bounds);
+                return 0.0;
             }
 
             double fnum = 0;
@@ -465,7 +491,13 @@ namespace Pchp.Library
             {
                 int digit = Core.Convert.AlphaNumericToDigit(number[i]);
                 if (digit < fromBase)
+                {
                     fnum = fnum * fromBase + digit;
+                }
+                else
+                {
+                    // Warning ?
+                }
             }
 
             return fnum;
@@ -507,23 +539,25 @@ namespace Pchp.Library
         {
             if (toBase < 2 || toBase > 36)
             {
-                throw new NotImplementedException();
-                //PhpException.InvalidArgument("toBase", LibResources.GetString("arg_out_of_bounds"));
-                //return String.Empty;
+                PhpException.InvalidArgument(nameof(toBase), Resources.LibResources.arg_out_of_bounds);
+                return null; // FALSE
             }
 
             // Don't try to convert infinity or NaN:
-            if (Double.IsInfinity(number) || Double.IsNaN(number))
+            if (double.IsInfinity(number) || double.IsNaN(number))
             {
-                throw new NotImplementedException();
-                //PhpException.InvalidArgument("number", LibResources.GetString("arg_out_of_bounds"));
-                //return String.Empty;
+                PhpException.InvalidArgument(nameof(number), Resources.LibResources.arg_out_of_bounds);
+                return null; // FALSE
             }
 
             double fvalue = Math.Floor(number); /* floor it just in case */
-            if (Math.Abs(fvalue) < 1) return "0";
+            if (Math.Abs(fvalue) < 1)
+            {
+                return "0";
+            }
 
-            StringBuilder sb = new StringBuilder();
+            var sb = StringBuilderUtilities.Pool.Get();
+
             while (Math.Abs(fvalue) >= 1)
             {
                 double mod = fmod(fvalue, toBase);
@@ -534,7 +568,7 @@ namespace Pchp.Library
                 fvalue /= toBase;
             }
 
-            return Strings.strrev(sb.ToString());
+            return Core.Utilities.StringUtils.Reverse(StringBuilderUtilities.GetStringAndReturn(sb));
         }
 
         /// <summary>
@@ -553,29 +587,8 @@ namespace Pchp.Library
                 return "0";
             }
 
-            double value;
-
-            try
-            {
-                value = BaseToDouble(number, fromBase);
-            }
-            catch (ArgumentException)
-            {
-                //PhpException.Throw(PhpError.Warning, LibResources.GetString("arg_invalid_value", "fromBase", fromBase));
-                //return PhpValue.False;
-                throw new NotImplementedException();
-            }
-
-            try
-            {
-                return DoubleToBase(value, toBase);
-            }
-            catch (ArgumentException)
-            {
-                //PhpException.Throw(PhpError.Warning, LibResources.GetString("arg_invalid_value", "toBase", toBase));
-                //return PhpValue.False;
-                throw new NotImplementedException();
-            }
+            var value = BaseToDouble(number, fromBase);
+            return DoubleToBase(value, toBase);
         }
 
         #endregion
@@ -1243,7 +1256,7 @@ namespace Pchp.Library
             }
             else
             {
-                ex = PhpValue.Void;
+                ex = PhpValue.Null;
             }
 
             enumerator.Dispose();

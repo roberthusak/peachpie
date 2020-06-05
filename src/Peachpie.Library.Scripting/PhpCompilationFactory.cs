@@ -63,16 +63,6 @@ namespace Peachpie.Library.Scripting
                 typeof(ScriptingProvider).Assembly,      // Peachpie.Library.Scripting
             };
 
-            // dynamically add well-known assemblies if loaded
-            Type t;
-
-            t = Type.GetType(Assembly.CreateQualifiedName("Peachpie.Library.XmlDom", "Peachpie.Library.XmlDom.XmlDom"));
-            if (t != null) impl.Add(t.Assembly);
-
-            t = Type.GetType(Assembly.CreateQualifiedName("Peachpie.Library.Graphics", "Peachpie.Library.Graphics.PhpImage"));
-            if (t != null) impl.Add(t.Assembly);
-
-            //
             var set = new HashSet<Assembly>();
 
             set.UnionWith(impl);
@@ -174,11 +164,13 @@ namespace Peachpie.Library.Scripting
 
         static int _counter = 0;
 
-        const string s_submissionAssemblyNamePrefix = "<submission>`";
+        const string s_submissionAssemblyNamePrefix = "<eval>`";
 
         public AssemblyName GetNewSubmissionName()
         {
-            return new AssemblyName(s_submissionAssemblyNamePrefix + (_counter++).ToString());
+            var id = Interlocked.Increment(ref _counter);
+
+            return new AssemblyName(s_submissionAssemblyNamePrefix + id.ToString());
         }
     }
 }

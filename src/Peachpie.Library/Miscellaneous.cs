@@ -1,4 +1,6 @@
-﻿using Pchp.Core;
+﻿#nullable enable
+
+using Pchp.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,7 +15,7 @@ namespace Pchp.Library
     public static class Miscellaneous
     {
         // [return: CastToFalse] // once $extension will be supported
-        public static string phpversion(string extension = null)
+        public static string phpversion(string? extension = null)
         {
             if (extension != null)
             {
@@ -221,7 +223,7 @@ namespace Pchp.Library
         /// <param name="extension">Internal extension name (e.g. <c>sockets</c>).</param>
         /// <returns>The array of function names or <c>null</c> if the <paramref name="extension"/> is not loaded.</returns>
         [return: CastToFalse]
-        public static PhpArray get_extension_funcs(string extension)
+        public static PhpArray? get_extension_funcs(string extension)
         {
             var result = new PhpArray();
             foreach (var e in Context.GetRoutinesByExtension(extension))
@@ -276,12 +278,17 @@ namespace Pchp.Library
         /// </summary>
         /// <returns>Returns a string with the hostname on success, otherwise FALSE is returned. </returns>
         [return: CastToFalse]
-        public static string gethostname()
+        public static string? gethostname()
         {
-            string host = null;
-
-            try { host = System.Net.Dns.GetHostName(); }
-            catch { }
+            string? host;
+            try
+            {
+                host = System.Net.Dns.GetHostName();
+            }
+            catch
+            {
+                host = null;
+            }
 
             return host;
         }
@@ -371,7 +378,7 @@ namespace Pchp.Library
         /// Returns the type of web server interface.
         /// </summary>
         /// <returns>The "isapi" string if runned under webserver (ASP.NET works via ISAPI) or "cli" otherwise.</returns>
-        public static string php_sapi_name(Context ctx) => ctx.ServerApi ?? "isapi";
+        public static string php_sapi_name(Context ctx) => ctx.ServerApi;
 
         #endregion
 
@@ -485,18 +492,24 @@ namespace Pchp.Library
         /// </summary>
         public static bool fastcgi_finish_request(Context ctx)
         {
-            if (ctx.IsWebApplication)
+            var webctx = ctx.HttpPhpContext;
+            if (webctx != null)
             {
-                ctx.HttpPhpContext.Flush();
+                try
+                {
+                    // finish the request
+                    webctx.Flush(endRequest: true);
 
-                // TODO: finish the request
-
-                return true;
+                    return true;
+                }
+                catch (ObjectDisposedException)
+                {
+                    // already ended
+                }
             }
-            else
-            {
-                return false;
-            }
+            
+            //
+            return false;
         }
 
         public static bool gc_enabled()

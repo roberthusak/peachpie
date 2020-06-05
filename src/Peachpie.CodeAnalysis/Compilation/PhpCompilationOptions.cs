@@ -96,6 +96,33 @@ namespace Pchp.CodeAnalysis
         /// </summary>
         public ImmutableArray<IObserver<object>> EventSources { get; internal set; }
 
+        /// <summary>
+        /// The compilation optimization level.
+        /// </summary>
+        public new PhpOptimizationLevel OptimizationLevel { get; internal set; }
+
+        /// <summary>
+        /// Set of compile-time defined constants.
+        /// </summary>
+        public ImmutableDictionary<string, string> Defines { get; internal set; }
+
+        /// <summary>
+        /// Set of relative file names from which class map will be generated.
+        /// Contained types will be marked as autoloaded.
+        /// </summary>
+        public ISet<string> Autoload_ClassMapFiles { get; internal set; }
+
+        /// <summary>
+        /// Set of relative file names to be marked as autoloaded.
+        /// </summary>
+        public ISet<string> Autoload_Files { get; internal set; }
+
+        /// <summary>
+        /// Collection of PSR-4 autoload rules.
+        /// Matching types (classes, traits and interfaces) will be marked as autoloaded.
+        /// </summary>
+        public IReadOnlyCollection<(string prefix, string path)> Autoload_PSR4 { get; internal set; }
+
         ///// <summary>
         ///// Flags applied to the top-level binder created for each syntax tree in the compilation 
         ///// as well as for the binder of global imports.
@@ -114,11 +141,11 @@ namespace Pchp.CodeAnalysis
             string mainTypeName = null,
             string scriptClassName = null,
             string versionString = null,
-            OptimizationLevel optimizationLevel = OptimizationLevel.Debug,
+            PhpOptimizationLevel optimizationLevel = PhpOptimizationLevel.Debug,
             bool checkOverflow = false,
             string cryptoKeyContainer = null,
             string cryptoKeyFile = null,
-            ImmutableArray<byte> cryptoPublicKey = default(ImmutableArray<byte>),
+            ImmutableArray<byte> cryptoPublicKey = default,
             bool? delaySign = null,
             Platform platform = Platform.AnyCpu,
             ReportDiagnostic generalDiagnosticOption = ReportDiagnostic.Default,
@@ -135,8 +162,9 @@ namespace Pchp.CodeAnalysis
             bool publicSign = false,
             PhpDocTypes phpdocTypes = PhpDocTypes.None,
             bool embedSourceMetadata = true,
-            ImmutableArray<Diagnostic> diagnostics = default(ImmutableArray<Diagnostic>),
+            ImmutableArray<Diagnostic> diagnostics = default,
             PhpParseOptions parseOptions = null,
+            ImmutableDictionary<string, string> defines = default,
             bool referencesSupersedeLowerVersions = false)
             : this(outputKind, baseDirectory, sdkDirectory, subDirectory,
                    reportSuppressedDiagnostics, moduleName, mainTypeName, scriptClassName,
@@ -157,6 +185,7 @@ namespace Pchp.CodeAnalysis
                    phpdocTypes: phpdocTypes,
                    embedSourceMetadata: embedSourceMetadata,
                    diagnostics: diagnostics,
+                   defines: defines,
                    parseOptions: parseOptions,
                    referencesSupersedeLowerVersions: referencesSupersedeLowerVersions)
         {
@@ -173,7 +202,7 @@ namespace Pchp.CodeAnalysis
             string mainTypeName,
             string scriptClassName,
             string versionString,
-            OptimizationLevel optimizationLevel,
+            PhpOptimizationLevel optimizationLevel,
             bool checkOverflow,
             string cryptoKeyContainer,
             string cryptoKeyFile,
@@ -198,9 +227,10 @@ namespace Pchp.CodeAnalysis
             bool embedSourceMetadata,
             ImmutableArray<Diagnostic> diagnostics,
             PhpParseOptions parseOptions,
+            ImmutableDictionary<string, string> defines,
             bool referencesSupersedeLowerVersions)
             : base(outputKind, reportSuppressedDiagnostics, moduleName, mainTypeName, scriptClassName,
-                   cryptoKeyContainer, cryptoKeyFile, cryptoPublicKey, delaySign, publicSign, optimizationLevel, checkOverflow,
+                   cryptoKeyContainer, cryptoKeyFile, cryptoPublicKey, delaySign, publicSign, optimizationLevel.AsOptimizationLevel(), checkOverflow,
                    platform, generalDiagnosticOption, warningLevel, specificDiagnosticOptions.ToImmutableDictionaryOrEmpty(),
                    concurrentBuild, deterministic, currentLocalTime, debugPlusMode, xmlReferenceResolver,
                    sourceReferenceResolver, metadataReferenceResolver, assemblyIdentityComparer,
@@ -214,6 +244,8 @@ namespace Pchp.CodeAnalysis
             this.ParseOptions = parseOptions;
             this.Diagnostics = diagnostics;
             this.VersionString = versionString;
+            this.OptimizationLevel = optimizationLevel;
+            this.Defines = defines;
         }
 
         private PhpCompilationOptions(PhpCompilationOptions other) : this(
@@ -251,9 +283,13 @@ namespace Pchp.CodeAnalysis
             embedSourceMetadata: other.EmbedSourceMetadata,
             diagnostics: other.Diagnostics,
             parseOptions: other.ParseOptions,
+            defines: other.Defines,
             referencesSupersedeLowerVersions: other.ReferencesSupersedeLowerVersions)
         {
             EventSources = other.EventSources;
+            Autoload_ClassMapFiles = other.Autoload_ClassMapFiles;
+            Autoload_Files = other.Autoload_Files;
+            Autoload_PSR4 = other.Autoload_PSR4;
         }
 
         public override string Language => Constants.PhpLanguageName;
@@ -347,12 +383,12 @@ namespace Pchp.CodeAnalysis
 
         public new PhpCompilationOptions WithOptimizationLevel(OptimizationLevel value)
         {
-            if (value == this.OptimizationLevel)
+            if (value == base.OptimizationLevel)
             {
                 return this;
             }
 
-            return new PhpCompilationOptions(this) { OptimizationLevel = value };
+            return new PhpCompilationOptions(this) { OptimizationLevel = value.AsPhpOptimizationLevel() };
         }
 
         public new PhpCompilationOptions WithOverflowChecks(bool enabled)
@@ -472,6 +508,16 @@ namespace Pchp.CodeAnalysis
             }
 
             return new PhpCompilationOptions(this) { DebugPlusMode_internal_protected_set = debugPlusMode };
+        }
+
+        public PhpCompilationOptions WithDefines(ImmutableDictionary<string, string> defines)
+        {
+            if (this.Defines == defines)
+            {
+                return this;
+            }
+
+            return new PhpCompilationOptions(this) { Defines = defines };
         }
 
         public new PhpCompilationOptions WithMetadataImportOptions(MetadataImportOptions value)

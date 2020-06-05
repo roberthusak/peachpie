@@ -27,13 +27,15 @@ namespace Pchp.CodeAnalysis.Emit
         private readonly EmitOptions _emitOptions;
         //private readonly Cci.ModulePropertiesForSerialization _serializationProperties;
 
-        SynthesizedScriptTypeSymbol _lazyScriptType;
+        /// <summary>
+        /// Gets script type containing entry point and additional assembly level symbols.
+        /// </summary>
+        internal SynthesizedScriptTypeSymbol ScriptType { get; }
 
         /// <summary>
         /// Manages synthesized methods and fields.
         /// </summary>
-        public SynthesizedManager SynthesizedManager => _synthesized;
-        readonly SynthesizedManager _synthesized;
+        public SynthesizedManager SynthesizedManager { get; }
 
         Cci.ICustomAttribute _debuggableAttribute, _phpextensionAttribute, _targetphpversionAttribute, _assemblyinformationalversionAttribute;
 
@@ -44,14 +46,6 @@ namespace Pchp.CodeAnalysis.Emit
         HashSet<string> _namesOfTopLevelTypes;  // initialized with set of type names within first call to GetTopLevelTypes()
 
         internal readonly CommonModuleCompilationState CompilationState;
-
-        // This is a map from the document "name" to the document.
-        // Document "name" is typically a file path like "C:\Abc\Def.cs". However, that is not guaranteed.
-        // For compatibility reasons the names are treated as case-sensitive in C# and case-insensitive in VB.
-        // Neither language trims the names, so they are both sensitive to the leading and trailing whitespaces.
-        // NOTE: We are not considering how filesystem or debuggers do the comparisons, but how native implementations did.
-        // Deviating from that may result in unexpected warnings or different behavior (possibly without warnings).
-        readonly ConcurrentDictionary<string, Cci.DebugSourceDocument> _debugDocuments;
 
         /// <summary>
         /// Builders for synthesized static constructors.
@@ -74,11 +68,13 @@ namespace Pchp.CodeAnalysis.Emit
             _sourceModule = sourceModule;
             _emitOptions = emitOptions;
             this.CompilationState = new CommonModuleCompilationState();
-            _debugDocuments = new ConcurrentDictionary<string, Cci.DebugSourceDocument>(compilation.IsCaseSensitive ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
-            _synthesized = new SynthesizedManager(this);
+            this.SynthesizedManager = new SynthesizedManager(this);
+            this.ScriptType = new SynthesizedScriptTypeSymbol(_compilation);
 
+            //
             AssemblyOrModuleSymbolToModuleRefMap.Add(sourceModule, this);
         }
+
 
         #region PEModuleBuilder
 
@@ -100,28 +96,28 @@ namespace Pchp.CodeAnalysis.Emit
         /// </summary>
         /// <param name="container">Containing type symbol.</param>
         /// <returns>Enumeration of synthesized fields.</returns>
-        public IEnumerable<FieldSymbol> GetSynthesizedFields(Cci.ITypeDefinition container) => _synthesized.GetMembers<FieldSymbol>(container);
+        public IEnumerable<FieldSymbol> GetSynthesizedFields(Cci.ITypeDefinition container) => SynthesizedManager.GetMembers<FieldSymbol>(container);
 
         /// <summary>
         /// Gets enumeration of synthesized properties for <paramref name="container"/>.
         /// </summary>
         /// <param name="container">Containing type symbol.</param>
         /// <returns>Enumeration of synthesized properties.</returns>
-        public IEnumerable<PropertySymbol> GetSynthesizedProperties(Cci.ITypeDefinition container) => _synthesized.GetMembers<PropertySymbol>(container);
+        public IEnumerable<PropertySymbol> GetSynthesizedProperties(Cci.ITypeDefinition container) => SynthesizedManager.GetMembers<PropertySymbol>(container);
 
         /// <summary>
         /// Gets enumeration of synthesized methods for <paramref name="container"/>.
         /// </summary>
         /// <param name="container">Containing type symbol.</param>
         /// <returns>Enumeration of synthesized methods.</returns>
-        public IEnumerable<MethodSymbol> GetSynthesizedMethods(Cci.ITypeDefinition container) => _synthesized.GetMembers<MethodSymbol>(container);
+        public IEnumerable<MethodSymbol> GetSynthesizedMethods(Cci.ITypeDefinition container) => SynthesizedManager.GetMembers<MethodSymbol>(container);
 
         /// <summary>
         /// Gets enumeration of synthesized nested types for <paramref name="container"/>.
         /// </summary>
         /// <param name="container">Containing type symbol.</param>
         /// <returns>Enumeration of synthesized nested types.</returns>
-        public IEnumerable<TypeSymbol> GetSynthesizedTypes(Cci.ITypeDefinition container) => _synthesized.GetMembers<TypeSymbol>(container);
+        public IEnumerable<TypeSymbol> GetSynthesizedTypes(Cci.ITypeDefinition container) => SynthesizedManager.GetMembers<TypeSymbol>(container);
 
         #endregion
 
@@ -233,11 +229,6 @@ namespace Pchp.CodeAnalysis.Emit
             throw new NotImplementedException();
         }
 
-        internal Cci.DebugSourceDocument GetOrAddDebugDocument(string path, string basePath, Func<string, Cci.DebugSourceDocument> factory)
-        {
-            return _debugDocuments.GetOrAdd(NormalizeDebugDocumentPath(path, basePath), factory);
-        }
-
         private string NormalizeDebugDocumentPath(string path, string basePath)
         {
             //var resolver = _compilation.Options.SourceReferenceResolver;
@@ -257,22 +248,6 @@ namespace Pchp.CodeAnalysis.Emit
             //return normalizedPath;
 
             return path;
-        }
-
-        /// <summary>
-        /// Gets script type containing entry point and additional assembly level symbols.
-        /// </summary>
-        internal SynthesizedScriptTypeSymbol ScriptType
-        {
-            get
-            {
-                if (_lazyScriptType == null)
-                {
-                    Interlocked.CompareExchange(ref _lazyScriptType, new SynthesizedScriptTypeSymbol(_compilation), null);
-                }
-
-                return _lazyScriptType;
-            }
         }
 
         public override string DefaultNamespace
@@ -323,7 +298,7 @@ namespace Pchp.CodeAnalysis.Emit
                 if (!_cctorBuilders.TryGetValue(container, out il))
                 {
                     var cctor = SynthesizedManager.EnsureStaticCtor(container); // ensure .cctor is declared
-                    _cctorBuilders[container] = il = new ILBuilder(this, new LocalSlotManager(null), _compilation.Options.OptimizationLevel);
+                    _cctorBuilders[container] = il = new ILBuilder(this, new LocalSlotManager(null), _compilation.Options.OptimizationLevel.AsOptimizationLevel());
                 }
             }
 

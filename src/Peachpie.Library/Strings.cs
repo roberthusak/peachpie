@@ -600,16 +600,7 @@ namespace Pchp.Library
         /// </summary>
         /// <param name="str">The string to be reversed.</param>
         /// <returns>The reversed string or empty string if <paramref name="str"/> is null.</returns>
-        public static string strrev(string str)
-        {
-            if (string.IsNullOrEmpty(str))
-                return string.Empty;
-
-            //
-            var chars = str.ToCharArray();
-            Array.Reverse(chars);
-            return new string(chars);
-        }
+        public static PhpString strrev(PhpString str) => str.Reverse();
 
         /// <summary>
         /// Finds a length of a segment consisting entirely of specified characters.
@@ -778,7 +769,7 @@ namespace Pchp.Library
                 throw new ArgumentException();
             }
 
-            return ImplodeInternal(ctx, PhpValue.Void, pieces);
+            return ImplodeInternal(ctx, PhpValue.Null, pieces);
         }
 
         /// <summary>
@@ -1017,7 +1008,7 @@ namespace Pchp.Library
         }
 
         /// <summary>
-        /// GetUserEntryPoint encode a string by shifting every letter (a-z, A-Z) by 13 places in the alphabet.
+        /// Encodes a string by shifting every letter (a-z, A-Z) by 13 places in the alphabet.
         /// </summary>
         /// <param name="str">The string to be encoded.</param>
         /// <returns>The string with characters rotated by 13 places.</returns>
@@ -2239,7 +2230,7 @@ namespace Pchp.Library
         /// <param name="charSet">The character set used in conversion. This parameter is ignored.</param>
         /// <param name="keepExisting">Whether to keep existing entities and do not encode them.</param>
         /// <returns>The converted substring.</returns>
-        static string HtmlSpecialCharsEncode(string str, int index, int length, QuoteStyle quoteStyle, string charSet, bool keepExisting)
+        internal static string HtmlSpecialCharsEncode(string str, int index, int length, QuoteStyle quoteStyle, string charSet, bool keepExisting)
         {
             int maxi = index + length;
             Debug.Assert(maxi <= str.Length);

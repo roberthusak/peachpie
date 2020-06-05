@@ -250,6 +250,15 @@ namespace Pchp.Core.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Argument {0} must be callable, {1} given.
+        /// </summary>
+        public static string argument_not_callable {
+            get {
+                return ResourceManager.GetString("argument_not_callable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Argument #{0} should be passed by reference.
         /// </summary>
         public static string argument_not_passed_byref {
@@ -2322,6 +2331,15 @@ namespace Pchp.Core.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Supplied resource is not a valid &apos;stream&apos; resource.
+        /// </summary>
+        public static string invalid_socket_resource {
+            get {
+                return ResourceManager.GetString("invalid_socket_resource", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Supplied resource is not a valid Socket Stream resource.
         /// </summary>
         public static string invalid_socket_stream_resource {
@@ -2831,6 +2849,15 @@ namespace Pchp.Core.Resources {
         public static string networkutils_unsupported {
             get {
                 return ResourceManager.GetString("networkutils_unsupported", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Cannot add element to the array as the next element is already occupied.
+        /// </summary>
+        public static string next_array_key_unavailable {
+            get {
+                return ResourceManager.GetString("next_array_key_unavailable", resourceCulture);
             }
         }
         

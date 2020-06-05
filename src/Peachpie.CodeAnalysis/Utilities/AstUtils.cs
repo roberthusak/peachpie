@@ -11,6 +11,7 @@ using System.Diagnostics;
 using System.Collections.Immutable;
 using Pchp.CodeAnalysis.Symbols;
 using Microsoft.CodeAnalysis;
+using Pchp.CodeAnalysis.Semantics;
 
 namespace Pchp.CodeAnalysis
 {
@@ -250,6 +251,16 @@ namespace Pchp.CodeAnalysis
         }
 
         /// <summary>
+        /// Gets text span of given expression.
+        /// </summary>
+        public static Microsoft.CodeAnalysis.Text.TextSpan GetTextSpan(this BoundExpression expression)
+        {
+            return expression != null && expression.PhpSyntax != null
+                ? expression.PhpSyntax.Span.ToTextSpan()
+                : default;
+        }
+
+        /// <summary>
         /// CLR compliant anonymous class name.
         /// </summary>
         public static string GetAnonymousTypeName(this AnonymousTypeDecl tdecl)
@@ -304,6 +315,20 @@ namespace Pchp.CodeAnalysis
             return tref is NullableTypeRef; // && tref != null
         }
 
+        /// <summary>
+        /// Gets value indicating the type refers to <c>callable</c> or <c>?callable</c>.
+        /// </summary>
+        public static bool IsCallable(this TypeRef tref)
+        {
+            if (tref is NullableTypeRef nullable)
+            {
+                tref = nullable.TargetType;
+            }
+
+            return tref is PrimitiveTypeRef primitiveType &&
+                primitiveType.PrimitiveTypeName == PrimitiveTypeRef.PrimitiveType.callable;
+        }
+
         public static Microsoft.CodeAnalysis.Text.TextSpan GetDeclareClauseSpan(this DeclareStmt declStmt)
         {
             if (declStmt.Statement is EmptyStmt)
@@ -322,6 +347,32 @@ namespace Pchp.CodeAnalysis
 
                 return new Microsoft.CodeAnalysis.Text.TextSpan(clauseStart, clauseLength);
             }
+        }
+
+        /// <summary>
+        /// Gets the span of "as" keyword in between enumeree and variables.
+        /// </summary>
+        public static Microsoft.CodeAnalysis.Text.TextSpan GetMoveNextSpan(this ForeachStmt stmt)
+        {
+            Debug.Assert(stmt != null);
+
+            // foreach(enumeree as key => value)
+            // foreach(enumeree as value)
+
+            var enumeree = stmt.Enumeree.Span;
+            if (enumeree.IsValid)
+            {
+                // key => value
+                // value
+                var variable = (stmt.KeyVariable ?? stmt.ValueVariable).Span;
+                if (variable.IsValid)
+                {
+                    return Span.FromBounds(enumeree.End + 1, variable.Start - 1).ToTextSpan();
+                }
+            }
+
+            // spans are not available
+            return default;
         }
     }
 }

@@ -194,6 +194,45 @@ namespace Pchp.Core.Utilities
                 return false;
             }
         }
+
+        /// <summary>
+        /// Safely returns item from array.
+        /// </summary>
+        public static bool TryGetItem<T>(T[] array, long idx, out T value)
+        {
+            if (idx >= 0 && idx < array.LongLength)
+            {
+                value = array[idx];
+                return true;
+            }
+            else
+            {
+                value = default;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Creates new array with reversed order of items.
+        /// </summary>
+        public static T[] Reverse<T>(this T[] array)
+        {
+            if (array == null) throw new ArgumentNullException(nameof(array));
+
+            if (array.Length == 0) return Array.Empty<T>();
+
+            var reversed = new T[array.Length];
+
+            Array.Copy(array, reversed, array.Length);
+            Array.Reverse(reversed);
+
+            return reversed;
+        }
+
+        /// <summary>
+        /// Gets value indicating the array is null or with no elements.
+        /// </summary>
+        public static bool IsNullOrEmpty<T>(T[] array) => array == null || array.Length == 0;
     }
 
     /// <summary>

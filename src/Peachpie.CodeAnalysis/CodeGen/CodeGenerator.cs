@@ -20,19 +20,6 @@ namespace Pchp.CodeAnalysis.CodeGen
 {
     internal partial class CodeGenerator : IDisposable
     {
-        #region BoundBlockOrdinalComparer
-
-        sealed class BoundBlockOrdinalComparer : IComparer<BoundBlock>, IEqualityComparer<BoundBlock>
-        {
-            int IEqualityComparer<BoundBlock>.GetHashCode(BoundBlock obj) => obj.GetHashCode();
-
-            bool IEqualityComparer<BoundBlock>.Equals(BoundBlock x, BoundBlock y) => object.ReferenceEquals(x, y);
-
-            int IComparer<BoundBlock>.Compare(BoundBlock x, BoundBlock y) => y.Ordinal - x.Ordinal;
-        }
-
-        #endregion
-
         #region LocalScope
 
         internal class LocalScope
@@ -179,7 +166,7 @@ namespace Pchp.CodeAnalysis.CodeGen
         readonly ILBuilder _il;
         readonly SourceRoutineSymbol _routine;
         readonly PEModuleBuilder _moduleBuilder;
-        readonly OptimizationLevel _optimizations;
+        readonly PhpOptimizationLevel _optimizations;
         readonly bool _emitPdbSequencePoints;
         readonly DiagnosticBag _diagnostics;
         readonly DynamicOperationFactory _factory;
@@ -220,6 +207,40 @@ namespace Pchp.CodeAnalysis.CodeGen
         /// </summary>
         internal SourceGeneratorSymbol GeneratorStateMachineMethod { get => _smmethod; set => _smmethod = value; }
         SourceGeneratorSymbol _smmethod;
+
+        /// <summary>
+        /// Local variable containing the current state of state machine.
+        /// </summary>
+        internal LocalDefinition GeneratorStateLocal { get; set; }
+
+        /// <summary>
+        /// "finally" block to be branched in when returning from the routine.
+        /// This finally block is not handled by CLR as it is emitted outside the TryCatchFinally scope.
+        /// </summary>
+        internal BoundBlock ExtraFinallyBlock { get; set; }
+
+        internal enum ExtraFinallyState : int
+        {
+            /// <summary>continue to NextBlock</summary>
+            None = 0,
+            /// <summary>continue to next ExtraFinallyBlock, eventually EmitRet</summary>
+            Return = 1,
+            /// <summary>rethrow exception (<see cref="ExceptionToRethrowVariable"/>)</summary>
+            Exception = 2,
+        }
+
+        /// <summary>
+        /// Temporary variable holding state of "finally" block handling. Value of <see cref="ExtraFinallyState"/>.
+        /// Variable created once only if <see cref="ExtraFinallyBlock"/> is set.
+        /// Type: <c>System.Int32</c>
+        /// </summary>
+        internal TemporaryLocalDefinition ExtraFinallyStateVariable { get; set; }
+
+        /// <summary>
+        /// Temporary variable holding exception to be rethrown after "finally" block ends.
+        /// Type: <c>System.Exception</c>
+        /// </summary>
+        internal TemporaryLocalDefinition ExceptionToRethrowVariable { get; set; }
 
         /// <summary>
         /// BoundBlock.Tag value indicating the block was emitted.
@@ -268,7 +289,7 @@ namespace Pchp.CodeAnalysis.CodeGen
         /// <summary>
         /// Whether to emit debug assertions.
         /// </summary>
-        public bool IsDebug => _optimizations == OptimizationLevel.Debug;
+        public bool IsDebug => _optimizations.IsDebug();
 
         /// <summary>
         /// Whether to emit sequence points (PDB).
@@ -339,11 +360,13 @@ namespace Pchp.CodeAnalysis.CodeGen
         }
         SourceFileSymbol _containingFile;
 
+        internal ExitBlock ExitBlock => ((ExitBlock)this.Routine.ControlFlowGraph.Exit);
+
         #endregion
 
         #region Construction
 
-        public CodeGenerator(ILBuilder il, PEModuleBuilder moduleBuilder, DiagnosticBag diagnostics, OptimizationLevel optimizations, bool emittingPdb,
+        public CodeGenerator(ILBuilder il, PEModuleBuilder moduleBuilder, DiagnosticBag diagnostics, PhpOptimizationLevel optimizations, bool emittingPdb,
             NamedTypeSymbol container, IPlace contextPlace, IPlace thisPlace, MethodSymbol routine = null, IPlace locals = null, bool localsInitialized = false, IPlace tempLocals = null)
         {
             Contract.ThrowIfNull(il);
@@ -386,9 +409,11 @@ namespace Pchp.CodeAnalysis.CodeGen
             : this(cg._il, cg._moduleBuilder, cg._diagnostics, cg._optimizations, cg._emitPdbSequencePoints, routine.ContainingType, cg.ContextPlaceOpt, cg.ThisPlaceOpt, routine, cg._localsPlaceOpt, cg.InitializedLocals)
         {
             _emmittedTag = cg._emmittedTag;
+            GeneratorStateLocal = cg.GeneratorStateLocal;
+            ExtraFinallyBlock = cg.ExtraFinallyBlock;
         }
 
-        public CodeGenerator(SourceRoutineSymbol routine, ILBuilder il, PEModuleBuilder moduleBuilder, DiagnosticBag diagnostics, OptimizationLevel optimizations, bool emittingPdb)
+        public CodeGenerator(SourceRoutineSymbol routine, ILBuilder il, PEModuleBuilder moduleBuilder, DiagnosticBag diagnostics, PhpOptimizationLevel optimizations, bool emittingPdb)
             : this(il, moduleBuilder, diagnostics, optimizations, emittingPdb, routine.ContainingType, routine.GetContextPlace(moduleBuilder), routine.GetThisPlace(), routine)
         {
             Contract.ThrowIfNull(routine);

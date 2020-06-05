@@ -45,7 +45,7 @@ namespace Peachpie.Library.MySql.MySqli
         /// <summary>
         /// Prepared command.
         /// </summary>
-        protected internal MySqlCommand Command { get; private set; }
+        private protected MySqlCommand Command { get; private set; }
 
         /// <summary>
         /// Result of the command execute command.
@@ -245,7 +245,7 @@ namespace Peachpie.Library.MySql.MySqli
                         switch (_bound_params_type[i])
                         {
                             case BoundType.Integer:
-                                boxed = variable.ToLongOrThrow();
+                                boxed = variable.ToLong();
                                 break;
                             case BoundType.Double:
                                 boxed = variable.ToDouble();

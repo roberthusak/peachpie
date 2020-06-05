@@ -16,6 +16,7 @@ namespace Pchp.Core.Reflection
     /// Hides special methods and hidden methods.
     /// Hides private methods from base classes.
     /// </summary>
+    [DebuggerNonUserCode]
     public class TypeMethods : IEnumerable<RoutineInfo>
     {
         /// <summary>
@@ -34,6 +35,7 @@ namespace Pchp.Core.Reflection
             __invoke, __tostring,
             __clone, __set_state, __debuginfo,
             __sleep, __wakeup,
+            __serialize, __unserialize,
 
             // magic CLR methods
             get_item, set_item,
@@ -69,7 +71,7 @@ namespace Pchp.Core.Reflection
                 methods = methods.Where(s_notObjectMember);
             }
 
-            // skip [PhpHidden] methods
+            // skip [PhpHidden] methods and hidden methods (internal, private protected)
             methods = methods.Where(s_phpvisible);
 
             // collect available methods (including methods on base classes)
@@ -132,7 +134,14 @@ namespace Pchp.Core.Reflection
 
         static readonly Func<MethodInfo, bool> s_notObjectMember = m => m.DeclaringType != typeof(object);
 
-        static readonly Func<MethodInfo, bool> s_phpvisible = m => !ReflectionUtils.IsPhpHidden(m);
+        static readonly Func<MethodInfo, bool> s_phpvisible = m =>
+        {
+            var access = m.Attributes & MethodAttributes.MemberAccessMask;
+            return
+                access != MethodAttributes.Assembly &&
+                access != MethodAttributes.FamANDAssem &&
+                !ReflectionUtils.IsPhpHidden(m);
+        };
 
         static bool IsSpecialName(MethodInfo[] methods)
         {

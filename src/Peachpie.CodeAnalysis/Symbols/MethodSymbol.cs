@@ -39,8 +39,6 @@ namespace Pchp.CodeAnalysis.Symbols
 
         public virtual IMethodSymbol ConstructedFrom => this;
 
-        public BoundExpression Initializer => null;
-
         ImmutableArray<IMethodSymbol> IMethodSymbol.ExplicitInterfaceImplementations => StaticCast<IMethodSymbol>.From(ExplicitInterfaceImplementations);
 
         public virtual ImmutableArray<MethodSymbol> ExplicitInterfaceImplementations => ImmutableArray<MethodSymbol>.Empty;
@@ -273,21 +271,18 @@ namespace Pchp.CodeAnalysis.Symbols
             throw new NotImplementedException();
         }
 
+        /// <summary>
+        /// Gets value indicating the method is annotated with [PhpHiddenAttribute] metadata.
+        /// </summary>
+        public virtual bool IsPhpHidden => false;
+
         #region IPhpRoutineSymbol
 
-        public virtual bool CastToFalse
-        {
-            get
-            {
-                // applies only if return type is int, long, double or a reference type
-                return this.GetReturnTypeAttributes().Any(IsCastToFalse);
-            }
-        }
+        public virtual bool CastToFalse => false;
 
-        static bool IsCastToFalse(AttributeData attr)
-        {
-            return attr.AttributeClass.MetadataName == "CastToFalse" && ((AssemblySymbol)attr.AttributeClass.ContainingAssembly).IsPeachpieCorLibrary;
-        }
+        public virtual bool IsInitFieldsOnly => false;
+
+        public virtual bool HasNotNull => false;
 
         /// <summary>
         /// For source routines, gets their control flow graph.
@@ -298,12 +293,14 @@ namespace Pchp.CodeAnalysis.Symbols
         /// <summary>
         /// Gets the routine name, equivalent to a PHP pseudoconstant <c>__FUNCTION__</c>.
         /// </summary>
-        public virtual string RoutineName => Name;
+        public virtual string RoutineName => Name; // TODO: "Name" struct with correct comparer
 
         /// <summary>
         /// Whether routine represents a global code.
         /// </summary>
         public virtual bool IsGlobalScope => false;
+
+        public BoundExpression Initializer => null; // not applicable for methods
 
         #endregion
     }

@@ -157,7 +157,7 @@ namespace Pchp.CodeAnalysis.Symbols
             for (int i = 0; i < ps.Length; i++)
             {
                 var p = ps[i];
-                
+
                 if (p.InitValue == null)
                 {
                     if (foundopt && !p.IsVariadic)
@@ -317,6 +317,8 @@ namespace Pchp.CodeAnalysis.Symbols
 
         public override bool CastToFalse => false;  // source routines never cast special values to FALSE
 
+        public override bool HasNotNull => !ReturnsNull;
+
         public override MethodKind MethodKind
         {
             get
@@ -379,6 +381,33 @@ namespace Pchp.CodeAnalysis.Symbols
 
         public override bool ReturnsVoid => ReturnType.SpecialType == SpecialType.System_Void;
 
+        /// <summary>
+        /// Gets value indicating the routine can return <c>null</c>.
+        /// </summary>
+        public bool ReturnsNull
+        {
+            get
+            {
+                var thint = SyntaxReturnType;
+
+                if (thint == null)
+                {
+                    // use the result of type analysis if possible
+                    var tmask = ResultTypeMask;
+
+                    return this.IsOverrideable()
+                        ? true
+                        : tmask.IsAnyType || tmask.IsRef || this.TypeRefContext.IsNull(tmask);
+                }
+                else
+                {
+                    // if type hint is provided,
+                    // only can be NULL if specified
+                    return thint.IsNullable();
+                }
+            }
+        }
+
         public override RefKind RefKind => RefKind.None;
 
         public override TypeSymbol ReturnType => PhpRoutineSymbolExtensions.ConstructClrReturnType(this);
@@ -418,7 +447,18 @@ namespace Pchp.CodeAnalysis.Symbols
 
         public override ImmutableArray<AttributeData> GetReturnTypeAttributes()
         {
-            return base.GetReturnTypeAttributes(); // TODO: [return: NotNull]
+            if (!ReturnsNull)
+            {
+                // [return: NotNull]
+                var returnType = this.ReturnType;
+                if (returnType != null && (returnType.IsReferenceType || returnType.Is_PhpValue())) // only if it makes sense to check for NULL
+                {
+                    return ImmutableArray.Create<AttributeData>(DeclaringCompilation.CreateNotNullAttribute());
+                }
+            }
+
+            //
+            return ImmutableArray<AttributeData>.Empty;
         }
 
         internal override ObsoleteAttributeData ObsoleteAttributeData
@@ -441,7 +481,29 @@ namespace Pchp.CodeAnalysis.Symbols
         /// </summary>
         internal override bool IsMetadataNewSlot(bool ignoreInterfaceImplementationChanges = false) => !IsOverride && IsMetadataVirtual(ignoreInterfaceImplementationChanges);
 
-        internal override bool IsMetadataVirtual(bool ignoreInterfaceImplementationChanges = false) => IsVirtual && (!ContainingType.IsSealed || IsOverride || IsAbstract); // do not make method virtual if not necessary
+        internal override bool IsMetadataVirtual(bool ignoreInterfaceImplementationChanges = false)
+        {
+            return IsVirtual && (!ContainingType.IsSealed || IsOverride || IsAbstract || OverrideOfMethod() != null);  // do not make method virtual if not necessary
+        }
+
+        /// <summary>
+        /// Gets value indicating the method is an override of another virtual method.
+        /// In such a case, this method MUST be virtual.
+        /// </summary>
+        private MethodSymbol OverrideOfMethod()
+        {
+            var overrides = ContainingType.ResolveOverrides(DiagnosticBag.GetInstance());   // Gets override resolution matrix. This is already resolved and does not cause an overhead.
+
+            for (int i = 0; i < overrides.Length; i++)
+            {
+                if (overrides[i].Override == this)
+                {
+                    return overrides[i].Method;
+                }
+            }
+
+            return null;
+        }
 
         internal override bool IsMetadataFinal => base.IsMetadataFinal && IsMetadataVirtual(); // altered IsMetadataVirtual -> causes change to '.final' metadata as well
 

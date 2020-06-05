@@ -1,4 +1,6 @@
-﻿using System;
+﻿#nullable enable
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -21,5 +23,15 @@ namespace Pchp.Core.Utilities
         /// </summary>
         /// <param name="array">Non-null reference to array.</param>
         public static bool IsPacked(this PhpArray array) => array.table.IsPacked;
+
+        /// <summary>
+        /// Ensures the array is not shared among more <see cref="PhpArray"/> instances.
+        /// Lazily clones if necessary.
+        /// </summary>
+        public static PhpArray AsWritable(this PhpArray array)
+        {
+            array.EnsureWritable();
+            return array;
+        }
     }
 }

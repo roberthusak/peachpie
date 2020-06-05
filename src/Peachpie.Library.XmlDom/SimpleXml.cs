@@ -9,6 +9,7 @@ using System.Text;
 using System.Xml;
 using System.Xml.XPath;
 using Pchp.Core;
+using Pchp.Core.Reflection;
 using Pchp.Library.Streams;
 
 namespace Peachpie.Library.XmlDom
@@ -34,10 +35,9 @@ namespace Peachpie.Library.XmlDom
         [return: CastToFalse]
         public static SimpleXMLElement simplexml_load_file(Context ctx, string fileName, string className = null, int options = 0)
         {
-            XmlDocument doc = new XmlDocument();
-            doc.PreserveWhitespace = true;
+            var doc = PhpXmlDocument.Create();
 
-            using (var stream = PhpStream.Open(ctx, fileName, "rt"))
+            using (var stream = PhpStream.Open(ctx, fileName, StreamOpenMode.ReadText))
             {
                 if (stream == null)
                 {
@@ -80,8 +80,7 @@ namespace Peachpie.Library.XmlDom
         [return: CastToFalse]
         public static SimpleXMLElement simplexml_load_string(Context ctx, string data, string className = null, int options = 0)
         {
-            XmlDocument doc = new XmlDocument();
-            doc.PreserveWhitespace = true;
+            var doc = PhpXmlDocument.Create();
 
             try
             {
@@ -354,7 +353,10 @@ namespace Peachpie.Library.XmlDom
                     // initialize the manager with prefixes/URIs from the document
                     foreach (var pair in GetNodeNamespaces(XmlElement, true))
                     {
-                        _namespaceManager.AddNamespace(pair.Key.String, pair.Value.ToStringOrThrow(_ctx));
+                        if (pair.Value.IsString(out var uri)) // always
+                        {
+                            _namespaceManager.AddNamespace(pair.Key.String, uri);
+                        }
                     }
                 }
                 return _namespaceManager;
@@ -445,14 +447,13 @@ namespace Peachpie.Library.XmlDom
 
         public void __construct(string data, int options = 0, bool dataIsUrl = false)
         {
-            XmlDocument doc = new XmlDocument();
-            doc.PreserveWhitespace = true;
+            var doc = PhpXmlDocument.Create();
 
             try
             {
                 if (dataIsUrl)
                 {
-                    using (PhpStream stream = PhpStream.Open(_ctx, data, "rt"))
+                    using (var stream = PhpStream.Open(_ctx, data, StreamOpenMode.ReadText))
                     {
                         if (stream != null) doc.Load(stream.RawStream);
                     }
@@ -504,7 +505,7 @@ namespace Peachpie.Library.XmlDom
             }
 
             // protected .ctor( Context ctx ) // does not call __construct
-            var instance = (SimpleXMLElement)type.GetUninitializedInstance(ctx);
+            var instance = (SimpleXMLElement)type.CreateUninitializedInstance(ctx);
 
             //var instance = (SimpleXMLElement)Activator.CreateInstance(
             //    type.Type,
@@ -634,8 +635,6 @@ namespace Peachpie.Library.XmlDom
         #region Internal overrides: Conversions, Dump, and Cloning
 
         string IPhpConvertible.ToString(Context ctx) => ToString();
-
-        string IPhpConvertible.ToStringOrThrow(Context ctx) => ToString();
 
         /// <summary>
         /// String representation of the XML element.
@@ -937,7 +936,7 @@ namespace Peachpie.Library.XmlDom
                 return false;
             }
 
-            child.InnerText = value.ToStringOrThrow(_ctx);
+            child.InnerText = StrictConvert.ToString(value, _ctx);
             return true;
         }
 
@@ -1427,7 +1426,7 @@ namespace Peachpie.Library.XmlDom
                     else
                     {
                         // there may be duplicates
-                        result[prefix] = (PhpValue)iterator.Current.Value;
+                        result[prefix] = iterator.Current.Value;
                     }
                 }
             }
@@ -1435,7 +1434,7 @@ namespace Peachpie.Library.XmlDom
             // the default ns should be at the beginning of the array
             if (default_ns != null)
             {
-                result.Prepend(string.Empty, (PhpValue)default_ns);
+                result.Prepend(string.Empty, default_ns);
             }
 
             return result;
@@ -1444,7 +1443,7 @@ namespace Peachpie.Library.XmlDom
         /// <summary>
         /// Returns the <paramref name="index"/>th sibling with the same local name and namespace URI or <B>null</B>.
         /// </summary>
-        private XmlElement GetSiblingForIndex(int index)
+        private XmlElement GetSiblingForIndex(long index)
         {
             if (index <= 0) return XmlElement;
 
@@ -1465,7 +1464,7 @@ namespace Peachpie.Library.XmlDom
         /// <summary>
         /// Returns the <param name="index"/>th attribute with the current namespace URI or<B>null</B>.
         /// </summary>
-        private XmlAttribute GetAttributeForIndex(int index)
+        private XmlAttribute GetAttributeForIndex(long index)
         {
             foreach (XmlAttribute attr in XmlElement.Attributes)
             {
@@ -1644,7 +1643,7 @@ namespace Peachpie.Library.XmlDom
                     }
                     else
                     {
-                        var value_str = value.ToStringOrThrow(_ctx);
+                        var value_str = StrictConvert.ToString(value, _ctx);
                         if (key.IsInteger)
                         {
                             if (iterationType == IterationType.AttributeList)

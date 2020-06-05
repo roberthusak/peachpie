@@ -16,6 +16,26 @@ namespace Pchp.Core
         /// </summary>
 		sealed class ConsoleContext : Context
         {
+            sealed class OSEncodingProvider : EncodingProvider
+            {
+                public Encoding ProvidedEncoding { get; }
+
+                public OSEncodingProvider(Encoding providedEncoding)
+                {
+                    ProvidedEncoding = providedEncoding ?? throw new ArgumentNullException(nameof(providedEncoding));
+                }
+
+                public override Encoding GetEncoding(int codepage)
+                {
+                    return (codepage == ProvidedEncoding.CodePage) ? ProvidedEncoding : null;
+                }
+
+                public override Encoding GetEncoding(string name)
+                {
+                    return null;
+                }
+            }
+
             /// <summary>
             /// Gets server type interface name.
             /// </summary>
@@ -39,6 +59,9 @@ namespace Pchp.Core
                 }
                 else
                 {
+                    //Console.OutputEncoding = Encoding.UTF8;
+                    //Console.Write("\xfeff"); // bom = byte order mark
+
                     // use the default Console output stream
                     InitOutput(Console.OpenStandardOutput(), Console.Out);
                 }
@@ -46,7 +69,20 @@ namespace Pchp.Core
                 // Globals
                 InitSuperglobals();
                 InitializeServerVars(mainscript);
-                InitializeArgvArgc(args);
+                InitializeArgvArgc(mainscript, args);
+
+                if (CurrentPlatform.IsWindows)
+                {
+                    // VT100
+                    WindowsPlatform.Enable_VT100();
+                }
+
+                // (sometimes??) the Encoding used by Console cannot be resolved by Encoding.GetEncoding(),
+                // register it for sure:
+                Encoding.RegisterProvider(new OSEncodingProvider(Console.OutputEncoding));
+
+                // autoload files
+                AutoloadFiles();
             }
         }
 
@@ -68,16 +104,20 @@ namespace Pchp.Core
         }
 
         /// <summary>Initializes global $argv and $argc variables and corresponding $_SERVER entries.</summary>
-        protected void InitializeArgvArgc(params string[] args)
+        protected void InitializeArgvArgc(string mianscript, params string[] args)
         {
             Debug.Assert(args != null);
+            
+            // PHP array with command line arguments
+            // including 0-th argument corresponding to program executable
+            var argv = new PhpArray(1 + args.Length);
+
+            argv.Add(mianscript ?? "-");
+            argv.AddRange(args);
 
             // command line argc, argv:
-            // adds all arguments to the array (the 0-th argument is not '-' as in PHP but the program file):
-            var argv = new PhpArray(args);
-
             this.Globals["argv"] = (this.Server["argv"] = argv).DeepCopy();
-            this.Globals["argc"] = this.Server["argc"] = args.Length;
+            this.Globals["argc"] = this.Server["argc"] = argv.Count;
         }
 
         /// <summary>

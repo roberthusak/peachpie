@@ -6,6 +6,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Specialized;
 using System.Reflection;
+using Peachpie.Library.PDO.Utilities;
+using System.Text;
+using Pchp.Library;
 
 namespace Peachpie.Library.PDO
 {
@@ -18,7 +21,7 @@ namespace Peachpie.Library.PDO
         /// <summary>
         /// Gets the driver name (used in DSN)
         /// </summary>
-        public string Name { get; }
+        public abstract string Name { get; }
 
         /// <summary>
         /// Gets the client version.
@@ -35,23 +38,7 @@ namespace Peachpie.Library.PDO
         }
 
         /// <inheritDoc />
-        public DbProviderFactory DbFactory { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="PDODriver"/> class.
-        /// </summary>
-        /// <param name="name">The name.</param>
-        /// <param name="dbFactory">The database factory object.</param>
-        /// <exception cref="System.ArgumentNullException">
-        /// name
-        /// or
-        /// dbFactory
-        /// </exception>
-        public PDODriver(string name, DbProviderFactory dbFactory)
-        {
-            this.Name = name ?? throw new ArgumentNullException(nameof(name));
-            this.DbFactory = dbFactory ?? throw new ArgumentNullException(nameof(dbFactory));
-        }
+        public abstract DbProviderFactory DbFactory { get; }
 
         /// <summary>
         /// Builds the connection string.
@@ -94,13 +81,27 @@ namespace Peachpie.Library.PDO
         public abstract string GetLastInsertId(PDO pdo, string name);
 
         /// <summary>
+        /// Sets <see cref="PDO.PDO_ATTR.ATTR_STRINGIFY_FETCHES"/> attribute value.
+        /// </summary>
+        /// <param name="pdo"><see cref="PDO"/> object reference.</param>
+        /// <param name="stringify">Whether to stringify fetched values.</param>
+        /// <returns>Value indicating the attribute was set succesfuly.</returns>
+        public virtual bool TrySetStringifyFetches(PDO pdo, bool stringify)
+        {
+            // NOTE: this method should be removed and stringify handled when actually used in PdoResultResource.GetValues()
+
+            pdo.Stringify = stringify;
+            return true;
+        }
+
+        /// <summary>
         /// Tries to set a driver specific attribute value.
         /// </summary>
         /// <param name="attributes">The current attributes collection.</param>
         /// <param name="attribute">The attribute to set.</param>
         /// <param name="value">The value.</param>
         /// <returns>true if value is valid, or false if value can't be set.</returns>
-        public virtual bool TrySetAttribute(Dictionary<PDO.PDO_ATTR, PhpValue> attributes, PDO.PDO_ATTR attribute, PhpValue value)
+        public virtual bool TrySetAttribute(Dictionary<PDO.PDO_ATTR, PhpValue> attributes, int attribute, PhpValue value)
         {
             return false;
         }
@@ -117,13 +118,106 @@ namespace Peachpie.Library.PDO
         }
 
         /// <summary>
+        /// Preprocesses the command for use with parameters.
+        /// Returns updated query string, optionally creates the <paramref name="bound_param_map"/> with parameter name mapping.
+        /// Most of ADO.NET drivers does not allow to use unnamed parameters - we'll rewrite them to named parameters.
+        /// </summary>
+        /// <param name="queryString">The original command text.</param>
+        /// <param name="options">Custom options.</param>
+        /// <param name="bound_param_map">Will be set to <c>null</c> or a map of user-provided names to rewritten parameter names.</param>
+        public virtual string RewriteCommand(string queryString, PhpArray options, out Dictionary<IntStringKey, IntStringKey> bound_param_map)
+        {
+            using (var rewriter = new StatementStringRewriter() { TranslateNamedParams = true, })
+            {
+                rewriter.ParseString(queryString);
+
+                bound_param_map = rewriter.BoundParamMap;
+                queryString = rewriter.RewrittenQueryString;
+            }
+
+            //
+            return queryString;
+        }
+
+        private class StatementStringRewriter : StatementStringParser, IDisposable
+        {
+            StringBuilder _stringBuilder = StringBuilderUtilities.Pool.Get();
+            int _unnamedParamIndex = 0;
+
+            public string RewrittenQueryString => _stringBuilder?.ToString();
+
+            public Dictionary<IntStringKey, IntStringKey> BoundParamMap { get; private set; }
+
+            /// <summary>
+            /// Translate `:name` syntax to `@name` syntax.
+            /// Add `name` to <see cref="BoundParamMap"/>.
+            /// </summary>
+            public bool TranslateNamedParams { get; set; }
+
+            protected override void Next(Tokens token, string text, int start, int length)
+            {
+                string mappedParamName;
+
+                switch (token)
+                {
+                    case Tokens.UnnamedParameter:
+
+                        mappedParamName = "@_" + _unnamedParamIndex;
+                        _stringBuilder.Append(mappedParamName);
+
+                        BoundParamMap ??= new Dictionary<IntStringKey, IntStringKey>();
+                        BoundParamMap[_unnamedParamIndex++] = mappedParamName;
+
+                        break;
+
+                    case Tokens.NamedParameter:
+
+                        if (TranslateNamedParams && text[start] == ':')
+                        {
+                            // :name => @name
+                            var paramName = text.Substring(start + 1, length - 1);
+                            mappedParamName = "@" + paramName;
+                            _stringBuilder.Append(mappedParamName);
+
+                            // BoundParamMap["name"] = "@name"
+                            // BoundParamMap[":name"] = "@name"
+                            BoundParamMap ??= new Dictionary<IntStringKey, IntStringKey>();
+                            BoundParamMap[paramName] = mappedParamName;
+                            BoundParamMap[":" + paramName] = mappedParamName;
+
+                            break;
+                        }
+                        else
+                        {
+                            goto default;
+                        }
+
+                    default:
+                        _stringBuilder.Append(text, start, length);
+                        break;
+                }
+            }
+
+            void IDisposable.Dispose()
+            {
+                StringBuilderUtilities.Pool.Return(_stringBuilder);
+                _stringBuilder = null;
+            }
+        }
+
+        /// <summary>
         /// Processes DB exception and returns corresponding error info.
         /// </summary>
-        public virtual void HandleException(Exception ex, out string SQLSTATE, out string code, out string message)
+        public virtual void HandleException(Exception ex, out PDO.ErrorInfo errorInfo)
         {
-            SQLSTATE = string.Empty;
-            code = null;
-            message = ex.Message;
+            if (ex is Pchp.Library.Spl.Exception pex)
+            {
+                errorInfo = PDO.ErrorInfo.Create(string.Empty, pex.getCode().ToString(), pex.Message);
+            }
+            else
+            {
+                errorInfo = PDO.ErrorInfo.Create(string.Empty, null, ex.Message);
+            }
         }
 
         /// <summary>
@@ -132,7 +226,7 @@ namespace Peachpie.Library.PDO
         /// <param name="pdo">The pdo.</param>
         /// <param name="attribute">The attribute.</param>
         /// <returns></returns>
-        public virtual PhpValue GetAttribute(PDO pdo, PDO.PDO_ATTR attribute)
+        public virtual PhpValue GetAttribute(PDO pdo, int attribute)
         {
             return PhpValue.Null;
         }

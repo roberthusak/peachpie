@@ -14,6 +14,7 @@ namespace Pchp.Core.Dynamic
     /// <summary>
     /// Provides information about the call.
     /// </summary>
+    [DebuggerNonUserCode]
     internal class CallSiteContext
     {
         public CallSiteContext(bool isStaticSyntax)
@@ -41,10 +42,19 @@ namespace Pchp.Core.Dynamic
             // bind trait definition !TSelf eventually
             BindTraitSelf();
 
-            // args[taken..count]
-            this.Arguments = (taken == args.Length)
-                ? Array.Empty<Expression>()
-                : args.Skip(taken).Select(x => x.Expression).ToArray();
+            // Arguments = args[taken..count]
+            if (taken == args.Length)
+            {
+                this.Arguments = Array.Empty<Expression>();
+            }
+            else
+            {
+                this.Arguments = new Expression[args.Length - taken];
+                for (int i = taken; i < args.Length; i++)
+                {
+                    this.Arguments[i - taken] = args[i].Expression;
+                }
+            }
 
             //
             return this;
@@ -158,6 +168,11 @@ namespace Pchp.Core.Dynamic
         /// Either instance or null.
         /// </summary>
         public Expression TargetInstance { get; set; }
+
+        /// <summary>
+        /// Optional. Late static bound type, results in <see cref="PhpTypeInfo"/>.
+        /// </summary>
+        public Expression LateStaticType { get; set; }
 
         /// <summary>
         /// Current target instance or <c>null</c>.

@@ -636,6 +636,18 @@ namespace Pchp.Core
             }
         }
 
+        /// <summary>
+        /// Adds range of values at the end of the hashtable.
+        /// </summary>
+        /// <param name="enumeration">The value enumeration. Cannot be <c>null</c>.</param>
+        public void AddRange(string[] enumeration)
+        {
+            for (int i = 0; i < enumeration.Length; i++)
+            {
+                AddToEnd(enumeration[i]);
+            }
+        }
+
         #endregion
 
         #region Prepend
@@ -845,19 +857,7 @@ namespace Pchp.Core
         /// <summary>
         /// Copies values to a new array.
         /// </summary>
-        public PhpValue[] GetValues()
-        {
-            if (this.Count != 0)
-            {
-                var array = new PhpValue[this.Count];
-                this.CopyValuesTo(array, 0);
-                return array;
-            }
-            else
-            {
-                return Array.Empty<PhpValue>();
-            }
-        }
+        public PhpValue[] GetValues() => table.GetValues();
 
         #endregion
 

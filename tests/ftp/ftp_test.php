@@ -1,6 +1,10 @@
 <?php
 namespace ftp\ftp_test;
-// Enviroment variables PEACHPIE_FTP_TEST_SERVER, PEACHPIE_FTP_TEST_USER, PEACHPIE_FTP_TEST_PASSWORD must be setted
+// Enviroment variables containing credentials must be set
+if (!getenv('PEACHPIE_FTP_TEST_SERVER') || !getenv('PEACHPIE_FTP_TEST_USER') || !getenv('PEACHPIE_FTP_TEST_PASSWORD')){
+  exit("***SKIP***");
+}
+
 $server = $user_name = $user_pass = false;
 
 if (!Init()){
@@ -248,13 +252,13 @@ function Test3($server, $user_name, $user_pass){
 
     // Prepare server
     if (ftp_size($conn_id, $testingFileClient) != -1) {
-        if (!ftp_delete($conn_id, $testingFileClient, $testingFileClient)) {
+        if (!ftp_delete($conn_id, $testingFileClient)) {
             return false;
         }
     }
 
     if (ftp_size($conn_id, $testingFileServer) != -1) {
-        if (!ftp_delete($conn_id, $testingFileServer, $testingFileServer)) {
+        if (!ftp_delete($conn_id, $testingFileServer)) {
             return false;
         }
     }

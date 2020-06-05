@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using Pchp.Core;
 using Pchp.Library.Streams;
+using static Pchp.Library.Network;
 
 namespace Pchp.Library
 {
@@ -19,54 +21,66 @@ namespace Pchp.Library
         /// <summary>
         /// Types of the DNS record.
         /// </summary>
-        [PhpHidden]
+        [PhpHidden, Flags]
         public enum DnsRecordType
         {
             /// <summary>IPv4 Address Resource</summary>
-            Ip4Address,
-
-            /// <summary>Mail Exchanger Resource</summary>
-            Mail,
-
-            /// <summary>Alias (Canonical Name) Resource</summary>
-            Alias,
+            Ip4Address = 1,
 
             /// <summary>Authoritative Name Server Resource.</summary>
-            NameServer,
+            NameServer = 1 << 1,
 
-            /// <summary>Pointer Resource.</summary>
-            Pointer,
-
-            /// <summary>Host Info Resource.</summary>
-            HostInfo,
+            /// <summary>Alias (Canonical Name) Resource</summary>
+            Alias = 1 << 4,
 
             /// <summary>Start of Authority Resource.</summary>
-            StartOfAuthority,
+            StartOfAuthority = 1 << 5,
+
+            /// <summary>Pointer Resource.</summary>
+            Pointer = 1 << 11,
+
+            /// <summary>Host Info Resource.</summary>
+            HostInfo = 1 << 12,
+
+            CertificationAuthorityAuthorization = 1 << 13,
+
+            /// <summary>Mail Exchanger Resource</summary>
+            Mail = 1 << 14,
 
             /// <summary>Text Resource.</summary>
-            Text,
+            Text = 1 << 15,
 
-            /// <summary>Any Resource Record.</summary>
-            Any,
+            /// <summary>
+            /// IPv6 A6 record.
+            /// </summary>
+            A6 = 1 << 24,
+
+            ServiceRecord = 1 << 25,
+
+            NameAuthorityPointer = 1 << 26,
 
             /// <summary>IPv6 Address Resource</summary>
-            Ip6Address,
+            Ip6Address = 1 << 27,
 
-            /// <summary>Iteratively query the name server for each available record type.</summary>
-            All
+            /// <summary>Any Resource Record.</summary>
+            Any = 1 << 28,
         }
 
         public const int DNS_A = (int)DnsRecordType.Ip4Address;
-        public const int DNS_MX = (int)DnsRecordType.Mail;
-        public const int DNS_CNAME = (int)DnsRecordType.Alias;
         public const int DNS_NS = (int)DnsRecordType.NameServer;
+        public const int DNS_CNAME = (int)DnsRecordType.Alias;
+        public const int DNS_SOA = (int)DnsRecordType.StartOfAuthority;
         public const int DNS_PTR = (int)DnsRecordType.Pointer;
         public const int DNS_HINFO = (int)DnsRecordType.HostInfo;
-        public const int DNS_SOA = (int)DnsRecordType.StartOfAuthority;
+        public const int DNS_CAA = (int)DnsRecordType.CertificationAuthorityAuthorization;
+        public const int DNS_MX = (int)DnsRecordType.Mail;
         public const int DNS_TXT = (int)DnsRecordType.Text;
-        public const int DNS_ANY = (int)DnsRecordType.Any;
+        public const int DNS_SRV = (int)DnsRecordType.ServiceRecord;
+        public const int DNS_NAPTR = (int)DnsRecordType.NameAuthorityPointer;
         public const int DNS_AAAA = (int)DnsRecordType.Ip6Address;
-        public const int DNS_ALL = (int)DnsRecordType.All;
+        public const int DNS_A6 = (int)DnsRecordType.A6;
+        public const int DNS_ANY = (int)DnsRecordType.Any;
+        public const int DNS_ALL = DNS_A | DNS_NS | DNS_CNAME | DNS_SOA | DNS_PTR | DNS_HINFO | DNS_CAA | DNS_MX | DNS_TXT | DNS_SRV | DNS_NAPTR | DNS_AAAA | DNS_A6 | DNS_ANY;
 
         #endregion
 
@@ -165,79 +179,140 @@ namespace Pchp.Library
         }
 
         #endregion
+
+        #region getprotobyname, getprotobynumber
+
+        static IEnumerable<(string name, ProtocolType type)> EnumerateProtocolTypes()
+        {
+            yield return ("ip", ProtocolType.IP);
+            yield return ("icmp", ProtocolType.Icmp);
+            yield return ("igmp", ProtocolType.Igmp);
+            yield return ("ggp", ProtocolType.Ggp);
+            yield return ("tcp", ProtocolType.Tcp);
+            //yield return ("egp", ProtocolType.); // 8
+            yield return ("pup", ProtocolType.Pup);
+            yield return ("udp", ProtocolType.Udp);
+            //yield return ("hmp", ProtocolType.); // 20
+            yield return ("xns-idp", ProtocolType.Idp);
+            //yield return ("rdp", ProtocolType.); // 27
+            yield return ("ipv6", ProtocolType.IPv6);
+            yield return ("ipv6-route", ProtocolType.IPv6RoutingHeader);
+            yield return ("ipv6-frag", ProtocolType.IPv6FragmentHeader);
+            yield return ("esp", ProtocolType.IPSecEncapsulatingSecurityPayload);
+            yield return ("ah", ProtocolType.IPSecAuthenticationHeader);
+            yield return ("ipv6-icmp", ProtocolType.IcmpV6);
+            yield return ("ipv6-nonxt", ProtocolType.IPv6NoNextHeader);
+            yield return ("ipv6-opts", ProtocolType.IPv6DestinationOptions);
+            //yield return ("rvd", ProtocolType.); // 66
+            //yield return ("nd", ProtocolType.ND);
+            yield return ("ipx", ProtocolType.Ipx);
+        }
+
+        static readonly Lazy<Dictionary<string, ProtocolType>> s_protoByName = new Lazy<Dictionary<string, ProtocolType>>(() =>
+        {
+            var map = new Dictionary<string, ProtocolType>(19, StringComparer.OrdinalIgnoreCase);
+            
+            foreach (var value in EnumerateProtocolTypes())
+            {
+                map[value.name] = value.type;
+            }
+
+            return map;
+        });
+
+        static readonly Lazy<Dictionary<ProtocolType, string>> s_protoByNumber = new Lazy<Dictionary<ProtocolType, string>>(() =>
+        {
+            var map = new Dictionary<ProtocolType, string>(19);
+
+            foreach (var value in EnumerateProtocolTypes())
+            {
+                map[value.type] = value.name;
+            }
+
+            return map;
+        });
+
+        /// <summary>
+        /// Get protocol number associated with protocol name.
+        /// </summary>
+        /// <remarks>Numbers correspond to <see cref="System.Net.Sockets.ProtocolType"/>.</remarks>
+        [return: CastToFalse]
+        public static int getprotobyname(string name)
+        {
+            if (s_protoByName.Value.TryGetValue(name, out var type))
+            {
+                return (int)type;
+            }
+            else
+            {
+                return -1; // FALSE
+            }
+        }
+
+        /// <summary>
+        /// Get protocol number associated with protocol name.
+        /// </summary>
+        /// <remarks>Numbers correspond to <see cref="System.Net.Sockets.ProtocolType"/>.</remarks>
+        [return: CastToFalse]
+        public static string getprotobynumber(ProtocolType type)
+        {
+            if (s_protoByNumber.Value.TryGetValue(type, out var name))
+            {
+                return name;
+            }
+            else
+            {
+                return null; // FALSE
+            }
+        }
+
+        #endregion
     }
 
     /// <summary>Functions working with DNS.</summary>
     [PhpExtension("standard")]
-	public static class PhpDns
+    public static class PhpDns
     {
-        //#region NS: dns_check_record, checkdnsrr
+        #region dns_check_record, checkdnsrr
 
-        //       /// <summary>
-        //       /// Not supported.
-        //       /// </summary>
-        //       [ImplementsFunction("checkdnsrr", FunctionImplOptions.NotSupported)]
-        //       public static int CheckRecordRows(string host)
-        //       {
-        //           return CheckRecords(host, "MX");
-        //       }
+        /// <summary>
+        /// Not supported.
+        /// </summary>
+        public static bool checkdnsrr(string host, string type = "MX") => dns_check_record(host, type);
 
-        //       /// <summary>
-        //       /// Not supported.
-        //       /// </summary>
-        //       [ImplementsFunction("checkdnsrr", FunctionImplOptions.NotSupported)]
-        //       public static int CheckRecordRows(string host, string type)
-        //       {
-        //           return CheckRecords(host, type);
-        //       }
+        /// <summary>
+        /// Not supported.
+        /// </summary>
+        public static bool dns_check_record(string host, string type = "MX")
+        {
+            throw new NotImplementedException();
+        }
 
-        //       /// <summary>
-        //       /// Not supported.
-        //       /// </summary>
-        //       [ImplementsFunction("dns_check_record", FunctionImplOptions.NotSupported)]
-        //       public static int CheckRecords(string host, string type)
-        //       {
-        //           PhpException.FunctionNotSupported();
-        //           return 0;
-        //       }
+        #endregion
 
+        #region dns_get_record
 
-        //       #endregion
+        /// <summary>
+        /// Not supported.
+        /// </summary>
+        [return: CastToFalse]
+        public static PhpArray dns_get_record(string host, DnsRecordType type = DnsRecordType.Any)
+        {
+            throw new NotImplementedException();
+        }
 
-        //       #region NS: dns_get_record
+        /// <summary>
+        /// Not supported.
+        /// </summary>
+        [return: CastToFalse]
+        public static PhpArray dns_get_record(string host, DnsRecordType type, out PhpArray authNS, out PhpArray additional)
+        {
+            authNS = null;
+            additional = null;
+            throw new NotImplementedException();
+        }
 
-        //       /// <summary>
-        //       /// Not supported.
-        //       /// </summary>
-        //       [ImplementsFunction("dns_get_record", FunctionImplOptions.NotSupported)]
-        //       public static PhpArray GetRecord(string host)
-        //       {
-        //           return GetRecord(host, DnsRecordType.All);
-        //       }
-
-        //       /// <summary>
-        //       /// Not supported.
-        //       /// </summary>
-        //       [ImplementsFunction("dns_get_record", FunctionImplOptions.NotSupported)]
-        //       public static PhpArray GetRecord(string host, DnsRecordType type)
-        //       {
-        //           PhpException.FunctionNotSupported();
-        //           return null;
-        //       }
-
-        //       /// <summary>
-        //       /// Not supported.
-        //       /// </summary>
-        //       [ImplementsFunction("dns_get_record", FunctionImplOptions.NotSupported)]
-        //       public static PhpArray GetRecord(string host, DnsRecordType type, out PhpArray authNS, out PhpArray additional)
-        //       {
-        //           PhpException.FunctionNotSupported();
-        //           authNS = null;
-        //           additional = null;
-        //           return null;
-        //       }
-
-        //       #endregion
+        #endregion
 
         #region gethostbyaddr, gethostbyname, gethostbynamel
 

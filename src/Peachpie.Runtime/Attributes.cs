@@ -1,4 +1,6 @@
-﻿using Pchp.Core.Reflection;
+﻿#nullable enable
+
+using Pchp.Core.Reflection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,11 +19,28 @@ namespace Pchp.Core
         /// <summary>
         /// Script path relative to the root.
         /// </summary>
-        public string Path { get; private set; }
+        public string Path { get; }
+
+        /// <summary>
+        /// Last modified time of the source file (UTC).
+        /// Can be <c>default</c> if not set.
+        /// </summary>
+        public DateTime LastModifiedTime { get; }
+
+        /// <summary>
+        /// Gets value indicating whether the file is marked to be autoloaded for each request.
+        /// </summary>
+        public bool IsAutoloaded { get; set; }
 
         public ScriptAttribute(string path)
+            : this(path, 0L)
+        {
+        }
+
+        public ScriptAttribute(string path, long modifiedTimeTicks)
         {
             this.Path = path;
+            this.LastModifiedTime = modifiedTimeTicks != 0 ? new DateTime(modifiedTimeTicks, DateTimeKind.Utc) : default;
         }
     }
 
@@ -64,7 +83,7 @@ namespace Pchp.Core
         /// <summary>
         /// Gets the first specified extension name or <c>null</c>.
         /// </summary>
-        public string FirstExtensionOrDefault
+        public string? FirstExtensionOrDefault
             => _extensions is string name ? name
             : _extensions is string[] names && names.Length != 0 ? names[0]
             : null;
@@ -82,11 +101,11 @@ namespace Pchp.Core
         /// The object is used to handle one-time initialization and context life-cycle.
         /// Implement initialization and subscription logic in .ctor.
         /// </remarks>
-        public Type Registrator { get; set; }
+        public Type? Registrator { get; set; }
 
         public PhpExtensionAttribute()
         {
-            _extensions = null;
+            _extensions = Array.Empty<string>();
         }
 
         public PhpExtensionAttribute(string extension)
@@ -163,7 +182,7 @@ namespace Pchp.Core
         /// <summary>
         /// Optional. Explicitly set type name.
         /// </summary>
-        public string ExplicitTypeName { get; }
+        public string? ExplicitTypeName { get; }
 
         /// <summary>
         /// Indicates how to treat the type name.
@@ -173,7 +192,18 @@ namespace Pchp.Core
         /// <summary>
         /// Optional. Relative path to the file where the type is defined.
         /// </summary>
-        public string FileName { get; }
+        public string? FileName { get; }
+
+        /// <summary>
+        /// - 0: type is not selected to be autoloaded.<br/>
+        /// - 1: type is marked to be autoloaded.<br/>
+        /// - 2: type is marked to be autoloaded and it is the only unconditional declaration in its source file.<br/>
+        /// </summary>
+        public byte AutoloadFlag { get; }
+
+        public const byte AutoloadAllow = 1;
+
+        public const byte AutoloadAllowNoSideEffect = 2;
 
         /// <summary>
         /// Value stating that the type name is inherited from the CLR name excluding its namespace part, see <see cref="PhpTypeName.NameOnly"/>.
@@ -184,7 +214,7 @@ namespace Pchp.Core
         /// <summary>
         /// Value indicating how to treat the type name in PHP.
         /// </summary>
-        public enum PhpTypeName
+        public enum PhpTypeName : byte
         {
             /// <summary>
             /// Full type name including its namespace name is used.
@@ -215,12 +245,28 @@ namespace Pchp.Core
         /// Annotates the PHP type.
         /// </summary>
         /// <param name="phpTypeName">The type name that will be used in PHP context instead of CLR type name.</param>
-        /// <param name="fileName">Optional relative path to the file where the type is defined.</param>
-        public PhpTypeAttribute(string phpTypeName, string fileName = null)
+        /// <param name="fileName">Optional. Relative path to the file where the type is defined.</param>
+        public PhpTypeAttribute(string phpTypeName, string fileName)
+            : this(phpTypeName, fileName, default)
+        {
+        }
+
+        /// <summary>
+        /// Annotates the PHP type.
+        /// </summary>
+        /// <param name="phpTypeName">The type name that will be used in PHP context instead of CLR type name.</param>
+        /// <param name="fileName">Relative path to the file where the type is defined.</param>
+        /// <param name="autoload">Optional. Specifies if the type can be autoloaded:<br/>
+        /// - 0: type is not selected to be autloaded.<br/>
+        /// - 1: type is marked to be autoloaded.<br/>
+        /// - 2: type is marked to be autoloaded and it is the only unconditional declaration in its source file.<br/>
+        /// </param>
+        public PhpTypeAttribute(string phpTypeName, string fileName, byte autoload)
         {
             ExplicitTypeName = phpTypeName ?? throw new ArgumentNullException();
             FileName = fileName;
             TypeNameAs = PhpTypeName.CustomName;
+            AutoloadFlag = autoload;
         }
     }
 
@@ -368,7 +414,7 @@ namespace Pchp.Core
         /// The type containing the backing field.
         /// <c>Null</c> indicates the containing type.
         /// </summary>
-        public Type ExplicitType { get; set; }
+        public Type? ExplicitType { get; set; }
 
         /// <summary>
         /// Name of the backing field.
@@ -448,7 +494,7 @@ namespace Pchp.Core
         /// <summary>
         /// The Script type from the dependent assembly.
         /// </summary>
-        public Type ScriptType { get; private set; }
+        public Type ScriptType { get; }
 
         public PhpPackageReferenceAttribute(Type scriptType)
         {

@@ -1,10 +1,14 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyModel;
 using Pchp.Core;
 using Pchp.Core.Utilities;
 
@@ -54,16 +58,46 @@ namespace Peachpie.AspNetCore.Web
         {
             if (options.ScriptAssembliesName != null)
             {
-                foreach (var assname in options.ScriptAssembliesName.Select(str => new System.Reflection.AssemblyName(str)))
+                foreach (var assname in options.ScriptAssembliesName)
                 {
-                    var ass = System.Reflection.Assembly.Load(assname);
-                    if (ass != null)
+                    Context.AddScriptReference(Assembly.Load(new AssemblyName(assname)));
+                }
+            }
+            else
+            {
+                var PeachpieRuntime = typeof(Context).Assembly.GetName().Name; // "Peachpie.Runtime"
+
+                // reads dependencies from DependencyContext
+                foreach (var lib in DependencyContext.Default.RuntimeLibraries)
+                {
+                    if (lib.Type != "package" && lib.Type != "project")
                     {
-                        Context.AddScriptReference(ass);
+                        continue;
                     }
-                    else
+
+                    if (lib.Name.StartsWith("Peachpie.", StringComparison.Ordinal))
                     {
-                        LogEventSource.Log.ErrorLog($"Assembly '{assname}' couldn't be loaded.");
+                        continue;
+                    }
+
+                    // process assembly if it has a dependency to runtime
+                    var dependencies = lib.Dependencies;
+                    for (int i = 0; i < dependencies.Count; i++)
+                    {
+                        if (dependencies[i].Name == PeachpieRuntime)
+                        {
+                            try
+                            {
+                                // assuming DLL is deployed with the executable,
+                                // and contained lib is the same name as package:
+                                Context.AddScriptReference(Assembly.Load(new AssemblyName(lib.Name)));
+                            }
+                            catch
+                            {
+                                // 
+                            }
+                            break;
+                        }
                     }
                 }
             }
@@ -87,17 +121,58 @@ namespace Peachpie.AspNetCore.Web
             _options.BeforeRequest?.Invoke(ctx);
         }
 
+        Task InvokeAndDispose(RequestContextCore phpctx, Context.ScriptInfo script)
+        {
+            try
+            {
+                OnContextCreated(phpctx);
+                phpctx.ProcessScript(script);
+            }
+            finally
+            {
+                phpctx.Dispose();
+                phpctx.RequestEndEvent?.Set();
+            }
+
+            //
+            return Task.CompletedTask;
+        }
+
+        static TimeSpan GetRequestTimeout(Context phpctx) =>
+            Debugger.IsAttached
+            ? Timeout.InfiniteTimeSpan
+            : TimeSpan.FromSeconds(phpctx.Configuration.Core.ExecutionTimeout);
+
         public Task Invoke(HttpContext context)
         {
             var script = RequestContextCore.ResolveScript(context.Request);
             if (script.IsValid)
             {
-                using (var phpctx = new RequestContextCore(context, _rootPath, _options.StringEncoding))
+                using var endevent = new ManualResetEventSlim(false);
+                var phpctx = new RequestContextCore(context, _rootPath, _options.StringEncoding)
                 {
-                    OnContextCreated(phpctx);
-                    phpctx.ProcessScript(script);
+                    RequestEndEvent = endevent,
+                };
+
+                // run the script, dispose phpctx when finished
+                var task = Task.Run(() => InvokeAndDispose(phpctx, script));
+
+                // wait for the request to finish
+                if (endevent.Wait(GetRequestTimeout(phpctx)) == false)
+                {
+                    // timeout
+                    // context.Response.StatusCode = HttpStatusCode.RequestTimeout;
                 }
 
+                phpctx.RequestEndEvent = null;
+
+                if (task.Exception != null)
+                {
+                    // rethrow script exception
+                    throw task.Exception;
+                }
+
+                //
                 return Task.CompletedTask;
             }
             else

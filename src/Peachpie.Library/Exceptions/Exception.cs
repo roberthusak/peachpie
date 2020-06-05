@@ -32,21 +32,29 @@ namespace Pchp.Library.Spl
         }
 
         protected PhpValue message; // laravel makes references to this variable hence it cannot be strictly `string` // https://github.com/peachpiecompiler/peachpie/issues/564 - can be typed as string once we allow making references to any type
-        protected long code;
+        
+        protected PhpValue code;    // should be `long` only, but laravel assigns string as well here // CHECK: isn't it just in PDOException?
+        
         protected string file;
+        
         protected int line;
+
+        internal protected void InitializeInternal()
+        {
+            this.file = _stacktrace.GetFilename();
+            this.line = _stacktrace.GetLine();
+        }
 
         [PhpFieldsOnlyCtor]
         protected Exception()
         {
+            InitializeInternal();
         }
 
         public Exception(string message = "", long code = 0, Throwable previous = null)
             : base(message, innerException: previous as System.Exception)
         {
-            this.file = _stacktrace.GetFilename();
-            this.line = _stacktrace.GetLine();
-
+            InitializeInternal();
             __construct(message, code, previous);
         }
 
@@ -95,7 +103,7 @@ namespace Pchp.Library.Spl
 
         public void __wakeup() => throw new NotImplementedException();
 
-        public virtual string __toString() => _stacktrace.FormatExceptionString(this.GetPhpTypeInfo().Name, getMessage()); // TODO: _trace
+        public virtual string __toString() => _stacktrace.FormatExceptionString(this.GetPhpTypeInfo().Name, this.Message); // TODO: _trace
 
         public sealed override string ToString() => __toString();
     }

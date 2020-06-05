@@ -50,8 +50,14 @@ namespace Pchp.Core.Dynamic
             }
 
             // from (object)null
-            if (arg is ConstantExpression c && ReferenceEquals(c.Value, null) && !target.IsValueType)
+            if (IsNullConstant(arg) && !target.IsValueType)
             {
+                if (target == typeof(PhpAlias))
+                {
+                    // new PhppAlias(PhpValue.Null, 1)
+                    return Expression.New(Cache.PhpAlias.ctor_PhpValue_int, BindToValue(arg), Expression.Constant(1));
+                }
+
                 // (T)null
                 return Expression.Constant(null, target);
             }
@@ -64,9 +70,11 @@ namespace Pchp.Core.Dynamic
                     // Template: arg.EnsureAlias()
                     return Expression.Call(arg, Cache.IndirectLocal.EnsureAlias);
                 }
-
-                // Template: arg.Value
-                return Bind(Expression.Property(arg, Cache.IndirectLocal.Value), target, ctx);
+                else
+                {
+                    // Template: arg.GetValue()
+                    return Bind(Expression.Call(arg, Cache.IndirectLocal.GetValue), target, ctx);
+                }
             }
 
             Debug.Assert(ctx != null, "!ctx");
@@ -98,7 +106,7 @@ namespace Pchp.Core.Dynamic
             if (target == typeof(PhpAlias))
             {
                 //Debug.Assert(arg.Type.IsByRef && arg.Type == typeof(PhpValue), "Variable should be PhpValue and passed by ref so things will work out!");
-                if (arg.Type == typeof(PhpValue)) return Expression.Call(arg, Cache.Operators.PhpValue_EnsureAlias);
+                if (arg.Type == typeof(PhpValue)) return Expression.Call(Cache.Operators.EnsureAlias_PhpValueRef, arg);
                 return Expression.New(Cache.PhpAlias.ctor_PhpValue_int, BindToValue(arg), Expression.Constant(1));
             }
 
@@ -126,7 +134,16 @@ namespace Pchp.Core.Dynamic
                 // IntPtr
                 if (target == typeof(IntPtr))
                 {
-                    return Expression.New(typeof(IntPtr).GetCtor(Cache.Types.Long), BindToLong(arg));
+                    if (IsNullConstant(arg))
+                    {
+                        // IntPtr.Zero
+                        return Expression.Field(null, typeof(IntPtr), "Zero");
+                    }
+                    else
+                    {
+                        // new IntPtr(long)
+                        return Expression.New(typeof(IntPtr).GetCtor(Cache.Types.Long), BindToLong(arg));
+                    }
                 }
 
                 // DateTime
@@ -143,6 +160,11 @@ namespace Pchp.Core.Dynamic
 
             //
             throw new NotImplementedException(target.ToString());
+        }
+
+        private static bool IsNullConstant(Expression arg)
+        {
+            return arg is ConstantExpression c && ReferenceEquals(c.Value, null);
         }
 
         public static MethodInfo FindImplicitOperator(Type t, Type toType)
@@ -263,16 +285,19 @@ namespace Pchp.Core.Dynamic
             if (source == typeof(PhpNumber)) return Expression.Call(Cache.Operators.ToLong_PhpNumber, expr);
             //TypeError//if (source == typeof(PhpArray)) return Expression.Call(expr, typeof(PhpArray).GetMethod("ToLong", Cache.Types.Empty));
             if (source == typeof(string)) return Expression.Call(Cache.Operators.ToLongOrThrow_String, expr);
-            if (source == typeof(PhpString)) return Expression.Call(expr, Cache.PhpString.ToLongOrThrow);
+            if (source == typeof(PhpString)) return Expression.Call(Cache.PhpString.ToLongOrThrow, expr);
             if (source == typeof(void)) return VoidAsConstant(expr, 0L, typeof(long));
             if (source == typeof(bool)) return Expression.Call(Cache.Operators.ToLong_Boolean, expr);
             if (source == typeof(long)) return expr;    // unreachable
-            if (source == typeof(PhpValue)) return Expression.Call(expr, Cache.Operators.PhpValue_ToLongOrThrow);
 
             // TODO: following conversions may fail, we should report it failed and throw TypeError exception
 
-            // TODO: throw new TypeError exception
-            throw new NotImplementedException($"{source.FullName} -> long");
+            if (IsNullConstant(expr))
+            {
+                // TODO: TypeError
+            }
+
+            return Expression.Call(Cache.Operators.PhpValue_ToLongOrThrow, BindToValue(expr));
         }
 
         private static Expression BindToDouble(Expression expr)
@@ -355,12 +380,22 @@ namespace Pchp.Core.Dynamic
                     return Expression.Constant(null, typeof(string));
                 }
 
-                // __toString
-
+                // __toString is called by ToString below
             }
 
-            // ToString()
-            return Expression.Call(expr, Cache.Object.ToString);
+            var callToString = Expression.Call(expr, Cache.Object.ToString);
+            if (expr.Type.IsValueType)
+            {
+                // ToString()
+                return callToString;
+            }
+            else
+            {
+                var nullString = Expression.Constant(null, typeof(string));
+
+                // ?ToString()
+                return Expression.Condition(Expression.ReferenceEqual(expr, nullString), nullString, callToString);
+            }
         }
 
         private static Expression BindToChar(Expression expr, Expression ctx)
@@ -415,8 +450,8 @@ namespace Pchp.Core.Dynamic
         {
             var source = expr.Type;
 
-            if (source == typeof(int)) return Expression.New(Cache.IntStringKey.ctor_Int, expr);
-            if (source == typeof(long)) return Expression.New(Cache.IntStringKey.ctor_Int, Expression.Convert(expr, Cache.Types.Int[0]));
+            if (source == typeof(int)) return Expression.New(Cache.IntStringKey.ctor_Long, Expression.Convert(expr, Cache.Types.Long[0]));
+            if (source == typeof(long)) return Expression.New(Cache.IntStringKey.ctor_Long, expr);
             if (source == typeof(string)) return Expression.New(Cache.IntStringKey.ctor_String, expr);
 
             // following conversions may throw an exception
@@ -451,14 +486,15 @@ namespace Pchp.Core.Dynamic
         public static Expression BindToValue(Expression expr)
         {
             // known constants:
+            if (IsNullConstant(expr))
+            {
+                // PhpValue.Null
+                return Expression.Field(null, Cache.Properties.PhpValue_Null);
+            }
+
             if (expr is ConstantExpression ce)
             {
-                if (ce.Value == null)
-                {
-                    // PhpValue.Null
-                    return Expression.Field(null, Cache.Properties.PhpValue_Null);
-                }
-                else if (ce.Value is bool b)
+                if (ce.Value is bool b)
                 {
                     return Expression.Field(null, b ? Cache.Properties.PhpValue_True : Cache.Properties.PhpValue_False);
                 }
@@ -473,7 +509,6 @@ namespace Pchp.Core.Dynamic
             if (source == typeof(bool)) return Expression.Call(typeof(PhpValue).GetMethod("Create", Cache.Types.Bool), expr);
             if (source == typeof(int)) return Expression.Call(typeof(PhpValue).GetMethod("Create", Cache.Types.Int), expr);
             if (source == typeof(long)) return Expression.Call(typeof(PhpValue).GetMethod("Create", Cache.Types.Long), expr);
-            if (source == typeof(uint)) return Expression.Call(typeof(PhpValue).GetMethod("Create", Cache.Types.Long), Expression.Convert(expr, typeof(long)));
             if (source == typeof(double)) return Expression.Call(typeof(PhpValue).GetMethod("Create", Cache.Types.Double), expr);
             if (source == typeof(float)) return Expression.Call(typeof(PhpValue).GetMethod("Create", Cache.Types.Double), Expression.Convert(expr, typeof(double)));
             if (source == typeof(string)) return Expression.Call(typeof(PhpValue).GetMethod("Create", Cache.Types.String), expr);
@@ -481,11 +516,13 @@ namespace Pchp.Core.Dynamic
             if (source == typeof(PhpNumber)) return Expression.Call(typeof(PhpValue).GetMethod("Create", Cache.Types.PhpNumber), expr);
             if (source == typeof(PhpArray)) return Expression.Call(typeof(PhpValue).GetMethod("Create", Cache.Types.PhpArray), expr);
             if (source == typeof(PhpAlias)) return Expression.Call(typeof(PhpValue).GetMethod("Create", Cache.Types.PhpAlias), expr);   // PhpValue.Create(PhpAlias)
-            if (source == typeof(IndirectLocal)) return Expression.Property(expr, Cache.IndirectLocal.Value);   // IndirectLocal.Value
+            if (source == typeof(IndirectLocal)) return Expression.Call(expr, Cache.IndirectLocal.GetValue);   // IndirectLocal.GetValue()
 
             if (source.GetTypeInfo().IsValueType)
             {
-                if (source == typeof(void)) return VoidAsConstant(expr, PhpValue.Void, Cache.Types.PhpValue);
+                if (source == typeof(void)) return VoidAsConstant(expr, PhpValue.Null, Cache.Types.PhpValue);
+                if (source == typeof(uint)) return Expression.Call(typeof(PhpValue).GetMethod("Create", Cache.Types.Long), Expression.Convert(expr, typeof(long)));
+                if (source == typeof(ulong)) return Expression.Call(typeof(PhpValue).GetMethod("Create", Cache.Types.UInt64), expr);
 
                 throw new NotImplementedException(source.FullName);
             }
@@ -571,7 +608,7 @@ namespace Pchp.Core.Dynamic
             var source = expr.Type;
 
             if (source == typeof(PhpArray) || source.IsSubclassOf(target)) return expr;
-            if (source == typeof(PhpValue)) return Expression.Call(expr, Cache.Operators.PhpValue_ToArrayOrThrow);
+            if (source == typeof(PhpValue)) return Expression.Call(Cache.Operators.PhpValue_ToArrayOrThrow, expr);
             if (expr is ConstantExpression c && c.Value == null) return Expression.Constant(null, typeof(PhpArray));
 
             throw new NotImplementedException(source.FullName);
@@ -617,7 +654,7 @@ namespace Pchp.Core.Dynamic
 
         public static Expression BindDefault(Type t)
         {
-            if (t == typeof(PhpValue)) return Expression.Field(null, Cache.Properties.PhpValue_Void);
+            if (t == typeof(PhpValue)) return Expression.Field(null, Cache.Properties.PhpValue_Null);
             if (t == typeof(PhpNumber)) return Expression.Field(null, Cache.Properties.PhpNumber_Default);
 
             return Expression.Default(t);
@@ -651,7 +688,7 @@ namespace Pchp.Core.Dynamic
 
             if (t == Cache.Types.IndirectLocal)
             {
-                return BindCost(Expression.Property(arg, Cache.IndirectLocal.Value), target); // PhpValue -> target
+                return BindCost(Expression.Call(arg, Cache.IndirectLocal.GetValue), target); // PhpValue -> target
             }
 
             if (target == typeof(PhpValue))
@@ -699,6 +736,19 @@ namespace Pchp.Core.Dynamic
             // other types
             if (target.GetTypeInfo().IsAssignableFrom(t.GetTypeInfo())) return Expression.Constant(ConversionCost.Pass);
 
+            // attempt to cast object:
+            if (!t.IsValueType && ReflectionUtils.IsPhpClassType(target))
+            {
+                if (!t.IsInterface && !target.IsInterface && !target.IsAssignableFrom(t) && !t.IsAssignableFrom(target))
+                {
+                    // no way
+                    return Expression.Constant(ConversionCost.NoConversion);
+                }
+
+                var toclass_T = typeof(CostOf).GetMethod("ToClass", Cache.Types.Object).MakeGenericMethod(target);
+                return Expression.Call(toclass_T, arg); // CostOf.ToClass<T>(object)
+            }
+
             // return Expression.Constant(ConversionCost.AttemptConvert);
 
             //
@@ -730,13 +780,14 @@ namespace Pchp.Core.Dynamic
                     // ref T : cost(T) | ConversionCost.Warning
                     // CONSIDER: no warning if PhpValue is passed by ref as well and we implement this in CallBinder {ref PhpValue value; int tmp; foo(ref tmp); value = tmp;}
                     return Expression.Or(
-                        Expression.Convert(BindCostFromValue(arg, target.GetElementType()), typeof(int)),
-                        Expression.Convert(Expression.Constant(ConversionCost.Warning), typeof(int)));
+                        BindCostFromValue(arg, target.GetElementType()),
+                        Expression.Constant(ConversionCost.Warning),
+                        Cache.Operators.Or_ConversionCost_ConversionCost);
                 }
 
                 if (ReflectionUtils.IsPhpClassType(target))
                 {
-                    var toclass_T = typeof(CostOf).GetTypeInfo().GetDeclaredMethod("ToClass").MakeGenericMethod(target);
+                    var toclass_T = typeof(CostOf).GetMethod("ToClass", Cache.Types.PhpValue).MakeGenericMethod(target);
                     return Expression.Call(toclass_T, arg); // CostOf.ToClass<T>(arg)
                 }
 
@@ -894,7 +945,6 @@ namespace Pchp.Core.Dynamic
                 case PhpTypeCode.Boolean:
                     return ConversionCost.Pass;
 
-                case PhpTypeCode.Int32:
                 case PhpTypeCode.Long:
                 case PhpTypeCode.Double:
                 case PhpTypeCode.MutableString:
@@ -927,7 +977,6 @@ namespace Pchp.Core.Dynamic
         {
             switch (value.TypeCode)
             {
-                case PhpTypeCode.Int32:
                 case PhpTypeCode.Long:
                     return ConversionCost.Pass;
 
@@ -948,7 +997,6 @@ namespace Pchp.Core.Dynamic
         {
             switch (value.TypeCode)
             {
-                case PhpTypeCode.Int32:
                 case PhpTypeCode.Long:
                 case PhpTypeCode.Boolean:
                 case PhpTypeCode.Double:
@@ -973,7 +1021,6 @@ namespace Pchp.Core.Dynamic
         {
             switch (value.TypeCode)
             {
-                case PhpTypeCode.Int32:
                 case PhpTypeCode.Long:
                     return ConversionCost.ImplicitCast;
 
@@ -1009,7 +1056,6 @@ namespace Pchp.Core.Dynamic
         {
             switch (value.TypeCode)
             {
-                case PhpTypeCode.Int32:
                 case PhpTypeCode.Long:
                 case PhpTypeCode.Boolean:
                 case PhpTypeCode.Double:
@@ -1038,7 +1084,6 @@ namespace Pchp.Core.Dynamic
         {
             switch (value.TypeCode)
             {
-                case PhpTypeCode.Int32:
                 case PhpTypeCode.Long:
                 case PhpTypeCode.Boolean:
                     return ConversionCost.ImplicitCast;
@@ -1062,7 +1107,6 @@ namespace Pchp.Core.Dynamic
         {
             switch (value.TypeCode)
             {
-                case PhpTypeCode.Int32:
                 case PhpTypeCode.Long:
                 case PhpTypeCode.Double:
                     return ConversionCost.Pass;
@@ -1086,7 +1130,6 @@ namespace Pchp.Core.Dynamic
         {
             switch (value.TypeCode)
             {
-                case PhpTypeCode.Int32:
                 case PhpTypeCode.Long:
                 case PhpTypeCode.Double:
                 case PhpTypeCode.Boolean:
@@ -1107,6 +1150,28 @@ namespace Pchp.Core.Dynamic
 
         public static ConversionCost ToDateTime(PhpValue value) => ToClass<DateTime>(value);    // TODO: DateTime from long or string
 
+        public static ConversionCost ToClass<T>(object value)
+        {
+            if (value == null)
+            {
+                return ConversionCost.DefaultValue;
+            }
+
+            var type = value.GetType();
+            if (type == typeof(T))
+            {
+                return ConversionCost.Pass;
+            }
+            else if (typeof(T).IsAssignableFrom(type))
+            {
+                return ConversionCost.PassCostly;
+            }
+            else
+            {
+                return ConversionCost.NoConversion;
+            }
+        }
+
         public static ConversionCost ToClass<T>(PhpValue value)
         {
             switch (value.TypeCode)
@@ -1115,15 +1180,7 @@ namespace Pchp.Core.Dynamic
                     return ConversionCost.DefaultValue;
 
                 case PhpTypeCode.Object:
-                    if (value.Object is T)
-                    {
-                        return ConversionCost.Pass;
-                    }
-                    else
-                    {
-                        Debug.Assert(!value.IsNull);
-                        return ConversionCost.NoConversion;
-                    }
+                    return ToClass<T>(value.Object);
 
                 case PhpTypeCode.String:
                     if (typeof(T) == typeof(byte[])) // string -> byte[]

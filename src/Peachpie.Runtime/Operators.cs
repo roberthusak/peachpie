@@ -24,7 +24,7 @@ namespace Pchp.Core
         /// <summary>
         /// Performs bitwise and operation.
         /// </summary>
-        internal static PhpValue BitAnd(ref PhpValue x, ref PhpValue y)
+        internal static PhpValue BitAnd(in PhpValue x, in PhpValue y)
         {
             var bx = x.ToBytesOrNull();
             if (bx != null)
@@ -43,7 +43,7 @@ namespace Pchp.Core
         /// <summary>
         /// Performs bitwise or operation.
         /// </summary>
-        internal static PhpValue BitOr(ref PhpValue x, ref PhpValue y)
+        internal static PhpValue BitOr(in PhpValue x, in PhpValue y)
         {
             var bx = x.ToBytesOrNull();
             if (bx != null)
@@ -62,7 +62,7 @@ namespace Pchp.Core
         /// <summary>
         /// Performs exclusive or operation.
         /// </summary>
-        internal static PhpValue BitXor(ref PhpValue x, ref PhpValue y)
+        internal static PhpValue BitXor(in PhpValue x, in PhpValue y)
         {
             var bx = x.ToBytesOrNull();
             if (bx != null)
@@ -154,15 +154,13 @@ namespace Pchp.Core
         /// <summary>
         /// Performs bitwise negation.
         /// </summary>
-        internal static PhpValue BitNot(ref PhpValue x)
+        internal static PhpValue BitNot(in PhpValue x)
         {
             switch (x.TypeCode)
             {
                 case PhpTypeCode.Long: return PhpValue.Create(~x.Long);
 
-                case PhpTypeCode.Int32: return PhpValue.Create(~x.ToLong());
-
-                case PhpTypeCode.Alias: return BitNot(ref x.Alias.Value);
+                case PhpTypeCode.Alias: return BitNot(in x.Alias.Value);
 
                 case PhpTypeCode.String:
                 case PhpTypeCode.MutableString:
@@ -187,7 +185,7 @@ namespace Pchp.Core
         /// <remarks>The division operator ("/") returns a float value unless the two operands are integers
         /// (or strings that get converted to integers) and the numbers are evenly divisible,
         /// in which case an integer value will be returned.</remarks>
-        internal static PhpNumber Div(ref PhpValue x, ref PhpValue y)
+        internal static PhpNumber Div(in PhpValue x, in PhpValue y)
         {
             var info = x.ToNumber(out var nx) | y.ToNumber(out var ny);
 
@@ -262,15 +260,44 @@ namespace Pchp.Core
         public static IPhpArray EnsureArray(ref IPhpArray arr) => arr ?? (arr = new PhpArray());
 
         /// <summary>
-        /// Ensures given ref to <see cref="PhpValue"/> as <see cref="PhpAlias"/>.
-        /// </summary>
-        public static PhpAlias EnsureAlias(ref PhpValue valueref) => valueref.EnsureAlias();
-
-        /// <summary>
         /// Ensures the value is <see cref="PhpString"/> and gets mutable access to the value (non-shared).
         /// </summary>
         /// <returns>Object on which edit operations can be performed. Cannot be <c>null</c>.</returns>
-        public static PhpString.Blob EnsureWritableString(ref PhpValue valueref) => valueref.EnsureWritableString();
+        public static PhpString.Blob EnsureWritableString(ref PhpValue value)
+        {
+            PhpString.Blob blob;
+
+            switch (value.TypeCode)
+            {
+                case PhpTypeCode.MutableString:
+                    if ((blob = value.MutableStringBlob).IsShared)
+                    {
+                        value = new PhpValue(blob = value.MutableStringBlob.ReleaseOne());
+                    }
+                    break;
+
+                case PhpTypeCode.Null:
+                    blob = new PhpString.Blob();
+                    value = new PhpValue(blob);
+                    break;
+
+                case PhpTypeCode.String:
+                    blob = new PhpString.Blob(value.String);
+                    value = new PhpValue(blob);
+                    break;
+
+                case PhpTypeCode.Alias:
+                    blob = EnsureWritableString(ref value.Alias.Value);
+                    break;
+
+                default:
+                    blob = new PhpString.Blob(value.ToStringUtf8());
+                    value = new PhpValue(blob);
+                    break;
+            }
+
+            return blob;
+        }
 
         #endregion
 
@@ -280,12 +307,12 @@ namespace Pchp.Core
         /// Implementation of PHP <c>isset</c> operator.
         /// </summary>
         /// <remarks>Value (eventualy dereferenced value) is not <c>NULL</c>.</remarks>
-        public static bool IsSet(PhpValue value) => !value.IsDefault && !value.IsNull;
+        public static bool IsSet(PhpValue value) => !value.IsNull;
 
         /// <summary>
         /// Implements <c>empty</c> operator.
         /// </summary>
-        public static bool IsEmpty(PhpValue value) => value.IsDefault || value.IsEmpty;
+        public static bool IsEmpty(PhpValue value) => value.IsEmpty;
 
         /// <summary>
         /// Implements <c>empty</c> operator on objects.
@@ -321,17 +348,20 @@ namespace Pchp.Core
 
             public PhpAlias EnsureItemAlias(IntStringKey key)
             {
-                return _array.offsetGet(PhpValue.Create(key)).EnsureAlias();
+                var item = _array.offsetGet(key);
+                return PhpValue.EnsureAlias(ref item);
             }
 
             public IPhpArray EnsureItemArray(IntStringKey key)
             {
-                return _array.offsetGet(PhpValue.Create(key)).EnsureArray();
+                var item = _array.offsetGet(key);
+                return PhpValue.EnsureArray(ref item);
             }
 
             public object EnsureItemObject(IntStringKey key)
             {
-                return _array.offsetGet(PhpValue.Create(key)).EnsureObject();
+                var item = _array.offsetGet(key);
+                return PhpValue.EnsureObject(ref item);
             }
 
             public PhpValue GetItemValue(IntStringKey key) => _array.offsetGet(PhpValue.Create(key));
@@ -370,48 +400,76 @@ namespace Pchp.Core
                 _array.Add(ToObject(value));
             }
 
-            public PhpAlias EnsureItemAlias(IntStringKey key) => GetItemValue(key).EnsureAlias();
+            public PhpAlias EnsureItemAlias(IntStringKey key)
+            {
+                var item = GetItemValue(key);
+                return PhpValue.EnsureAlias(ref item);
+            }
 
-            public IPhpArray EnsureItemArray(IntStringKey key) => GetItemValue(key).EnsureArray();
+            public IPhpArray EnsureItemArray(IntStringKey key)
+            {
+                var item = GetItemValue(key);
+                return PhpValue.EnsureArray(ref item);
+            }
 
-            public object EnsureItemObject(IntStringKey key) => GetItemValue(key).EnsureObject();
+            public object EnsureItemObject(IntStringKey key)
+            {
+                var item = GetItemValue(key);
+                return PhpValue.EnsureObject(ref item);
+            }
 
             public PhpValue GetItemValue(IntStringKey key)
             {
-                if (key.IsInteger)
-                    return PhpValue.FromClr(_array[key.Integer]);
+                if (key.IsInteger && Utilities.NumberUtils.IsInt32(key.Integer))
+                {
+                    return PhpValue.FromClr(_array[unchecked((int)key.Integer)]);
+                }
                 else
+                {
                     throw new ArgumentException(nameof(key));
+                }
             }
 
             public PhpValue GetItemValue(PhpValue index) => GetItemValue(index.ToIntStringKey());
 
             public void RemoveKey(IntStringKey key)
             {
-                if (key.IsInteger)
-                    _array.RemoveAt(key.Integer);
+                if (key.IsInteger && Utilities.NumberUtils.IsInt32(key.Integer))
+                {
+                    _array.RemoveAt(unchecked((int)key.Integer));
+                }
                 else
+                {
                     throw new ArgumentException(nameof(key));
+                }
             }
 
             public void RemoveKey(PhpValue index) => RemoveKey(index.ToIntStringKey());
 
             public void SetItemAlias(IntStringKey key, PhpAlias alias)
             {
-                if (key.IsInteger)
-                    _array[key.Integer] = ToObject(alias.Value);
+                if (key.IsInteger && Utilities.NumberUtils.IsInt32(key.Integer))
+                {
+                    _array[unchecked((int)key.Integer)] = ToObject(alias.Value);
+                }
                 else
+                {
                     throw new ArgumentException(nameof(key));
+                }
             }
 
             public void SetItemAlias(PhpValue index, PhpAlias alias) => SetItemAlias(index.ToIntStringKey(), alias);
 
             public void SetItemValue(IntStringKey key, PhpValue value)
             {
-                if (key.IsInteger)
-                    _array[key.Integer] = ToObject(value);
+                if (key.IsInteger && Utilities.NumberUtils.IsInt32(key.Integer))
+                {
+                    _array[unchecked((int)key.Integer)] = ToObject(value);
+                }
                 else
+                {
                     throw new ArgumentException(nameof(key));
+                }
             }
 
             public void SetItemValue(PhpValue index, PhpValue value) => SetItemValue(index.ToIntStringKey(), value);
@@ -433,11 +491,23 @@ namespace Pchp.Core
 
             public void AddValue(PhpValue value) => throw new NotSupportedException();
 
-            public PhpAlias EnsureItemAlias(IntStringKey key) => GetItemValue(key).EnsureAlias();
+            public PhpAlias EnsureItemAlias(IntStringKey key)
+            {
+                var item = GetItemValue(key);
+                return PhpValue.EnsureAlias(ref item);
+            }
 
-            public IPhpArray EnsureItemArray(IntStringKey key) => GetItemValue(key).EnsureArray();
+            public IPhpArray EnsureItemArray(IntStringKey key)
+            {
+                var item = GetItemValue(key);
+                return PhpValue.EnsureArray(ref item);
+            }
 
-            public object EnsureItemObject(IntStringKey key) => GetItemValue(key).EnsureObject();
+            public object EnsureItemObject(IntStringKey key)
+            {
+                var item = GetItemValue(key);
+                return PhpValue.EnsureObject(ref item);
+            }
 
             public PhpValue GetItemValue(IntStringKey key) => GetItemValue((PhpValue)key);
 
@@ -513,7 +583,21 @@ namespace Pchp.Core
             throw new ArgumentException(nameof(obj));
         }
 
-        public static IPhpArray GetArrayAccess(PhpValue value) => value.GetArrayAccess();
+        /// <summary>
+        /// Gets <see cref="IPhpArray"/> instance providing access to the value with array operators.
+        /// Returns <c>null</c> if underlaying value does provide array access.
+        /// </summary>
+        public static IPhpArray GetArrayAccess(ref PhpValue value) => value.TypeCode switch
+        {
+            // TODO // CONSIDER: what is this?
+
+            PhpTypeCode.PhpArray => value.Array,
+            PhpTypeCode.String => PhpValue.EnsureArray(ref value),
+            PhpTypeCode.MutableString => value.MutableStringBlob,
+            PhpTypeCode.Object => EnsureArray(value.Object),
+            PhpTypeCode.Alias => GetArrayAccess(ref value.Alias.Value),
+            _ => null,
+        };
 
         /// <summary>
         /// Gets <see cref="IPhpArray"/> to be used as R-value of <c>list</c> expression.
@@ -542,11 +626,11 @@ namespace Pchp.Core
         /// <param name="value">String to be accessed as array.</param>
         /// <param name="index">Index.</param>
         /// <returns>Character on index or empty string if index is our of range.</returns>
-        public static string GetItemValue(string value, int index)
+        public static string GetItemValue(string value, long index)
         {
             return (value != null && index >= 0 && index < value.Length)
-                ? value[index].ToString()
-                : string.Empty;
+                ? value[unchecked((int)index)].ToString()
+                : string.Empty; // TODO: quiet ?
         }
 
         /// <summary>
@@ -554,9 +638,9 @@ namespace Pchp.Core
         /// </summary>
         public static string GetItemValue(string value, IntStringKey key)
         {
-            int index = key.IsInteger
+            var index = key.IsInteger
                 ? key.Integer
-                : (int)Convert.StringToLongInteger(key.String);
+                : Convert.StringToLongInteger(key.String);
 
             return GetItemValue(value, index);
         }
@@ -566,12 +650,12 @@ namespace Pchp.Core
         /// </summary>
         public static string GetItemValueOrNull(string value, IntStringKey key)
         {
-            int index = key.IsInteger
+            var index = key.IsInteger
                 ? key.Integer
-                : (int)Convert.StringToLongInteger(key.String);
+                : Convert.StringToLongInteger(key.String);
 
             return (value != null && index >= 0 && index < value.Length)
-                ? value[index].ToString()
+                ? value[unchecked((int)index)].ToString()
                 : null;
         }
 
@@ -580,9 +664,9 @@ namespace Pchp.Core
         /// </summary>
         public static string GetItemValue(string value, PhpValue index, bool quiet)
         {
-            if (Convert.TryToIntStringKey(index, out var key))
+            if (value != null && index.TryToIntStringKey(out var key))
             {
-                int i;
+                long i;
 
                 if (key.IsInteger)
                 {
@@ -592,12 +676,12 @@ namespace Pchp.Core
                 {
                     if (quiet) return null;
 
-                    i = (int)Convert.StringToLongInteger(key.String);
+                    i = Convert.StringToLongInteger(key.String);
                 }
 
-                if (value != null && i >= 0 && i < value.Length)
+                if (i >= 0 && i < value.Length)
                 {
-                    return value[i].ToString();
+                    return value[(int)i].ToString();
                 }
             }
 
@@ -609,58 +693,299 @@ namespace Pchp.Core
             }
             else
             {
-                PhpException.InvalidArgument(nameof(index));
+                PhpException.Throw(PhpError.Warning, Resources.ErrResources.illegal_string_offset, index.ToString());
                 return string.Empty;
             }
         }
 
+        /// <summary>
+        /// Shortcut for calling <c>ord($s[$i])</c> on a <see cref="PhpValue"/>
+        /// without any extra allocation.
+        /// </summary>
+        public static long GetItemOrdValue(PhpValue value, long index)
+        {
+            switch (value.TypeCode)
+            {
+                case PhpTypeCode.String:
+                    return GetItemOrdValue(value.String, index);
+
+                case PhpTypeCode.MutableString:
+                    return GetItemOrdValue(value.MutableString, index);
+
+                case PhpTypeCode.Alias:
+                    return GetItemOrdValue(value.Alias.Value, index);
+
+                default:
+                    var item = value.GetArrayItem(index);
+                    if (item.IsMutableString(out var itemPhpString))
+                    {
+                        return itemPhpString.IsEmpty ? 0 : itemPhpString[0];
+                    }
+                    else
+                    {
+                        var str = item.ToStringUtf8();
+                        return string.IsNullOrEmpty(str) ? 0 : str[0];
+                    }
+            }
+        }
+
+        /// <summary>
+        /// Shortcut for calling <c>ord($s[$i])</c> on a <see cref="string"/>
+        /// without any extra allocation.
+        /// </summary>
+        public static long GetItemOrdValue(string value, long index)
+        {
+            if (value != null && index >= 0 && index < value.Length)
+            {
+                return value[(int)index];
+            }
+
+            //
+            PhpException.Throw(PhpError.Warning, Resources.ErrResources.illegal_string_offset, index.ToString());
+            return 0;
+        }
+
+        /// <summary>
+        /// Shortcut for calling <c>ord($s[$i])</c> on a <see cref="PhpString"/>
+        /// without any extra allocation.
+        /// </summary>
+        public static long GetItemOrdValue(PhpString value, long index)
+        {
+            if (index >= 0 && index < value.Length)
+            {
+                return value[(int)index];
+            }
+
+            PhpException.Throw(PhpError.Warning, Resources.ErrResources.illegal_string_offset, index.ToString());
+            return 0;
+        }
+
         public static object EnsureItemObject(this IPhpArray array, PhpValue index)
         {
-            if (Convert.TryToIntStringKey(index, out IntStringKey key))
+            if (index.TryToIntStringKey(out var key))
             {
                 return array.EnsureItemObject(key);
             }
             else
             {
-                throw new ArgumentException();
+                throw PhpException.TypeErrorException(Resources.ErrResources.illegal_offset_type);
             }
         }
 
         public static IPhpArray EnsureItemArray(this IPhpArray array, PhpValue index)
         {
-            if (Convert.TryToIntStringKey(index, out IntStringKey key))
+            if (index.TryToIntStringKey(out var key))
             {
                 return array.EnsureItemArray(key);
             }
             else
             {
-                throw new ArgumentException();
+                throw PhpException.TypeErrorException(Resources.ErrResources.illegal_offset_type);
             }
         }
 
         public static PhpAlias EnsureItemAlias(this IPhpArray array, PhpValue index, bool quiet)
         {
-            if (Convert.TryToIntStringKey(index, out IntStringKey key))
+            if (index.TryToIntStringKey(out var key))
             {
                 return array.EnsureItemAlias(key);
             }
             else
             {
-                if (!quiet) throw new ArgumentException();
+                if (!quiet)
+                {
+                    PhpException.IllegalOffsetType();
+                }
 
-                return new PhpAlias(PhpValue.Void);
+                return new PhpAlias(PhpValue.Null);
             }
         }
 
         /// <summary>
         /// Implements <c>[]</c> operator on <see cref="PhpValue"/>.
         /// </summary>
-        public static PhpValue GetItemValue(PhpValue value, PhpValue index, bool quiet = false) => value.GetArrayItem(index, quiet);
+        public static PhpValue GetItemValue(PhpValue value, PhpValue index, bool quiet = false)
+        {
+            switch (value.TypeCode)
+            {
+                case PhpTypeCode.String:
+                    var item = Operators.GetItemValue(value.String, index, quiet);
+                    if (quiet && string.IsNullOrEmpty(item))
+                    {
+                        return PhpValue.Null;
+                    }
+                    return item;
+
+                case PhpTypeCode.MutableString:
+                    return ((IPhpArray)value.MutableStringBlob).GetItemValue(index); // quiet);
+
+                case PhpTypeCode.PhpArray:
+                    return value.Array.GetItemValue(index); // , quiet);
+
+                case PhpTypeCode.Object:
+                    return Operators.GetItemValue(value.Object, index, quiet);
+
+                case PhpTypeCode.Alias:
+                    return value.Alias.Value.GetArrayItem(index, quiet);
+
+                default:
+                    return PhpValue.Null;
+            }
+        }
+
+        /// <summary>
+        /// Implements <c>[]</c> operator on <see cref="PhpValue"/>.
+        /// </summary>
+        public static PhpValue GetItemValue(object obj, PhpValue index, bool quiet = false)
+        {
+            // IPhpArray.GetItemValue
+            if (obj is IPhpArray arr)
+            {
+                return arr.GetItemValue(index); // , quiet);
+            }
+
+            // ArrayAccess.offsetGet()
+            if (obj is ArrayAccess arracces)
+            {
+                return arracces.offsetGet(index);
+            }
+
+            // IList[]
+            if (obj is IList list)
+            {
+                if (index.TryToIntStringKey(out var key) && key.IsInteger)
+                {
+                    if (key.Integer >= 0 && key.Integer < list.Count)
+                    {
+                        return PhpValue.FromClr(list[(int)key.Integer]);
+                    }
+                    else if (!quiet)
+                    {
+                        PhpException.UndefinedOffset(key);
+                    }
+                }
+                else if (!quiet)
+                {
+                    PhpException.IllegalOffsetType();
+                }
+
+                return PhpValue.Null;
+            }
+
+            //
+            if (!quiet)
+            {
+                PhpException.Throw(
+                    PhpError.Error,
+                    Resources.ErrResources.object_used_as_array, obj != null ? obj.GetPhpTypeInfo().Name : PhpVariable.TypeNameNull);
+            }
+
+            //
+            return PhpValue.Null;
+        }
+
+        public static bool TryGetItemValue(this PhpArray value, string index, out PhpValue item)
+        {
+            if (value != null && value.TryGetValue(index, out item) && IsSet(item))
+            {
+                return true;
+            }
+            else
+            {
+                item = default;
+                return false;
+            }
+        }
+
+        public static bool TryGetItemValue(this PhpArray value, PhpValue index, out PhpValue item)
+        {
+            if (value != null && index.TryToIntStringKey(out var key) && value.TryGetValue(key, out item) && IsSet(item))
+            {
+                return true;
+            }
+            else
+            {
+                item = default;
+                return false;
+            }
+        }
+
+        public static bool TryGetItemValue(this PhpValue value, PhpValue index, out PhpValue item)
+        {
+            if (value.IsPhpArray(out var array))
+            {
+                // Specialized call for array
+                return TryGetItemValue(array, index, out item);
+            }
+            else
+            {
+                // Otherwise use the original semantics of isset($x[$y]) ? $x[$y] : ...;
+                if (offsetExists(value, index))
+                {
+                    item = GetItemValue(value, index);
+                    return true;
+                }
+                else
+                {
+                    item = default;
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public static PhpAlias EnsureItemAlias_Old(PhpValue value, PhpValue index, bool quiet = false)
+        {
+            Debug.WriteLineIf(value.IsNull, "NULL value won't be changed to array!");
+
+            return EnsureItemAlias(ref value, index, quiet);
+        }
 
         /// <summary>
         /// Implements <c>&amp;[]</c> operator on <see cref="PhpValue"/>.
+        /// Ensures the value is an array and item at given <paramref name="index"/> is an alias.
         /// </summary>
-        public static PhpAlias EnsureItemAlias(PhpValue value, PhpValue index, bool quiet = false) => value.EnsureItemAlias(index, quiet);
+        public static PhpAlias EnsureItemAlias(ref PhpValue value, PhpValue index, bool quiet = false)
+        {
+            switch (value.TypeCode)
+            {
+                case PhpTypeCode.Null:
+                    // TODO: Err: Warning: Creating default object from empty value
+                    var arr = new PhpArray();
+                    value = PhpValue.Create(arr);
+                    return arr.EnsureItemAlias(index, quiet);
+
+                case PhpTypeCode.PhpArray:
+                    return value.Array.EnsureItemAlias(index, quiet);
+
+                case PhpTypeCode.String:
+                    throw new NotImplementedException();
+
+                case PhpTypeCode.MutableString:
+                    throw new NotImplementedException();
+
+                case PhpTypeCode.Object:
+                    if (value.Object is IPhpArray array)
+                    {
+                        return EnsureItemAlias(array, index, quiet);
+                    }
+
+                    if (!quiet) // NOTE: PHP does not report this error (?)
+                    {
+                        PhpException.Throw(PhpError.Error, Resources.ErrResources.object_used_as_array, value.Object.GetPhpTypeInfo().Name);
+                    }
+
+                    break;
+
+                case PhpTypeCode.Alias:
+                    return EnsureItemAlias(ref value.Alias.Value, index, quiet);
+            }
+
+            // TODO: Warning
+            return new PhpAlias(PhpValue.Null);
+        }
 
         public static bool offsetExists(this PhpArray value, long index) =>
             value != null &&
@@ -867,7 +1192,7 @@ namespace Pchp.Core
 
             //
             PhpException.UndefinedProperty(type.Name, propertyName);
-            return PhpValue.Void;
+            return PhpValue.Null;
         }
 
         #endregion
@@ -965,7 +1290,14 @@ namespace Pchp.Core
 
             public PhpValue CurrentValue => _iterator.current().DeepCopy();
 
-            public PhpAlias CurrentValueAliased => _iterator.current().EnsureAlias();
+            public PhpAlias CurrentValueAliased
+            {
+                get
+                {
+                    var value = _iterator.current();
+                    return PhpValue.EnsureAlias(ref value);
+                }
+            }
 
             object IEnumerator.Current => Current;
 
@@ -1038,7 +1370,14 @@ namespace Pchp.Core
 
             public PhpValue CurrentValue => _enumerator.Current.Value.GetValue().DeepCopy();
 
-            public PhpAlias CurrentValueAliased => _enumerator.Current.Value.EnsureAlias();
+            public PhpAlias CurrentValueAliased
+            {
+                get
+                {
+                    var value = _enumerator.Current.Value;
+                    return PhpValue.EnsureAlias(ref value);
+                }
+            }
 
             object IEnumerator.Current => _enumerator.Current;
 
@@ -1177,22 +1516,22 @@ namespace Pchp.Core
 
                 public void Dispose()
                 {
-                    _key = _value = PhpValue.Void;
+                    _key = _value = PhpValue.Null;
                     (Enumerator as IDisposable)?.Dispose();
                 }
 
-                public bool MoveFirst()
+                public virtual bool MoveFirst()
                 {
                     Enumerator.Reset();
                     return MoveNext();
                 }
 
-                public bool MoveLast()
+                public virtual bool MoveLast()
                 {
                     throw new NotImplementedException();
                 }
 
-                public bool MoveNext()
+                public virtual bool MoveNext()
                 {
                     if (Enumerator.MoveNext())
                     {
@@ -1205,7 +1544,7 @@ namespace Pchp.Core
                     }
                 }
 
-                public bool MovePrevious()
+                public virtual bool MovePrevious()
                 {
                     throw new NotSupportedException();
                 }
@@ -1222,9 +1561,23 @@ namespace Pchp.Core
 
                 protected override IEnumerator Enumerator => _enumerator;
 
+                long _key;
+
+                public override bool MoveFirst()
+                {
+                    _key = -1;
+                    return base.MoveFirst();
+                }
+
+                public override bool MoveNext()
+                {
+                    _key++;
+                    return base.MoveNext();
+                }
+
                 protected override void FetchCurrent(ref PhpValue key, ref PhpValue value)
                 {
-                    key = (PhpValue)(key.IsDefault ? 0L : key.ToLong());
+                    key = _key;
                     value = PhpValue.FromClr(_enumerator.Current);
                 }
 
@@ -1232,6 +1585,7 @@ namespace Pchp.Core
                 {
                     Debug.Assert(enumerator != null);
                     _enumerator = enumerator;
+                    _key = -1;
                 }
             }
 
@@ -1389,6 +1743,30 @@ namespace Pchp.Core
         public static PhpValue DeepCopy(PhpValue value) => value.DeepCopy();
 
         /// <summary>
+        /// Deep copies the value in-place.
+        /// Called when this has been passed by value and inplace dereferencing and copying is necessary.
+        /// </summary>
+        [DebuggerNonUserCode, DebuggerStepThrough]
+        public static void PassValue(ref PhpValue value)
+        {
+            switch (value.TypeCode)
+            {
+                case PhpTypeCode.MutableString:
+                    // lazy copy
+                    value.MutableStringBlob.AddRef();
+                    break;
+                case PhpTypeCode.PhpArray:
+                    // lazy copy
+                    value = new PhpValue(value.Array.DeepCopy());
+                    break;
+                case PhpTypeCode.Alias:
+                    // dereference & lazy copy
+                    value = value.Alias.Value.DeepCopy();
+                    break;
+            }
+        }
+
+        /// <summary>
         /// Performs <c>clone</c> operation on given object.
         /// </summary>
         public static object Clone(Context ctx, object value)
@@ -1422,7 +1800,7 @@ namespace Pchp.Core
             var tinfo = value.GetPhpTypeInfo();
 
             // memberwise clone
-            var newobj = tinfo.GetUninitializedInstance(ctx);
+            var newobj = tinfo.CreateUninitializedInstance(ctx);
             if (newobj != null)
             {
                 Serialization.MemberwiseClone(tinfo, value, newobj);
@@ -1712,7 +2090,7 @@ namespace Pchp.Core
         /// <summary>
         /// Create <see cref="Generator"/> with specified state machine function and parameters.
         /// </summary>
-        public static Generator BuildGenerator(Context ctx, object @this, PhpArray locals, PhpArray tmpLocals, GeneratorStateMachineDelegate smmethod, RuntimeMethodHandle ownerhandle) => new Generator(ctx, @this, locals, tmpLocals, smmethod, ownerhandle);
+        public static Generator BuildGenerator(Context ctx, PhpArray locals, PhpArray tmpLocals, GeneratorStateMachineDelegate smmethod, RuntimeMethodHandle ownerhandle) => new Generator(ctx, locals, tmpLocals, smmethod, ownerhandle);
 
         public static int GetGeneratorState(Generator g) => g._state;
 
@@ -1757,7 +2135,7 @@ namespace Pchp.Core
             SetGeneratorCurrentFrom(g, value, key);
 
             // update the Generator auto-increment key
-            if (key.IsLong(out long ikey) && ikey > g._maxNumericalKey)
+            if (key.IsLong(out var ikey) && ikey > g._maxNumericalKey)
             {
                 g._maxNumericalKey = ikey;
             }
@@ -1769,13 +2147,34 @@ namespace Pchp.Core
 
         public static object GetGeneratorThis(Generator g) => g._this;
 
+        public static Generator SetGeneratorThis(this Generator generator, object @this)
+        {
+            generator._this = @this;
+            return generator;
+        }
+
+        /// <summary>
+        /// Resolves generator's <c>static</c> type.
+        /// </summary>
+        /// <returns><see cref="PhpTypeInfo"/> refering to the lazy static bound type. Cannot be <c>null</c>.</returns>
+        public static PhpTypeInfo GetGeneratorLazyStatic(this Generator generator)
+        {
+            return generator._static ?? generator._this?.GetPhpTypeInfo() ?? throw new InvalidOperationException();
+        }
+
+        public static Generator SetGeneratorLazyStatic(this Generator generator, PhpTypeInfo @static)
+        {
+            generator._static = @static;
+            return generator;
+        }
+
         public static Context GetGeneratorContext(Generator g) => g._ctx;
 
         public static GeneratorStateMachineDelegate GetGeneratorMethod(Generator g) => g._stateMachineMethod;
 
         public static MethodInfo GetGeneratorOwnerMethod(Generator g) => (MethodInfo)MethodBase.GetMethodFromHandle(g._ownerhandle);
 
-        public static Generator UseDynamicScope(this Generator g, RuntimeTypeHandle scope)
+        public static Generator SetGeneratorDynamicScope(this Generator g, RuntimeTypeHandle scope)
         {
             g._scope = scope;
             return g;
@@ -1806,7 +2205,7 @@ namespace Pchp.Core
                 {
                     Context = ctx,
                     Location = new Location(Path.Combine(ctx.RootPath, currentpath), line, column),
-                    EmitDebugInformation = false,   // TODO
+                    EmitDebugInformation = Debugger.IsAttached,   // CONSIDER // DOC
                     IsSubmission = true,
                 },
                 code);
@@ -1823,6 +2222,43 @@ namespace Pchp.Core
         /// Normalizes path's slashes for the current platform.
         /// </summary>
         public static string NormalizePath(string value) => Utilities.CurrentPlatform.NormalizeSlashes(value);
+
+        #endregion
+
+        #region BindTargetToMethod
+
+        /// <summary>
+        /// Helper lightweight class to reuse already bound <see cref="PhpInvokable"/> to be used as <see cref="PhpCallable"/>
+        /// by calling it on a given target.
+        /// </summary>
+        sealed class BoundTargetCallable : IPhpCallable
+        {
+            readonly object _target;
+            readonly PhpInvokable _invokable;
+
+            public BoundTargetCallable(object target, PhpInvokable invokable)
+            {
+                _target = target;
+                _invokable = invokable;
+            }
+
+            public PhpValue Invoke(Context ctx, params PhpValue[] arguments) => _invokable.Invoke(ctx, _target, arguments);
+
+            public PhpValue ToPhpValue() => PhpValue.Null;
+        }
+
+        /// <summary>
+        /// Creates an <see cref="IPhpCallable"/> from an instance method, binding the target to call the method on.
+        /// </summary>
+        public static IPhpCallable BindTargetToMethod(object targetInstance, RoutineInfo routine)
+        {
+            if (routine is PhpMethodInfo methodInfo)
+            {
+                return new BoundTargetCallable(targetInstance, methodInfo.PhpInvokable);
+            }
+
+            return PhpCallback.CreateInvalid();
+        }
 
         #endregion
     }

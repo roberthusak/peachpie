@@ -1634,4 +1634,13 @@ Additional information:
   <data name="uncloneable_cloned" xml:space="preserve">
     <value>Trying to clone an uncloneable object of class {0}</value>
   </data>
+  <data name="argument_not_callable" xml:space="preserve">
+    <value>Argument {0} must be callable, {1} given</value>
+  </data>
+  <data name="next_array_key_unavailable" xml:space="preserve">
+    <value>Cannot add element to the array as the next element is already occupied</value>
+  </data>
+  <data name="invalid_socket_resource" xml:space="preserve">
+    <value>Supplied resource is not a valid 'stream' resource</value>
+  </data>
 </root>

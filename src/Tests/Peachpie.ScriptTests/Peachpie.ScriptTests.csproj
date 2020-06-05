@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>    
-    <TargetFrameworks>netcoreapp3.0</TargetFrameworks> 
+    <TargetFrameworks>netcoreapp3.0</TargetFrameworks>
+    <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,8 +16,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\PDO\Peachpie.Library.PDO.Sqlite\Peachpie.Library.PDO.Sqlite.csproj" />
+    <ProjectReference Include="..\..\PDO\Peachpie.Library.PDO\Peachpie.Library.PDO.csproj" />
     <ProjectReference Include="..\..\Peachpie.CodeAnalysis\Peachpie.CodeAnalysis.csproj" />
     <ProjectReference Include="..\..\Peachpie.Library.Graphics\Peachpie.Library.Graphics.csproj" />
+    <ProjectReference Include="..\..\Peachpie.Library.Network\Peachpie.Library.Network.csproj" />
     <ProjectReference Include="..\..\Peachpie.Library.Scripting\Peachpie.Library.Scripting.csproj" />
     <ProjectReference Include="..\..\Peachpie.Library\Peachpie.Library.csproj" />
     <ProjectReference Include="..\..\Peachpie.Runtime\Peachpie.Runtime.csproj" />

@@ -5,6 +5,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using Pchp.Core.Reflection;
+using Pchp.Core.Resources;
+using System.Runtime.CompilerServices;
+using System.IO;
 
 namespace Pchp.Library.Spl
 {
@@ -79,8 +82,25 @@ namespace Pchp.Library.Spl
     /// its getIterator() method manually.
     /// </summary>
     [PhpType(PhpTypeAttribute.InheritName), PhpExtension(SplExtension.Name)]
-    public class ArrayIterator : Iterator, Traversable, ArrayAccess, SeekableIterator, Countable
+    public class ArrayIterator : Iterator, Traversable, ArrayAccess, SeekableIterator, Countable, Serializable
     {
+        #region Constants
+
+        /// <summary>
+        /// Properties of the object have their normal functionality when accessed as list (var_dump, foreach, etc.).
+        /// </summary>
+        /// <remarks>
+        /// Not used by Peachpie, as it currently does not change any observable behavior in PHP either (as of PHP 7.4).
+        /// </remarks>
+        public const int STD_PROP_LIST = 1;
+
+        /// <summary>
+        /// Entries can be accessed as properties (read and write).
+        /// </summary>
+        public const int ARRAY_AS_PROPS = 2;
+
+        #endregion
+
         #region Fields & Properties
 
         readonly protected Context _ctx;
@@ -97,6 +117,18 @@ namespace Pchp.Library.Spl
 
         bool _isValid = false;
 
+        protected int _flags;
+
+        /// <summary>
+        /// Lazily initialized array to store values set as properties if <see cref="ARRAY_AS_PROPS"/> is not set.
+        /// </summary>
+        /// <remarks>
+        /// Its presence also enables <see cref="__get(PhpValue)"/> and <see cref="__set(PhpValue, PhpValue)"/>
+        /// to work properly.
+        /// </remarks>
+        [CompilerGenerated]
+        internal PhpArray __peach__runtimeFields;
+
         /// <summary>
         /// Instantiates new enumerator and advances its position to the first element.
         /// </summary>
@@ -106,6 +138,51 @@ namespace Pchp.Library.Spl
 
             _enumerator = Operators.GetForeachEnumerator(storage, false, default);
             _isValid = _enumerator.MoveNext();
+        }
+
+        public virtual void __set(PhpValue prop, PhpValue value)
+        {
+            // TODO: Make aliases work (they currently get dealiased before passed here)
+
+            if ((_flags & ARRAY_AS_PROPS) == 0)
+            {
+                if (__peach__runtimeFields == null)
+                    __peach__runtimeFields = new PhpArray();
+
+                __peach__runtimeFields.SetItemValue(prop, value);
+            }
+            else if (storage is PhpArray array)
+            {
+                array.SetItemValue(prop, value);
+            }
+            else
+            {
+                Operators.PropertySetValue(default(RuntimeTypeHandle), storage, prop, value);
+            }
+        }
+
+        public virtual PhpValue __get(PhpValue prop)
+        {
+            if ((_flags & ARRAY_AS_PROPS) == 0)
+            {
+                if (__peach__runtimeFields != null && __peach__runtimeFields.TryGetValue(prop, out var val))
+                {
+                    return val;
+                }
+                else
+                {
+                    PhpException.Throw(PhpError.Warning, ErrResources.undefined_property_accessed, this.GetPhpTypeInfo().Name, prop.ToString());
+                    return PhpValue.Null;
+                }
+            }
+            else if (storage is PhpArray array)
+            {
+                return array.GetItemValue(prop);
+            }
+            else
+            {
+                return Operators.PropertyGetValue(default(RuntimeTypeHandle), storage, prop);
+            }
         }
 
         #endregion
@@ -131,6 +208,8 @@ namespace Pchp.Library.Spl
         /// <param name="flags">Flags to control the behaviour of the ArrayIterator object. See ArrayIterator::setFlags().</param>
         public virtual void __construct(Context/*!*/ctx, PhpValue array = default, int flags = 0)
         {
+            _flags = flags;
+
             if (array.IsPhpArray(out var phparray))
             {
                 storage = phparray;
@@ -185,15 +264,9 @@ namespace Pchp.Library.Spl
 
         #region ArrayIterator (getFlags, setFlags, append, getArrayCopy)
 
-        public virtual int getFlags()
-        {
-            throw new NotImplementedException();
-        }
+        public virtual int getFlags() => _flags;
 
-        public virtual object setFlags(int flags)
-        {
-            throw new NotImplementedException();
-        }
+        public virtual void setFlags(int flags) => _flags = flags;
 
         public virtual PhpArray getArrayCopy()
         {
@@ -378,14 +451,31 @@ namespace Pchp.Library.Spl
 
         #region interface Serializable
 
-        public virtual PhpString serialize()
+        public virtual PhpString serialize() => PhpSerialization.serialize(_ctx, default, __serialize());
+
+        public virtual void unserialize(PhpString data) =>
+            __unserialize(StrictConvert.ToArray(PhpSerialization.unserialize(_ctx, default, data)));
+
+        public virtual PhpArray __serialize()
         {
-            throw new NotImplementedException();
+            var array = new PhpArray(3);
+            array.AddValue(_flags);
+            array.AddValue(PhpValue.FromClr(storage));
+            array.AddValue(__peach__runtimeFields ?? PhpArray.NewEmpty());
+
+            return array;
         }
 
-        public virtual void unserialize(PhpString data)
+        public virtual void __unserialize(PhpArray array)
         {
-            throw new NotImplementedException();
+            _flags = array.TryGetValue(0, out var flagsVal) && flagsVal.IsLong(out long flags)
+                ? (int)flags : throw new InvalidDataException();
+
+            storage = array.TryGetValue(1, out var storageVal) && (storageVal.IsArray || storageVal.IsObject)
+                ? storageVal.Object : throw new InvalidDataException();
+
+            __peach__runtimeFields = array.TryGetValue(2, out var propsVal) && propsVal.IsPhpArray(out var propsArray)
+                ? propsArray : throw new InvalidDataException();
         }
 
         #endregion
@@ -398,7 +488,10 @@ namespace Pchp.Library.Spl
     [PhpType(PhpTypeAttribute.InheritName), PhpExtension(SplExtension.Name)]
     public class RecursiveArrayIterator : ArrayIterator, RecursiveIterator
     {
-        // TODO: Add and use the CHILD_ARRAYS_ONLY constant when flags are functional
+        /// <summary>
+        /// Treat only arrays (not objects) as having children for recursive iteration.
+        /// </summary>
+        public const int CHILD_ARRAYS_ONLY = 4;
 
         [PhpFieldsOnlyCtor]
         protected RecursiveArrayIterator(Context/*!*/ctx) : base(ctx)
@@ -418,16 +511,16 @@ namespace Pchp.Library.Spl
                 return null;
             }
 
-            var elem = current();
+            var elem = hasChildren() ? current() : PhpArray.NewEmpty();
             var type = GetType();
             if (type == typeof(RecursiveArrayIterator))
             {
-                return new RecursiveArrayIterator(_ctx, elem);
+                return new RecursiveArrayIterator(_ctx, elem, _flags);
             }
             else
             {
                 // We create an instance of the current type, if used from a subclass
-                return (RecursiveArrayIterator)_ctx.Create(default(RuntimeTypeHandle), type.GetPhpTypeInfo(), elem);
+                return (RecursiveArrayIterator)_ctx.Create(default(RuntimeTypeHandle), type.GetPhpTypeInfo(), elem, _flags);
             }
         }
 
@@ -436,7 +529,7 @@ namespace Pchp.Library.Spl
         public bool hasChildren()
         {
             var elem = current();
-            return (elem.IsArray || elem.IsObject) && !elem.IsEmpty;
+            return (elem.IsArray || ((_flags & CHILD_ARRAYS_ONLY) == 0 && elem.IsObject)) && !elem.IsEmpty;
         }
     }
 
@@ -584,12 +677,12 @@ namespace Pchp.Library.Spl
 
         public virtual PhpValue key()
         {
-            return (_enumerator != null && _valid) ? _enumerator.CurrentKey : PhpValue.Void;
+            return (_enumerator != null && _valid) ? _enumerator.CurrentKey : PhpValue.Null;
         }
 
         public virtual PhpValue current()
         {
-            return (_enumerator != null && _valid) ? _enumerator.CurrentValue : PhpValue.Void;
+            return (_enumerator != null && _valid) ? _enumerator.CurrentValue : PhpValue.Null;
         }
 
         public PhpValue __call(Context ctx, string name, PhpArray arguments) => this.CallOnInner(ctx, name, arguments);
@@ -931,12 +1024,12 @@ namespace Pchp.Library.Spl
 
         public override PhpValue current()
         {
-            return isValidImpl() ? _index.Value.current() : PhpValue.Void;
+            return isValidImpl() ? _index.Value.current() : PhpValue.Null;
         }
 
         public override PhpValue key()
         {
-            return isValidImpl() ? _index.Value.key() : PhpValue.Void;
+            return isValidImpl() ? _index.Value.key() : PhpValue.Null;
         }
 
         public override bool valid() => isValidImpl();
@@ -1176,7 +1269,7 @@ namespace Pchp.Library.Spl
         /// <summary>
         /// Return the string representation of the current element.
         /// </summary>
-        public override string ToString()
+        public virtual string __toString()
         {
             if ((_flags & (CALL_TOSTRING | TOSTRING_USE_INNER)) != 0)
             {
@@ -1196,6 +1289,8 @@ namespace Pchp.Library.Spl
                 return string.Empty;
             }
         }
+
+        public override string ToString() => __toString();
 
         protected private virtual void NextImpl()
         {
@@ -1397,11 +1492,16 @@ namespace Pchp.Library.Spl
         /// </summary>
         public const int USE_KEY = 1;
 
+        /// <summary>
+        /// Special flag: Filter out the entries which match the pattern.
+        /// </summary>
+        public const int INVERT_MATCH = 2;
+
         #endregion
 
         #region Fields and properties
 
-        protected private Context _ctx;
+        readonly protected Context _ctx;
 
         private PhpValue _currentVal;
         private PhpValue _currentKey;
@@ -1413,7 +1513,7 @@ namespace Pchp.Library.Spl
 
         public string replacement;
 
-        private bool IsKeyUsed => (_flags & USE_KEY) != 0;
+        private protected bool IsKeyUsed => (_flags & USE_KEY) != 0;
 
         #endregion
 
@@ -1498,11 +1598,6 @@ namespace Pchp.Library.Spl
             var key = base.key();
             var val = base.current();
 
-            if (key.IsDefault || val.IsDefault)
-            {
-                return false;
-            }
-
             _currentKey = key;
             _currentVal = val;
 
@@ -1512,14 +1607,14 @@ namespace Pchp.Library.Spl
             switch (_mode)
             {
                 case MATCH:
-                    result = (PCRE.preg_match(_ctx, _regex, subject) > 0);
+                    result = (PCRE.preg_match(_regex, subject) > 0);
                     break;
                 case GET_MATCH:
-                    result = (PCRE.preg_match(_ctx, _regex, subject, out matches, _pregFlags) > 0);
+                    result = (PCRE.preg_match(_regex, subject, out matches, _pregFlags) > 0);
                     _currentVal = matches;
                     break;
                 case ALL_MATCHES:
-                    result = (PCRE.preg_match_all(_ctx, _regex, subject, out matches, _pregFlags) > 0);
+                    result = (PCRE.preg_match_all(_regex, subject, out matches, _pregFlags) > 0);
                     _currentVal = matches;
                     break;
                 case SPLIT:
@@ -1528,8 +1623,7 @@ namespace Pchp.Library.Spl
                     _currentVal = matches;
                     break;
                 case REPLACE:
-                    long replaceCount = 0;
-                    var replaceResult = PCRE.preg_replace(_ctx, _regex, replacement, subject, -1, out replaceCount);
+                    var replaceResult = PCRE.preg_replace(_ctx, _regex, replacement, subject, -1, out var replaceCount);
 
                     if (replaceResult.IsNull || replaceCount == 0)
                     {
@@ -1552,6 +1646,9 @@ namespace Pchp.Library.Spl
                     result = false;
                     break;
             }
+
+            if ((_flags & INVERT_MATCH) != 0)
+                result = !result;
 
             return result;
         }

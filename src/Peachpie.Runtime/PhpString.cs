@@ -18,7 +18,7 @@ namespace Pchp.Core.Text
     /// Used internally.
     /// </summary>
     [DebuggerNonUserCode]
-    internal struct BlobChar
+    internal readonly struct BlobChar
     {
         private readonly short _b;
         private readonly char _ch;
@@ -270,6 +270,19 @@ namespace Pchp.Core.Text
         /// </summary>
         /// <exception cref="ArgumentOutOfRangeException">The start index is less than zero.</exception>
         public static PhpString Substring(this PhpString str, int startIndex, int length) => str.SubstringInternal(startIndex, length);
+
+        /// <summary>
+        /// Creates a new string with reversed order of characters.
+        /// </summary>
+        public static PhpString Reverse(this PhpString str)
+        {
+            if (str.IsEmpty)
+            {
+                return PhpString.Empty;
+            }
+
+            return str.ReverseInternal();
+        }
     }
 
     #endregion
@@ -664,6 +677,9 @@ namespace Pchp.Core
             {
                 switch (value.TypeCode)
                 {
+                    case PhpTypeCode.Null:
+                        break;
+
                     case PhpTypeCode.String:
                         Add(value.String);
                         break;
@@ -677,7 +693,7 @@ namespace Pchp.Core
                         break;
 
                     default:
-                        Add(value.ToStringOrThrow(ctx));
+                        Add(StrictConvert.ToString(value, ctx));
                         break;
                 }
             }
@@ -711,7 +727,7 @@ namespace Pchp.Core
                     else
                     {
                         AssertChunkObject(chunks);
-                        _chunks = new [] { chunks, newchunk, null, null }; // [4]
+                        _chunks = new[] { chunks, newchunk, null, null }; // [4]
                         _chunksCount = 2;
                         _flags |= Flags.IsArrayOfChunks;
                     }
@@ -942,24 +958,134 @@ namespace Pchp.Core
 
             #endregion
 
+            #region Reverse
+
+            internal Blob Reverse()
+            {
+                var result = new Blob();
+
+                var chunks = _chunks;
+                if (chunks is object[] originalchunks)
+                {
+                    var count = _chunksCount;
+                    var reversedchunks = new object[count];
+                    for (int i = 0; i < count; i++)
+                    {
+                        // reverse chunks in reverse order:
+                        reversedchunks[count - i - 1] = ReverseInternal(originalchunks[i]);
+                    }
+
+                    result._chunks = reversedchunks;
+                    result._chunksCount = count;
+                }
+                else
+                {
+                    result._chunks = ReverseInternal(chunks);
+                }
+
+                //
+                result._string = null; // no cached reversed string
+                result._length = _length; // same length as before
+                result._flags = _flags; // same flags as before
+
+                return result;
+            }
+
+            static object ReverseInternal(object chunk)
+            {
+                switch (chunk)
+                {
+                    case string str:
+                        return StringUtils.Reverse(str);
+
+                    case byte[] barr:
+                        return ArrayUtils.Reverse(barr);
+
+                    case Blob b:
+                        return b.Reverse();
+
+                    case char[] carr:
+                        return ArrayUtils.Reverse(carr);
+
+                    case BlobChar[] barr:
+                        return ArrayUtils.Reverse(barr);
+
+                    default:
+                        throw new ArgumentException(chunk.GetType().ToString());
+                }
+            }
+
+            #endregion
+
+            #region GetByteCount
+
+            public int GetByteCount(Encoding encoding)
+            {
+                var chunks = _chunks;
+                if (chunks != null)
+                {
+                    return (chunks is object[] objs)
+                        ? GetByteCount(encoding, objs, _chunksCount)
+                        : GetByteCount(encoding, chunks);
+                }
+                else
+                {
+                    return 0;
+                }
+            }
+
+            static int GetByteCount(Encoding encoding, object[] chunks, int count)
+            {
+                var length = 0;
+
+                for (int i = 0; i < count; i++)
+                {
+                    length += GetByteCount(encoding, chunks[i]);
+                }
+
+                return length;
+            }
+
+            static int GetByteCount(Encoding encoding, object chunk)
+            {
+                AssertChunkObject(chunk);
+
+                switch (chunk)
+                {
+                    case string str: return encoding.GetByteCount(str);
+                    case byte[] barr: return barr.Length;
+                    case Blob b: return b.GetByteCount(encoding);
+                    case char[] carr: return carr.Length;
+                    case BlobChar[] barr: return barr.Length;
+                    default: throw new ArgumentException(chunk.GetType().ToString());
+                }
+            }
+
+            #endregion
+
             #region ToString
 
             public override string ToString() => ToString(Encoding.UTF8);
 
             public string ToString(Encoding encoding)
             {
+                if (_string != null)
+                {
+                    return _string;
+                }
+
                 // TODO: cache the result for current chunks version
 
                 var chunks = _chunks;
                 if (chunks != null)
                 {
-                    return (chunks.GetType() == typeof(object[]))
-                        ? ChunkToString(encoding, (object[])chunks, _chunksCount)
+                    return (chunks is object[] objs)
+                        ? ChunkToString(encoding, objs, _chunksCount)
                         : ChunkToString(encoding, chunks);
                 }
                 else
                 {
-                    return string.Empty;
+                    return (_string = string.Empty);
                 }
             }
 
@@ -1008,16 +1134,16 @@ namespace Pchp.Core
 
             public byte[] ToBytes(Encoding encoding)
             {
-                var chunks = _chunks;
-                if (chunks != null)
+                if (IsEmpty)
                 {
-                    return (chunks.GetType() == typeof(object[]))
-                        ? ChunkToBytes(encoding, (object[])chunks, _chunksCount)
-                        : ChunkToBytes(encoding, chunks);
+                    return ArrayUtils.EmptyBytes;
                 }
                 else
                 {
-                    return ArrayUtils.EmptyBytes;
+                    var chunks = _chunks;
+                    return (chunks.GetType() == typeof(object[]))
+                        ? ChunkToBytes(encoding, (object[])chunks, _chunksCount)
+                        : ChunkToBytes(encoding, chunks);
                 }
             }
 
@@ -1282,8 +1408,8 @@ namespace Pchp.Core
             /// </summary>
             PhpValue IPhpArray.GetItemValue(IntStringKey key)
             {
-                int index = key.IsInteger ? key.Integer : (int)Convert.StringToLongInteger(key.String);
-                return (index >= 0 && index < this.Length) ? this[index].AsValue() : PhpValue.Create(string.Empty);
+                var index = key.IsInteger ? key.Integer : Convert.StringToLongInteger(key.String);
+                return (index >= 0 && index < this.Length) ? this[(int)index].AsValue() : PhpValue.Create(string.Empty);
             }
 
             PhpValue IPhpArray.GetItemValue(PhpValue index)
@@ -1298,7 +1424,7 @@ namespace Pchp.Core
 
             void IPhpArray.SetItemValue(PhpValue index, PhpValue value)
             {
-                if (index.TryToIntStringKey(out IntStringKey key))
+                if (index.TryToIntStringKey(out var key))
                 {
                     ((IPhpArray)this).SetItemValue(key, value);
                 }
@@ -1313,8 +1439,15 @@ namespace Pchp.Core
             /// </summary>
             void IPhpArray.SetItemValue(IntStringKey key, PhpValue value)
             {
-                int index = key.IsInteger ? key.Integer : (int)Convert.StringToLongInteger(key.String);
-                this[index] = value;
+                var index = key.IsInteger ? key.Integer : Convert.StringToLongInteger(key.String);
+                if (NumberUtils.IsInt32(index))
+                {
+                    this[(int)index] = value;
+                }
+                else
+                {
+                    throw new NotSupportedException();
+                }
             }
 
             /// <summary>
@@ -1466,9 +1599,7 @@ namespace Pchp.Core
         /// </summary>
         public Blob/*!*/EnsureWritable()
         {
-            Blob blob;
-
-            if ((blob = _data as Blob) != null)
+            if (_data is Blob blob)
             {
                 if (blob.IsShared)
                 {
@@ -1482,6 +1613,10 @@ namespace Pchp.Core
             else if (_data is string str)
             {
                 _data = blob = new Blob(str);
+            }
+            else
+            {
+                throw new InvalidOperationException();
             }
 
             //
@@ -1517,21 +1652,9 @@ namespace Pchp.Core
 
         public long ToLong() => Convert.ToLong(ToString());
 
-        public Convert.NumberInfo ToNumber(out PhpNumber number)
-        {
-            double d;
-            long l;
-            var info = Convert.StringToNumber(ToString(), out l, out d);
-            number = (info & Convert.NumberInfo.Double) != 0
-                ? PhpNumber.Create(d)
-                : PhpNumber.Create(l);
-
-            return info;
-        }
+        public Convert.NumberInfo ToNumber(out PhpNumber number) => Convert.ToNumber(ToString(), out number);
 
         public string ToString(Context ctx) => ToString(ctx.StringEncoding);
-
-        public string ToStringOrThrow(Context ctx) => ToString(ctx.StringEncoding);
 
         public object ToClass() => new stdClass(AsPhpValue(this));
 
@@ -1600,6 +1723,31 @@ namespace Pchp.Core
         }
 
         /// <summary>
+        /// Returns reversed string safe to binary data and unicode characters.
+        /// </summary>
+        internal PhpString ReverseInternal()
+        {
+            if (_data is string str)
+            {
+                return str.Reverse();
+            }
+            else if (_data is Blob b)
+            {
+                if (b.ContainsBinaryData)
+                {
+                    return new PhpString(b.Reverse());
+                }
+                else if (!b.IsEmpty)
+                {
+                    return new PhpString(b.ToString().Reverse());
+                }
+            }
+
+            // 
+            return string.Empty;
+        }
+
+        /// <summary>
         /// Copies portion of this instance to the target string.
         /// </summary>
         /// <exception cref="ArgumentOutOfRangeException">The start index is less than zero.</exception>
@@ -1643,6 +1791,29 @@ namespace Pchp.Core
         /// </summary>
         public static implicit operator PhpValue(PhpString value) => AsPhpValue(value);
 
+        /// <summary>
+        /// Gets bytes count when converted to bytes using provided <paramref name="encoding"/>.
+        /// </summary>
+        /// <param name="encoding">Encoding to be used to decode bytes from unicode string segments.</param>
+        /// <returns>Resulting bytes count.</returns>
+        public int GetByteCount(Encoding encoding)
+        {
+            if (encoding == null) throw new ArgumentNullException(nameof(encoding));
+
+            if (_data is string str)
+            {
+                return encoding.GetByteCount(str);
+            }
+            else if (_data is Blob b)
+            {
+                return b.GetByteCount(encoding);
+            }
+            else
+            {
+                return 0;
+            }
+        }
+
         #endregion
 
         /// <summary>
@@ -1659,12 +1830,14 @@ namespace Pchp.Core
         /// <summary>
         /// Wraps the string into <see cref="PhpValue"/>.
         /// </summary>
-        internal static PhpValue AsPhpValue(PhpString str) =>
-            str.IsDefault
-            ? (PhpValue)string.Empty
-            : str._data is Blob b
-                ? PhpValue.Create(b.AddRef())
-                : PhpValue.Create((string)str._data);
+        internal static PhpValue AsPhpValue(PhpString str)
+        {
+            return ReferenceEquals(str._data, null) // default
+                ? (PhpValue)string.Empty
+                : str._data is Blob b
+                    ? PhpValue.Create(b.AddRef())
+                    : PhpValue.Create((string)str._data);
+        }
 
         /// <summary>
         /// Gets the first character.
@@ -1692,13 +1865,14 @@ namespace Pchp.Core
 
         public byte[] ToBytes(Context ctx) => ToBytes(ctx.StringEncoding);
 
-        public byte[] ToBytes(Encoding encoding) => IsEmpty ? Array.Empty<byte>() : _data is Blob b ? b.ToBytes(encoding) : encoding.GetBytes((string)_data);
-
-        /// <summary>
-        /// Implicit conversion to <see cref="long"/>.
-        /// Throws <c>TypeError</c> in case the implicit conversion cannot be done.
-        /// </summary>
-        public long ToLongOrThrow() => Convert.ToLongOrThrow(ToString());
+        public byte[] ToBytes(Encoding encoding) =>
+            ReferenceEquals(_data, null)
+                ? ArrayUtils.EmptyBytes
+                : _data is Blob b
+                    ? b.ToBytes(encoding)
+                    : _data is string str && str.Length != 0
+                        ? encoding.GetBytes(str)
+                        : ArrayUtils.EmptyBytes;
 
         public PhpNumber ToNumber()
         {

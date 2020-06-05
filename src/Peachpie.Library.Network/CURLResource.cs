@@ -5,6 +5,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using Pchp.Core;
+using Pchp.Core.Utilities;
 using Pchp.Library.Streams;
 
 namespace Peachpie.Library.Network
@@ -25,8 +26,8 @@ namespace Peachpie.Library.Network
             StoreRequestHeaders = 1,
             Verbose = 2,
             FailOnError = 4,
-            CookieFileSet = 8,
-            FollowLocation = 16,
+            FollowLocation = 8,
+            SafeUpload = 16,
         }
 
         #endregion
@@ -82,7 +83,7 @@ namespace Peachpie.Library.Network
         public int MaxRedirects { get; set; } = -1;
 
         /// <summary>
-        /// The maximum number of miliseconds to allow cURL functions to execute.
+        /// The maximum number of milliseconds to allow cURL functions to execute.
         /// </summary>
         public int Timeout { get; set; } = 0; // default of curl is 0 which means it never times out during transfer
 
@@ -115,9 +116,17 @@ namespace Peachpie.Library.Network
         }
 
         /// <summary>
-        /// The contents of the <c>Accept-Encoding</c> header.
+        /// <see cref="CURLConstants.CURLOPT_SAFE_UPLOAD"/> option.
         /// </summary>
-        public string AcceptEncoding { get; set; }
+        public bool SafeUpload
+        {
+            get => (_flags & Flags.SafeUpload) != 0;
+            set
+            {
+                if (value) _flags |= Flags.SafeUpload;
+                else _flags &= ~Flags.SafeUpload;
+            }
+        }
 
         public string Method { get; set; } = WebRequestMethods.Http.Get;
 
@@ -126,7 +135,7 @@ namespace Peachpie.Library.Network
         /// This parameter can either be passed as a urlencoded string like 'para1=val1&amp;para2=val2&amp;...' or as an array with the field name as key and field data as value.
         /// If value is an array, the Content-Type header will be set to multipart/form-data.
         /// </summary>
-        public PhpValue PostFields { get; set; } = PhpValue.Void;
+        public PhpValue PostFields { get; set; } = default;
 
         /// <summary>
         /// The value of the Cookie header.
@@ -137,16 +146,9 @@ namespace Peachpie.Library.Network
         /// <summary>
         /// As long as <see cref="CURLConstants.CURLOPT_COOKIEFILE"/> is set (regardless of the value, even
         /// null suffices), the cookies retrieved from the server are recorded.
+        /// Otherwise this reference is <c>null</c>.
         /// </summary>
-        public bool CookieFileSet
-        {
-            get => (_flags & Flags.CookieFileSet) != 0;
-            set
-            {
-                if (value) _flags |= Flags.CookieFileSet;
-                else _flags &= ~Flags.CookieFileSet;
-            }
-        }
+        public CookieContainer CookieContainer { get; set; }
 
         public string Username { get; set; }
 
@@ -214,7 +216,7 @@ namespace Peachpie.Library.Network
             this.ProcessingHeaders = ProcessMethod.Ignore;
             this.ProcessingResponse = ProcessMethod.StdOut;
             this.ProcessingRequest = new ProcessMethod() { Method = ProcessMethodEnum.FILE };
-            this.PostFields = PhpValue.Void;
+            this.PostFields = default;
             this.VerboseOutput = null;
 
             this._options.Clear();
@@ -255,6 +257,17 @@ namespace Peachpie.Library.Network
         /// Gets enumeration of set of additional options.
         /// </summary>
         internal IEnumerable<ICurlOption>/*!*/Options => _options.Values;
+
+        /// <summary>
+        /// Applies all the options to the request.
+        /// </summary>
+        internal void ApplyOptions(Context ctx,  WebRequest request)
+        {
+            foreach (var option in this.Options)
+            {
+                option.Apply(ctx, request);
+            }
+        }
     }
 
     #region ProcessMethod, ProcessMethodEnum
@@ -321,6 +334,11 @@ namespace Peachpie.Library.Network
     sealed class CURLResponse
     {
         /// <summary>
+        /// Gets empty response with all the values zero (response of not executed request).
+        /// </summary>
+        public static CURLResponse Empty => new CURLResponse();
+
+        /// <summary>
         /// Error code number if exception happened.
         /// </summary>
         public CurlErrors ErrorCode { get; set; } = CurlErrors.CURLE_OK;
@@ -339,7 +357,7 @@ namespace Peachpie.Library.Network
 
         public HttpStatusCode StatusCode { get; }
 
-        public DateTime LastModified
+        public DateTime? LastModified
         {
             get
             {
@@ -349,21 +367,44 @@ namespace Peachpie.Library.Network
                 }
                 else
                 {
-                    return DateTime.UtcNow;
+                    return null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets <c>lastmodified</c> header as a Unix time stamp.
+        /// Gets <c>-1</c> if header is not specified.
+        /// </summary>
+        public long LastModifiedTimeStamp
+        {
+            get
+            {
+                var date = this.LastModified;
+                if (date.HasValue)
+                {
+                    return DateTimeUtils.UtcToUnixTimeStamp(date.Value);
+                }
+                else
+                {
+                    return -1;
                 }
             }
         }
 
         /// <summary>
         /// Content length of download, read from Content-Length: field.
+        /// If not specified, gets <c>-1</c>.
         /// </summary>
         public long ContentLength => Headers != null && long.TryParse(Headers[HttpRequestHeader.ContentLength], out var length) ? length : -1;
 
-        public string ContentType => (Headers != null) ? Headers[HttpRequestHeader.ContentType] : string.Empty;
+        public string ContentType => (Headers != null) ? Headers[HttpRequestHeader.ContentType] : null;
 
         public string StatusHeader { get; set; } = string.Empty;
 
-        public int HeaderSize => StatusHeader.Length + HttpHeaders.HeaderSeparator.Length + ((Headers != null) ? Headers.ToByteArray().Length : 0);
+        public int HeaderSize =>
+            (string.IsNullOrEmpty(StatusHeader) ? 0 : (StatusHeader.Length + HttpHeaders.HeaderSeparator.Length)) +
+            ((Headers != null && Headers.Count != 0) ? Headers.ToByteArray().Length : 0);
 
         public WebHeaderCollection Headers { get; }
 
@@ -380,7 +421,12 @@ namespace Peachpie.Library.Network
 
         public PhpValue ExecValue { get; }
 
-        public static CURLResponse CreateError(CurlErrors errcode, Exception ex = null) => new CURLResponse(PhpValue.False) { ErrorCode = errcode, ErrorMessage = ex?.Message };
+        public static CURLResponse CreateError(CurlErrors errcode, Exception ex = null) =>
+            new CURLResponse(PhpValue.False)
+            {
+                ErrorCode = errcode,
+                ErrorMessage = ex?.Message,
+            };
 
         public CURLResponse(PhpValue execvalue, HttpWebResponse response = null, CURLResource ch = null)
         {
@@ -399,6 +445,11 @@ namespace Peachpie.Library.Network
             {
                 this.RequestHeaders = ch.RequestHeaders;
             }
+        }
+
+        private CURLResponse()
+        {
+            // everything to default, not exected request
         }
     }
 }

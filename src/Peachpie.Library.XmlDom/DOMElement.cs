@@ -12,15 +12,21 @@ namespace Peachpie.Library.XmlDom
     {
         #region Fields and Properties
 
-        internal XmlElement XmlElement
+        [PhpHidden]
+        internal protected XmlElement XmlElement
         {
             get { return (XmlElement)XmlNode; }
             set { XmlNode = value; }
         }
 
-        private string _name;
-        private string _value;
-        private string _namespaceUri;
+        [PhpHidden]
+        private protected string _name;
+
+        [PhpHidden]
+        private protected string _value;
+
+        [PhpHidden]
+        private protected string _namespaceUri;
 
         /// <summary>
         /// Returns the name of the element.
@@ -101,7 +107,8 @@ namespace Peachpie.Library.XmlDom
             this.XmlElement = xmlElement;
         }
 
-        protected override DOMNode CloneObjectInternal(bool deepCopyFields)
+        [PhpHidden]
+        private protected override DOMNode CloneObjectInternal(bool deepCopyFields)
         {
             if (IsAssociated) return new DOMElement(XmlElement);
             else
@@ -124,7 +131,8 @@ namespace Peachpie.Library.XmlDom
 
         #region Hierarchy
 
-        internal override void Associate(XmlDocument/*!*/ document)
+        [PhpHidden]
+        internal protected override void Associate(XmlDocument/*!*/ document)
         {
             if (!IsAssociated)
             {
@@ -212,17 +220,26 @@ namespace Peachpie.Library.XmlDom
                 return false;
             }
 
-            // parse the qualified name
-            string local_name, prefix;
-            Utils.ParseQualifiedName(qualifiedName, out prefix, out local_name);
+            if (string.IsNullOrEmpty(qualifiedName))
+            {
+                // Warning: DOMElement::setAttributeNS(): Attribute Name is required
+                PhpException.InvalidArgument(nameof(qualifiedName));
+                return false;
+            }
 
-            XmlAttribute attr = XmlElement.Attributes[local_name, namespaceUri];
+            // parse the qualified name
+            Utils.ParseQualifiedName(qualifiedName, out var prefix, out var local_name);
+
+            var attr = XmlElement.Attributes[local_name, namespaceUri];
             if (attr == null)
             {
                 attr = XmlNode.OwnerDocument.CreateAttribute(qualifiedName, namespaceUri);
                 XmlElement.Attributes.Append(attr);
             }
-            else attr.Prefix = prefix;
+            else
+            {
+                attr.Prefix = prefix;
+            }
 
             attr.Value = value;
 
@@ -242,7 +259,7 @@ namespace Peachpie.Library.XmlDom
                 return false;
             }
 
-            XmlAttribute attr = XmlElement.Attributes[name];
+            var attr = XmlElement.Attributes[name];
             if (attr != null) XmlElement.Attributes.Remove(attr);
 
             return true;
@@ -262,7 +279,7 @@ namespace Peachpie.Library.XmlDom
                 return false;
             }
 
-            XmlAttribute attr = XmlElement.Attributes[localName, namespaceUri];
+            var attr = XmlElement.Attributes[localName, namespaceUri];
             if (attr != null) XmlElement.Attributes.Remove(attr);
 
             return true;
@@ -278,7 +295,7 @@ namespace Peachpie.Library.XmlDom
         {
             if (IsAssociated)
             {
-                XmlAttribute attr = XmlElement.Attributes[name];
+                var attr = XmlElement.Attributes[name];
                 if (attr != null) return new DOMAttr(attr);
             }
             return null;
@@ -295,7 +312,7 @@ namespace Peachpie.Library.XmlDom
         {
             if (IsAssociated)
             {
-                XmlAttribute attr = XmlElement.Attributes[localName, namespaceUri];
+                var attr = XmlElement.Attributes[localName, namespaceUri];
                 if (attr != null) return new DOMAttr(attr);
             }
             return null;
@@ -322,7 +339,7 @@ namespace Peachpie.Library.XmlDom
                 return null;
             }
 
-            XmlAttribute attr = XmlElement.Attributes[attribute.nodeName];
+            var attr = XmlElement.Attributes[attribute.nodeName];
             if (attr != null)
             {
                 XmlElement.Attributes.Remove(attr);
@@ -357,7 +374,7 @@ namespace Peachpie.Library.XmlDom
                 return null;
             }
 
-            XmlAttribute attr = XmlElement.Attributes[attribute.localName, attribute.namespaceURI];
+            var attr = XmlElement.Attributes[attribute.localName, attribute.namespaceURI];
             if (attr != null)
             {
                 XmlElement.Attributes.Remove(attr);
@@ -384,7 +401,7 @@ namespace Peachpie.Library.XmlDom
                 return null;
             }
 
-            XmlAttribute attr = XmlElement.Attributes[attribute.nodeName];
+            var attr = XmlElement.Attributes[attribute.nodeName];
             if (attr == null)
             {
                 DOMException.Throw(ExceptionCode.NotFound);

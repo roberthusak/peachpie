@@ -79,6 +79,15 @@ namespace Peachpie.CodeAnalysis.Errors {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Invalid &apos;{0}&apos; value: &apos;{1}&apos;..
+        /// </summary>
+        internal static string ERR_BadCompilationOptionValue {
+            get {
+                return ResourceManager.GetString("ERR_BadCompilationOptionValue", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Provided documentation mode is unsupported or invalid: &apos;{0}&apos;..
         /// </summary>
         internal static string ERR_BadDocumentationMode {
@@ -169,6 +178,15 @@ namespace Peachpie.CodeAnalysis.Errors {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Cannot open &apos;{0}&apos; for writing -- &apos;{1}&apos;.
+        /// </summary>
+        internal static string ERR_CantOpenFileWrite {
+            get {
+                return ResourceManager.GetString("ERR_CantOpenFileWrite", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Error reading resource &apos;{0}&apos; -- &apos;{1}&apos;.
         /// </summary>
         internal static string ERR_CantReadResource {
@@ -183,6 +201,15 @@ namespace Peachpie.CodeAnalysis.Errors {
         internal static string ERR_CircularBase {
             get {
                 return ResourceManager.GetString("ERR_CircularBase", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Compilation cancelled by user.
+        /// </summary>
+        internal static string ERR_CompileCancelled {
+            get {
+                return ResourceManager.GetString("ERR_CompileCancelled", resourceCulture);
             }
         }
         
@@ -349,6 +376,15 @@ namespace Peachpie.CodeAnalysis.Errors {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Source file &apos;{0}&apos; could not be opened -- {1}.
+        /// </summary>
+        internal static string ERR_NoSourceFile {
+            get {
+                return ResourceManager.GetString("ERR_NoSourceFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to {0} is currently not supported by PeachPie..
         /// </summary>
         internal static string ERR_NotYetImplemented {
@@ -372,6 +408,15 @@ namespace Peachpie.CodeAnalysis.Errors {
         internal static string ERR_OutputWriteFailed {
             get {
                 return ResourceManager.GetString("ERR_OutputWriteFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Failure writing debug information: {0}.
+        /// </summary>
+        internal static string ERR_PdbWritingFailed {
+            get {
+                return ResourceManager.GetString("ERR_PdbWritingFailed", resourceCulture);
             }
         }
         
@@ -529,15 +574,6 @@ namespace Peachpie.CodeAnalysis.Errors {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Wrong case in class name &apos;{0}&apos;, expected &apos;{1}&apos;..
-        /// </summary>
-        internal static string INF_ClassNameWrongCase {
-            get {
-                return ResourceManager.GetString("INF_ClassNameWrongCase", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Use of &apos;__destruct&apos; is discouraged. Garbage collection behavior is a subject to change..
         /// </summary>
         internal static string INF_DestructDiscouraged {
@@ -556,11 +592,29 @@ namespace Peachpie.CodeAnalysis.Errors {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Overriden function name &apos;{0}&apos; does not match it&apos;s parent name &apos;{1}&apos;, letter casing mismatch..
+        /// </summary>
+        internal static string INF_OverrideNameCaseMismatch {
+            get {
+                return ResourceManager.GetString("INF_OverrideNameCaseMismatch", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Cast is redundant..
         /// </summary>
         internal static string INF_RedundantCast {
             get {
                 return ResourceManager.GetString("INF_RedundantCast", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Name &apos;{0}&apos; does not match the expected name &apos;{1}&apos;, letter casing mismatch..
+        /// </summary>
+        internal static string INF_TypeNameCaseMismatch {
+            get {
+                return ResourceManager.GetString("INF_TypeNameCaseMismatch", resourceCulture);
             }
         }
         
@@ -646,7 +700,7 @@ namespace Peachpie.CodeAnalysis.Errors {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Wrong number of arguments in {0}..
+        ///   Looks up a localized string similar to Call to &apos;{0}()&apos; expects {1} argument(s), {2} given..
         /// </summary>
         internal static string WRN_FormatStringWrongArgCount {
             get {
@@ -705,6 +759,15 @@ namespace Peachpie.CodeAnalysis.Errors {
         internal static string WRN_ParentCtorNotCalled {
             get {
                 return ResourceManager.GetString("WRN_ParentCtorNotCalled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to PCRE pattern parse error: {0} at offset {1}.
+        /// </summary>
+        internal static string WRN_PCRE_Pattern_Error {
+            get {
+                return ResourceManager.GetString("WRN_PCRE_Pattern_Error", resourceCulture);
             }
         }
         

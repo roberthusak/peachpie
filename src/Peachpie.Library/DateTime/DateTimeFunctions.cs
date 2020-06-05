@@ -60,9 +60,13 @@ namespace Pchp.Library.DateTime
 
         public const string DATE_RFC3339 = @"Y-m-d\TH:i:sP";
 
-        public const string DATE_RSS = @"D, d M Y H:i:s T";
+        public const string DATE_RFC7231 = @"D, d M Y H:i:s \G\M\T";
 
-        public const string DATE_W3C = @"Y-m-d\TH:i:sO";
+        public const string DATE_RFC3339_EXTENDED = @"Y-m-d\TH:i:s.vP";
+
+        public const string DATE_RSS = @"D, d M Y H:i:s O";
+
+        public const string DATE_W3C = @"Y-m-d\TH:i:sP";
 
         #endregion
 
@@ -171,7 +175,7 @@ namespace Pchp.Library.DateTime
         //[return:CastToFalse]
         public static DateTime date_sub(DateTime @object, DateInterval interval) => @object.sub(interval);
 
-        static System_DateTime TimeFromInterface(DateTimeInterface dti)
+        internal static System_DateTime TimeFromInterface(DateTimeInterface dti)
         {
             if (dti is Library.DateTime.DateTime dt) return dt.Time;
             if (dti is DateTimeImmutable dtimmutable) return dtimmutable.Time;
@@ -205,6 +209,28 @@ namespace Pchp.Library.DateTime
         /// Gets the date and time as Unix timestamp.
         /// </summary>
         public static long date_timestamp_get(DateTime @object) => @object.getTimestamp();
+
+        #endregion
+
+        #region
+
+        /// <summary>
+        /// Alias to <see cref="DateTime.setTime"/>.
+        /// </summary>
+        public static DateTime date_time_set(DateTime @object, int hour, int minute, int second)
+            => @object.setTime(hour, minute, second);
+
+        /// <summary>
+        /// Alias to <see cref="DateTime.setDate"/>.
+        /// </summary>
+        public static DateTime date_date_set(DateTime @object, int year, int month, int day)
+            => @object.setDate(year, month, day);
+
+        /// <summary>
+        /// Alias to <see cref="DateTime.setISODate"/>.
+        /// </summary>
+        public static DateTime date_isodate_set(DateTime @object, int year, int week, int day = 1)
+            => @object.setISODate(year, week, day);
 
         #endregion
 
@@ -689,12 +715,18 @@ namespace Pchp.Library.DateTime
 
         #endregion
 
-        #region date_interval_create_from_date_string
+        #region date_interval_create_from_date_string, date_interval_format
 
         /// <summary>
         /// Alias of <see cref="DateInterval.createFromDateString(string)"/>.
         /// </summary>
         public static DateInterval date_interval_create_from_date_string(string time) => DateInterval.createFromDateString(time);
+
+        /// <summary>
+        /// Alias to <see cref="DateInterval.format"/>.
+        /// </summary>
+        [return: NotNull]
+        public static string date_interval_format(DateInterval @object, string format) => @object.format(format);
 
         #endregion
 
@@ -1642,23 +1674,26 @@ namespace Pchp.Library.DateTime
 
         static PhpArray AsArray(Context ctx, DateInfo dateinfo, DateTimeErrors errors)
         {
-            var datetime = dateinfo.GetDateTime(ctx, System_DateTime.UtcNow);
+            var timezone = dateinfo.ResolveTimeZone(ctx, null);
+            var datetime = dateinfo.GetDateTime(ctx, System_DateTime.UtcNow);   // gets UTC time!
+
+            var localtime = TimeZoneInfo.ConvertTimeFromUtc(datetime, timezone);
 
             var result = new PhpArray(16);
             //[year] => 2006
-            result["year"] = dateinfo.have_date != 0 ? (PhpValue)datetime.Year : PhpValue.False;
+            result["year"] = dateinfo.y >= 0 ? (PhpValue)localtime.Year : PhpValue.False;
             //[month] => 12
-            result["month"] = dateinfo.have_date != 0 ? (PhpValue)datetime.Month : PhpValue.False;
+            result["month"] = dateinfo.m >= 0 ? (PhpValue)localtime.Month : PhpValue.False;
             //[day] => 12
-            result["day"] = dateinfo.have_date != 0 ? (PhpValue)datetime.Day : PhpValue.False;
+            result["day"] = dateinfo.d >= 0 ? (PhpValue)localtime.Day : PhpValue.False;
             //[hour] => 10
-            result["hour"] = dateinfo.have_time != 0 ? (PhpValue)datetime.Hour : PhpValue.False;
+            result["hour"] = dateinfo.h >= 0 ? (PhpValue)localtime.Hour : PhpValue.False;
             //[minute] => 0
-            result["minute"] = dateinfo.have_time != 0 ? (PhpValue)datetime.Minute : PhpValue.False;
+            result["minute"] = dateinfo.i >= 0 ? (PhpValue)localtime.Minute : PhpValue.False;
             //[second] => 0
-            result["second"] = dateinfo.have_time != 0 ? (PhpValue)datetime.Second : PhpValue.False;
+            result["second"] = dateinfo.s >= 0 ? (PhpValue)localtime.Second : PhpValue.False;
             //[fraction] => 0.5
-            result["fraction"] = dateinfo.have_time != 0 ? (PhpValue)dateinfo.f : PhpValue.False;
+            result["fraction"] = dateinfo.have_time != 0 ? (PhpValue)dateinfo.f : 0;
             //[warning_count] => 0
             result["warning_count"] = errors != null && errors.Warnings != null ? errors.Warnings.Count : 0;
             //[warnings] => Array()
@@ -1668,11 +1703,21 @@ namespace Pchp.Library.DateTime
             //[errors] => Array()
             result["errors"] = errors != null && errors.Errors != null ? new PhpArray(errors.Errors) : PhpArray.NewEmpty();
             //[is_localtime] => 
-            result["is_localtime"] = (PhpValue)(false); // ???
+            result["is_localtime"] = dateinfo.have_zone != 0; // ???
+
+            if (dateinfo.have_zone != 0)
+            {
+                // [zone_type] => 1
+                result["zone_type"] = DateInfo.GetTimeLibZoneType(timezone);
+                // [zone] => 37800
+                result["zone"] = dateinfo.z * 60; // seconds!
+                // [is_dst] => 
+                result["is_dst"] = timezone.IsDaylightSavingTime(localtime);
+            }
 
             if (dateinfo.have_relative != 0)
             {
-                result["relative"] = (PhpValue)new PhpArray(6)
+                result["relative"] = new PhpArray(6)
                 {
                     //[year] => 0
                     { "year", dateinfo.relative.y },
@@ -1686,6 +1731,8 @@ namespace Pchp.Library.DateTime
                     { "minute", dateinfo.relative.i },
                     //[second] => 0
                     { "second", dateinfo.relative.s },
+                    //[weekday] => 1
+                    { "weekday", dateinfo.have_weekday_relative != 0 ? dateinfo.relative.weekday : 0 },
                 };
             }
 

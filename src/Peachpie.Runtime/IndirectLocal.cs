@@ -13,37 +13,39 @@ namespace Pchp.Core
     /// </summary>
     [DebuggerDisplay("{DisplayString,nq}", Name = "${_name,nq}", Type = "{DebugTypeName,nq}")]
     [DebuggerNonUserCode, DebuggerStepThrough]
-    public struct IndirectLocal
+    public readonly struct IndirectLocal
     {
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         readonly OrderedDictionary _locals;
 
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        IntStringKey _name;
+        readonly IntStringKey _name;
 
-        // TODO: cache ref to the value (avoid repetitious lookups to hashtable), check _locals.version (_locals.entries) did not change
-
-        //[DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
-        public PhpValue Value
+        [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
+        object DebugValue
         {
-            get => _locals.GetValueOrNull(_name);
-            set => _locals[_name] = value;
+            get => _locals.TryGetValue(_name, out var value) ? value.ToClr() : null;
+            //set => _locals[_name] = value;
         }
 
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        ref PhpValue ValueRef => ref _locals.EnsureValue(_name);
+        ref PhpValue EnsureValueRef() => ref _locals.EnsureValue(_name);
 
         /// <summary>
         /// Gets underlaying value as <see cref="PhpAlias"/>.
         /// Modifies the underlaying table.
         /// </summary>
-        public PhpAlias EnsureAlias() => ValueRef.EnsureAlias();
+        public PhpAlias EnsureAlias() => PhpValue.EnsureAlias(ref EnsureValueRef());
+
+        /// <summary>
+        /// Gets the underlaying value or <c>NULL</c> if value does not exist.
+        /// </summary>
+        public PhpValue GetValue() => _locals.GetValueOrNull(_name);
 
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        string DisplayString => Value.DisplayString;
+        string DisplayString => GetValue().DisplayString;
 
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        string DebugTypeName => Value.DebugTypeName;
+        string DebugTypeName => GetValue().DebugTypeName;
 
         public IndirectLocal(OrderedDictionary/*!*/locals, IntStringKey/*!*/name)
         {

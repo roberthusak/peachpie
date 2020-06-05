@@ -16,6 +16,7 @@ using Microsoft.CodeAnalysis.Text;
 using static Pchp.CodeAnalysis.AstUtils;
 using Pchp.CodeAnalysis.Utilities;
 using Pchp.CodeAnalysis.Errors;
+using System.IO;
 
 namespace Pchp.CodeAnalysis.Symbols
 {
@@ -30,6 +31,10 @@ namespace Pchp.CodeAnalysis.Symbols
         /// Gets fully qualified name of the class.
         /// </summary>
         public virtual QualifiedName FullName => _syntax.QualifiedName;
+
+        /// <summary><see cref="FullName"/> as string.</summary>
+        internal string FullNameString => _FullNameString ??= FullName.ToString();
+        string _FullNameString;
 
         /// <summary>
         /// Optional.
@@ -98,7 +103,22 @@ namespace Pchp.CodeAnalysis.Symbols
         /// <summary>
         /// Optional. A <c>.ctor</c> that ensures the initialization of the class without calling the PHP constructor.
         /// </summary>
-        public IMethodSymbol InstanceConstructorFieldsOnly => InstanceConstructors.SingleOrDefault(MethodSymbolExtensions.IsFieldsOnlyConstructor);
+        public IMethodSymbol InstanceConstructorFieldsOnly => InstanceConstructors.SingleOrDefault(ctor => ctor.IsInitFieldsOnly);
+
+        public virtual byte AutoloadFlag
+        {
+            get
+            {
+                if (_autoloadFlag == 0xff)
+                {
+                    _autoloadFlag = ResolvePhpTypeAutoloadFlag();
+                }
+
+                return _autoloadFlag;
+            }
+        }
+
+        byte _autoloadFlag = 0xff;
 
         #endregion
 
@@ -1019,7 +1039,7 @@ namespace Pchp.CodeAnalysis.Symbols
                 {
                     yield return new SourceFieldSymbol(this, f.Name.Value,
                         CreateLocation(f.NameSpan),
-                        flist.Modifiers.GetAccessibility(), f.PHPDoc ?? flist.PHPDoc,
+                        flist.Modifiers.GetAccessibility(), flist.PHPDoc,
                         fkind,
                         initializer: (f.Initializer != null) ? binder.BindWholeExpression(f.Initializer, BoundAccess.Read).SingleBoundElement() : null,
                         customAttributes: attrs);
@@ -1033,7 +1053,7 @@ namespace Pchp.CodeAnalysis.Symbols
                 {
                     yield return new SourceFieldSymbol(this, c.Name.Name.Value,
                         CreateLocation(c.Name.Span),
-                        Accessibility.Public, c.PHPDoc ?? clist.PHPDoc,
+                        clist.Modifiers.GetAccessibility(), clist.PHPDoc,
                         PhpPropertyKind.ClassConstant,
                         binder.BindWholeExpression(c.Initializer, BoundAccess.Read).SingleBoundElement());
                 }
@@ -1366,17 +1386,154 @@ namespace Pchp.CodeAnalysis.Symbols
         public override ImmutableArray<NamedTypeSymbol> GetTypeMembers(string name)
             => GetTypeMembers().Where(t => t.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).AsImmutable();
 
+        /// <summary>
+        /// See <c>PhpTypeAttribute</c>
+        /// - 0: type is not selected to be autloaded.<br/>
+        /// - 1: type is marked to be autoloaded.<br/>
+        /// - 2: type is marked to be autoloaded and it is the only unconditional declaration in its source file.<br/>
+        /// </summary>
+        byte ResolvePhpTypeAutoloadFlag()
+        {
+            var options = DeclaringCompilation.Options;
+
+            bool isautoload = false;
+
+            // match the class in classmap:
+            if (options.Autoload_ClassMapFiles != null &&
+                options.Autoload_ClassMapFiles.Count != 0)
+            {
+                var relativeFilePath = this.ContainingFile.RelativeFilePath;
+                isautoload = options.Autoload_ClassMapFiles.Contains(relativeFilePath);
+            }
+
+            // match the class in psr map:
+            if (!isautoload && // autoload not resolved yet
+                options.Autoload_PSR4 != null &&
+                options.Autoload_PSR4.Count != 0 &&
+                (FullName.Name.Value + ".php").Equals(ContainingFile.FileName, StringComparison.InvariantCultureIgnoreCase) // "file name" must match "class name .php"
+                )
+            {
+                var fullname = FullNameString;
+                var relativeFilePath = this.ContainingFile.RelativeFilePath;
+
+                foreach (var prefix_path in options.Autoload_PSR4)
+                {
+                    // prefix must match (it may or may not be suffixed with slash)
+                    if (fullname.StartsWith(prefix_path.prefix, StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        // cut off name component of prefix, keep trailing slash
+                        // "UniqueGlobalClass" -> ""
+                        // "Monolog\" -> "Monolog\"
+                        // "A\B\" -> "A\B\"
+                        var nsprefix = prefix_path.prefix;
+                        nsprefix = nsprefix.Substring(0, nsprefix.LastIndexOf(QualifiedName.Separator) + 1);
+
+                        // path+{fullname without prefix namespace} == {relativeFilePath}
+                        var expectedpath = PhpFileUtilities.NormalizeSlashes(Path.Combine(prefix_path.path, fullname.Substring(nsprefix.Length) + ".php"));
+                        if (expectedpath.Equals(relativeFilePath, StringComparison.InvariantCultureIgnoreCase))
+                        {
+                            isautoload = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // determine autoload flag:
+            if (isautoload)
+            {
+                // source file does not have any side effects?
+                // 1: autoload but with side effects
+                // 2: autoload without side effect
+
+                // function declaration, other types, global code, ... ?
+
+                foreach (var f in ContainingFile.SyntaxTree.Functions)
+                {
+                    if (f.ContainingType == null) // function declared in global code (not in a method)
+                        return 1;
+                }
+
+                foreach (var t in ContainingFile.SyntaxTree.Types)
+                {
+                    if (t is AnonymousTypeDecl)
+                        continue;
+
+                    if (t.IsConditional || t != this.Syntax)
+                        return 1;
+                }
+
+                // ContainingFile.SyntaxTree.Root contains a global code?
+                var statements = new List<Statement>(ContainingFile.SyntaxTree.Root.Statements);
+                for (int i = 0; i < statements.Count; i++)
+                {
+                    var stmt = statements[i];
+
+                    if (stmt is NamespaceDecl ns)
+                    {
+                        statements.AddRange(ns.Body.Statements);
+                    }
+                    else if (stmt is EmptyStmt || stmt is TypeDecl || stmt is DeclareStmt)
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        return 1;
+                    }
+                }
+
+                // naive recursion prevention...
+                _autoloadFlag = 2;
+
+                // check base type, interfaces, and used traits
+                foreach (var d in this.GetDependentSourceTypeSymbols().OfType<IPhpTypeSymbol>())
+                {
+                    var a = d.AutoloadFlag;
+                    if (a == 0 || a == 1) return 1;
+                }
+
+                // no side effects found
+                return 2;
+            }
+
+            //
+            return 0;
+        }
+
         public override ImmutableArray<AttributeData> GetAttributes()
         {
             var attrs = base.GetAttributes();
 
-            // [PhpTypeAttribute(FullName, FileName)]
-            attrs = attrs.Add(new SynthesizedAttributeData(
+            AttributeData phptypeattr;
+            var autoload = AutoloadFlag;
+            if (autoload == 0)
+            {
+                // most common case, shorter signature:
+                // [PhpTypeAttribute(string FullName, string FileName)]
+                phptypeattr = new SynthesizedAttributeData(
                     DeclaringCompilation.CoreMethods.Ctors.PhpTypeAttribute_string_string,
                     ImmutableArray.Create(
-                        DeclaringCompilation.CreateTypedConstant(FullName.ToString()),
-                        DeclaringCompilation.CreateTypedConstant(ContainingFile.RelativeFilePath.ToString())),
-                    ImmutableArray<KeyValuePair<string, TypedConstant>>.Empty));
+                        DeclaringCompilation.CreateTypedConstant(FullNameString),
+                        DeclaringCompilation.CreateTypedConstant(ContainingFile.RelativeFilePath.ToString())
+                    ),
+                    ImmutableArray<KeyValuePair<string, TypedConstant>>.Empty);
+            }
+            else
+            {
+                // [PhpTypeAttribute(string FullName, string FileName, byte Autoload)]
+                phptypeattr = new SynthesizedAttributeData(
+                    DeclaringCompilation.CoreMethods.Ctors.PhpTypeAttribute_string_string_byte,
+                    ImmutableArray.Create(
+                        DeclaringCompilation.CreateTypedConstant(FullNameString),
+                        DeclaringCompilation.CreateTypedConstant(ContainingFile.RelativeFilePath.ToString()),
+                        DeclaringCompilation.CreateTypedConstant(autoload)
+                    ),
+                    ImmutableArray<KeyValuePair<string, TypedConstant>>.Empty);
+            }
+
+            //
+            attrs = attrs.Add(phptypeattr);
 
             // attributes from syntax node
             if (this.Syntax.TryGetCustomAttributes(out var customattrs))
@@ -1481,6 +1638,8 @@ namespace Pchp.CodeAnalysis.Symbols
         public new AnonymousTypeDecl Syntax => (AnonymousTypeDecl)_syntax;
 
         public override QualifiedName FullName => Syntax.GetAnonymousTypeQualifiedName();
+
+        public override byte AutoloadFlag => 0; // anonymous classes are never autoloaded (nor even declared in Context)
 
         public override string MetadataName => Name;
 
