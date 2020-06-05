@@ -18,7 +18,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
         /// <summary>
         /// Internal name of the block.
         /// </summary>
-        protected virtual string DebugName => "Block";
+        internal virtual string DebugName => "Block";
 
         /// <summary>
         /// Debugger display.
@@ -170,7 +170,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
         /// <summary>
         /// Internal name of the block.
         /// </summary>
-        protected override string DebugName => "Start";
+        internal override string DebugName => "Start";
 
         internal StartBlock()
             : base()
@@ -211,7 +211,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
         /// <summary>
         /// Internal name of the block.
         /// </summary>
-        protected override string DebugName => "Exit";
+        internal override string DebugName => "Exit";
 
         internal ExitBlock()
             : base()
@@ -254,7 +254,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
         /// <summary>
         /// Internal name of the block.
         /// </summary>
-        protected override string DebugName => "Catch";
+        internal override string DebugName => "Catch";
 
         /// <summary>
         /// Catch variable type.
@@ -323,7 +323,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
         /// <summary>
         /// Internal name of the block.
         /// </summary>
-        protected override string DebugName => IsDefault ? "default:" : "case:";
+        internal override string DebugName => IsDefault ? "default:" : "case:";
 
         /// <summary>
         /// Gets case value expression bag.
