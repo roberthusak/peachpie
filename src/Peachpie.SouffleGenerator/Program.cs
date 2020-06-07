@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime;
 using System.Runtime.InteropServices.ComTypes;
 using Pchp.CodeAnalysis.Semantics;
+using Pchp.CodeAnalysis.Semantics.Graph;
 using Peachpie.CodeAnalysis.FlowAnalysis.Souffle;
 
 namespace Peachpie.SouffleGenerator
@@ -26,8 +28,9 @@ namespace Peachpie.SouffleGenerator
         {
             var opTypes =
                 typeof(BoundOperation).Assembly.GetTypes()
-                .Where(t => t.IsSubclassOf(typeof(BoundOperation)))
+                .Where(t => t.IsSubclassOf(typeof(BoundOperation)) || t.IsSubclassOf(typeof(Edge)))
                 .Append(typeof(BoundOperation))
+                .Append(typeof(Edge))
                 .ToHashSet();
 
             var leafOpTypes =
@@ -74,7 +77,8 @@ namespace Peachpie.SouffleGenerator
                 var singleProps =
                     parentType.GetProperties()
                     .Where(p =>
-                        (p.PropertyType == typeof(BoundOperation) || p.PropertyType.IsSubclassOf(typeof(BoundOperation))) &&
+                        (p.PropertyType == typeof(BoundOperation) || p.PropertyType.IsSubclassOf(typeof(BoundOperation)) ||
+                        p.PropertyType == typeof(Edge) || p.PropertyType.IsSubclassOf(typeof(Edge))) &&
                         p.DeclaringType == parentType && p.GetGetMethod().GetBaseDefinition().DeclaringType == parentType)
                     .ToArray();
 
@@ -87,13 +91,13 @@ namespace Peachpie.SouffleGenerator
                 var enumerableProps =
                     parentType.GetProperties()
                     .Where(p =>
-                        typeof(IEnumerable<BoundOperation>).IsAssignableFrom(p.PropertyType) &&
+                        typeof(IEnumerable<BoundOperation>).IsAssignableFrom(p.PropertyType) &&                             // There are no Edge enumerables, no need to handle them
                         p.DeclaringType == parentType && p.GetGetMethod().GetBaseDefinition().DeclaringType == parentType)
                     .ToArray();
 
                 foreach (var prop in enumerableProps)
                 {
-                    var enumerableType = prop.PropertyType.GetInterface("IEnumerable`1");
+                    var enumerableType = (prop.PropertyType.Name == "IEnumerable`1") ? prop.PropertyType : prop.PropertyType.GetInterface("IEnumerable`1");
                     var itemType = enumerableType.GenericTypeArguments[0];
                     string propTypeName = SouffleUtils.GetOperationTypeName(itemType, unionOpTypes.Contains(itemType));
 
