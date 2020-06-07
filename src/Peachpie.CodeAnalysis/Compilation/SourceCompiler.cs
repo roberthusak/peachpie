@@ -6,6 +6,7 @@ using Pchp.CodeAnalysis.CommandLine;
 using Pchp.CodeAnalysis.Emit;
 using Pchp.CodeAnalysis.FlowAnalysis;
 using Pchp.CodeAnalysis.FlowAnalysis.Passes;
+using Pchp.CodeAnalysis.FlowAnalysis.Souffle;
 using Pchp.CodeAnalysis.Semantics;
 using Pchp.CodeAnalysis.Semantics.Graph;
 using Pchp.CodeAnalysis.Semantics.Model;

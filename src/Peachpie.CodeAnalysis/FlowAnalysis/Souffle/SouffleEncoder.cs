@@ -7,7 +7,7 @@ using Pchp.CodeAnalysis.Semantics.Graph;
 using Pchp.CodeAnalysis.Symbols;
 using Peachpie.CodeAnalysis.Utilities;
 
-namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
+namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 {
     internal class SouffleEncoder : GraphExplorer<VoidStruct>
     {
