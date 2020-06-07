@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime;
-using System.Runtime.InteropServices.ComTypes;
 using Pchp.CodeAnalysis.Semantics;
 using Pchp.CodeAnalysis.Semantics.Graph;
 using Peachpie.CodeAnalysis.FlowAnalysis.Souffle;
@@ -26,53 +24,39 @@ namespace Peachpie.SouffleGenerator
 
         private static void GenerateTypes(TextWriter writer)
         {
-            var opTypes =
-                typeof(BoundOperation).Assembly.GetTypes()
-                .Where(t => t.IsSubclassOf(typeof(BoundOperation)) || t.IsSubclassOf(typeof(Edge)))
-                .Append(typeof(BoundOperation))
-                .Append(typeof(Edge))
-                .ToHashSet();
-
-            var leafOpTypes =
-                opTypes
-                .Where(t1 => !opTypes.Any(t2 => t2.IsSubclassOf(t1)))
-                .ToHashSet();
-
-            var unionOpTypes = opTypes.Except(leafOpTypes);
-
-            // Base types
-            foreach (var opType in opTypes.Where(t => !t.IsAbstract))
+            // Basic types
+            foreach (var opType in SouffleUtils.ExportedTypes.Where(t => !t.IsAbstract))
             {
-                string name = SouffleUtils.GetOperationTypeName(opType, false);
+                string name = SouffleUtils.GetOperationTypeName(opType, isBase: false);
                 writer.WriteLine($".type {name} <: symbol");
             }
 
             writer.WriteLine();
 
             // Turn inheritance into union hierarchy
-            foreach (var opType in unionOpTypes)
+            foreach (var opType in SouffleUtils.ExportedUnionTypes)
             {
                 var subTypes =
-                    opTypes
+                    SouffleUtils.ExportedTypes
                     .Where(t => t.BaseType == opType)
-                    .Select(t => SouffleUtils.GetOperationTypeName(t, unionOpTypes.Contains(t)))
+                    .Select(t => SouffleUtils.GetOperationTypeName(t))
                     .ToArray();
 
                 if (!opType.IsAbstract)
                 {
-                    subTypes = subTypes.Prepend(SouffleUtils.GetOperationTypeName(opType, false)).ToArray();
+                    subTypes = subTypes.Prepend(SouffleUtils.GetOperationTypeName(opType, isBase: false)).ToArray();
                 }
 
-                string name = SouffleUtils.GetOperationTypeName(opType, true);
+                string name = SouffleUtils.GetOperationTypeName(opType, isBase: true);
                 writer.WriteLine($".type {name} = " + string.Join(" | ", (object[])subTypes));
             }
 
             writer.WriteLine();
 
             // Turn properties containing operation types into relations
-            foreach (var parentType in opTypes)
+            foreach (var parentType in SouffleUtils.ExportedTypes)
             {
-                string parentTypeName = SouffleUtils.GetOperationTypeName(parentType, unionOpTypes.Contains(parentType));
+                string parentTypeName = SouffleUtils.GetOperationTypeName(parentType);
 
                 var singleProps =
                     parentType.GetProperties()
@@ -84,7 +68,7 @@ namespace Peachpie.SouffleGenerator
 
                 foreach (var prop in singleProps)
                 {
-                    string propTypeName = SouffleUtils.GetOperationTypeName(prop.PropertyType, unionOpTypes.Contains(prop.PropertyType));
+                    string propTypeName = SouffleUtils.GetOperationTypeName(prop.PropertyType);
                     writer.WriteLine($".decl {parentTypeName}_{prop.Name}(parent: {parentTypeName}, value: {propTypeName})");
                 }
 
@@ -99,7 +83,7 @@ namespace Peachpie.SouffleGenerator
                 {
                     var enumerableType = (prop.PropertyType.Name == "IEnumerable`1") ? prop.PropertyType : prop.PropertyType.GetInterface("IEnumerable`1");
                     var itemType = enumerableType.GenericTypeArguments[0];
-                    string propTypeName = SouffleUtils.GetOperationTypeName(itemType, unionOpTypes.Contains(itemType));
+                    string propTypeName = SouffleUtils.GetOperationTypeName(itemType);
 
                     writer.WriteLine($".decl {parentTypeName}_{prop.Name}_Item(parent: {parentTypeName}, index: unsigned, value: {propTypeName})");
                 }
