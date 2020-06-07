@@ -7,36 +7,41 @@ namespace Peachpie.CodeAnalysis.FlowAnalysis.Souffle
 {
     internal static class SouffleUtils
     {
-        public static string GetExpressionTypeName(Type exprType, bool isBase)
+        public static string GetOperationTypeName(Type exprType, bool isBase)
         {
-            if (exprType == typeof(BoundExpression))
-            {
-                return "Expression";
-            }
-
             string name = exprType.Name;
 
+            // Strip the Bound- prefix
             if (name.StartsWith("Bound"))
             {
                 name = name.Substring("Bound".Length);
             }
 
+            // Unify by skipping the -Ex suffix if present
             if (name.EndsWith("Ex"))
             {
                 name = name.Substring(0, name.Length - "Ex".Length);
             }
 
-            if (name.EndsWith("Expression"))
+            // The same with possible -Expression suffix as well
+            if (name.EndsWith("Expression") && name != "Expression")
             {
                 name = name.Substring(0, name.Length - "Expression".Length);
             }
 
-            if (isBase)
+            // Distinguish Souffle type from union in non-abstract types by -Base suffix
+            if (isBase && !exprType.IsAbstract)
             {
                 name += "Base";
             }
 
-            return name + "Ex";
+            // Mark expressions by -Ex suffix
+            if (exprType.IsSubclassOf(typeof(BoundExpression)))
+            {
+                name += "Ex";
+            }
+
+            return name;
         }
     }
 }

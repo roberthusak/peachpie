@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.ComTypes;
@@ -23,63 +24,80 @@ namespace Peachpie.SouffleGenerator
 
         private static void GenerateTypes(TextWriter writer)
         {
-            var exprTypes =
-                typeof(BoundExpression).Assembly.GetTypes()
-                .Where(t => t.IsSubclassOf(typeof(BoundExpression)))
-                .Append(typeof(BoundExpression))
+            var opTypes =
+                typeof(BoundOperation).Assembly.GetTypes()
+                .Where(t => t.IsSubclassOf(typeof(BoundOperation)))
+                .Append(typeof(BoundOperation))
                 .ToHashSet();
 
-            var leafExprTypes =
-                exprTypes
-                .Where(t1 => !exprTypes.Any(t2 => t2.IsSubclassOf(t1)))
+            var leafOpTypes =
+                opTypes
+                .Where(t1 => !opTypes.Any(t2 => t2.IsSubclassOf(t1)))
                 .ToHashSet();
 
-            var unionExprTypes = exprTypes.Except(leafExprTypes);
+            var unionOpTypes = opTypes.Except(leafOpTypes);
 
             // Base types
-            foreach (var exprType in exprTypes.Where(t => !t.IsAbstract))
+            foreach (var opType in opTypes.Where(t => !t.IsAbstract))
             {
-                string name = SouffleUtils.GetExpressionTypeName(exprType, false);
+                string name = SouffleUtils.GetOperationTypeName(opType, false);
                 writer.WriteLine($".type {name} <: symbol");
             }
 
             writer.WriteLine();
 
             // Turn inheritance into union hierarchy
-            foreach (var exprType in unionExprTypes)
+            foreach (var opType in unionOpTypes)
             {
                 var subTypes =
-                    exprTypes
-                    .Where(t => t.BaseType == exprType)
-                    .Select(t => SouffleUtils.GetExpressionTypeName(t, unionExprTypes.Contains(t)))
+                    opTypes
+                    .Where(t => t.BaseType == opType)
+                    .Select(t => SouffleUtils.GetOperationTypeName(t, unionOpTypes.Contains(t)))
                     .ToArray();
 
-                if (!exprType.IsAbstract)
+                if (!opType.IsAbstract)
                 {
-                    subTypes = subTypes.Prepend(SouffleUtils.GetExpressionTypeName(exprType, false)).ToArray();
+                    subTypes = subTypes.Prepend(SouffleUtils.GetOperationTypeName(opType, false)).ToArray();
                 }
 
-                string name = SouffleUtils.GetExpressionTypeName(exprType, true);
+                string name = SouffleUtils.GetOperationTypeName(opType, true);
                 writer.WriteLine($".type {name} = " + string.Join(" | ", (object[])subTypes));
             }
 
             writer.WriteLine();
 
-            // Turn properties containing expression types into relations
-            foreach (var parentType in exprTypes)
+            // Turn properties containing operation types into relations
+            foreach (var parentType in opTypes)
             {
-                var props =
+                string parentTypeName = SouffleUtils.GetOperationTypeName(parentType, unionOpTypes.Contains(parentType));
+
+                var singleProps =
                     parentType.GetProperties()
                     .Where(p =>
-                        (p.PropertyType == typeof(BoundExpression) || p.PropertyType.IsSubclassOf(typeof(BoundExpression))) &&
+                        (p.PropertyType == typeof(BoundOperation) || p.PropertyType.IsSubclassOf(typeof(BoundOperation))) &&
                         p.DeclaringType == parentType && p.GetGetMethod().GetBaseDefinition().DeclaringType == parentType)
                     .ToArray();
 
-                foreach (var prop in props)
+                foreach (var prop in singleProps)
                 {
-                    string parentTypeName = SouffleUtils.GetExpressionTypeName(parentType, unionExprTypes.Contains(parentType));
-                    string propTypeName = SouffleUtils.GetExpressionTypeName(prop.PropertyType, unionExprTypes.Contains(parentType));
+                    string propTypeName = SouffleUtils.GetOperationTypeName(prop.PropertyType, unionOpTypes.Contains(prop.PropertyType));
                     writer.WriteLine($".decl {parentTypeName}_{prop.Name}(parent: {parentTypeName}, value: {propTypeName})");
+                }
+
+                var enumerableProps =
+                    parentType.GetProperties()
+                    .Where(p =>
+                        typeof(IEnumerable<BoundOperation>).IsAssignableFrom(p.PropertyType) &&
+                        p.DeclaringType == parentType && p.GetGetMethod().GetBaseDefinition().DeclaringType == parentType)
+                    .ToArray();
+
+                foreach (var prop in enumerableProps)
+                {
+                    var enumerableType = prop.PropertyType.GetInterface("IEnumerable`1");
+                    var itemType = enumerableType.GenericTypeArguments[0];
+                    string propTypeName = SouffleUtils.GetOperationTypeName(itemType, unionOpTypes.Contains(itemType));
+
+                    writer.WriteLine($".decl {parentTypeName}_{prop.Name}_Item(parent: {parentTypeName}, index: unsigned, value: {propTypeName})");
                 }
             }
         }
