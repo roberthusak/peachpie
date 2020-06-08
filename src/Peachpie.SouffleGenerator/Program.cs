@@ -70,6 +70,7 @@ namespace Peachpie.SouffleGenerator
                 {
                     string propTypeName = SouffleUtils.GetOperationTypeName(prop.PropertyType);
                     writer.WriteLine($".decl {parentTypeName}_{prop.Name}(parent: {parentTypeName}, value: {propTypeName})");
+                    writer.WriteLine($".input {parentTypeName}_{prop.Name}");
                 }
 
                 var enumerableProps =
@@ -86,6 +87,7 @@ namespace Peachpie.SouffleGenerator
                     string propTypeName = SouffleUtils.GetOperationTypeName(itemType);
 
                     writer.WriteLine($".decl {parentTypeName}_{prop.Name}_Item(parent: {parentTypeName}, index: unsigned, value: {propTypeName})");
+                    writer.WriteLine($".input {parentTypeName}_{prop.Name}_Item");
                 }
             }
         }
