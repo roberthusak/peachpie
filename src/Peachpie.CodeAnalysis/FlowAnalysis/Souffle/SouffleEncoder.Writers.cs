@@ -20,10 +20,11 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             {
                 _basePath = basePath;
 
-                // Clean up all the relevant files from previous outputs (we would rewrite some of them anyway)
-                foreach (var relation in SouffleUtils.ExportedProperties.Values)
+                // Create/erase all the property files in advance (even empty relations must exist) and open them for writing
+                foreach (var kvp in SouffleUtils.ExportedProperties)
                 {
-                    File.Delete(Path.Combine(basePath, relation.Name + FileSuffix));
+                    var writer = new StreamWriter(File.Open(Path.Combine(_basePath, kvp.Value.Name + FileSuffix), FileMode.Create));
+                    _writers[(kvp.Key.DeclaringType.Name, kvp.Key.Name)] = writer;
                 }
             }
 
@@ -37,7 +38,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
             public void WriteProperty(string typeName, string propertyName, string parent, string value)
             {
-                var writer = FindPropertyWriter(typeName, propertyName);
+                var writer = _writers[(typeName, propertyName)];
                 writer.Write(parent);
                 writer.Write('\t');
                 writer.WriteLine(value);
@@ -45,30 +46,12 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
             public void WritePropertyItem(string typeName, string propertyName, string parent, int index, string value)
             {
-                var writer = FindPropertyWriter(typeName, propertyName);
+                var writer = _writers[(typeName, propertyName)];
                 writer.Write(parent);
                 writer.Write('\t');
                 writer.Write(index);
                 writer.Write('\t');
                 writer.WriteLine(value);
-            }
-
-            private TextWriter FindPropertyWriter(string typeName, string propertyName)
-            {
-                if (!_writers.TryGetValue((typeName, propertyName), out var writer))
-                {
-                    // Create the writer lazily
-                    string relationName =
-                        SouffleUtils.ExportedProperties
-                        .Where(kvp => kvp.Key.Name == propertyName && kvp.Key.DeclaringType.Name == typeName)
-                        .Single()
-                        .Value.Name;
-
-                    writer = new StreamWriter(File.Open(Path.Combine(_basePath, relationName + FileSuffix), FileMode.Create));
-                    _writers[(typeName, propertyName)] = writer;
-                }
-
-                return writer;
             }
         }
     }
