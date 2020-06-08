@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Text;
 
-namespace Peachpie.CodeAnalysis.FlowAnalysis.Souffle
+namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 {
     internal class SouffleRelation
     {

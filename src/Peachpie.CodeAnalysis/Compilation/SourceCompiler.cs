@@ -473,7 +473,7 @@ namespace Pchp.CodeAnalysis
                 compiler.WalkTypes(compiler.EnqueueFieldsInitializer, allowParallel: true);
             }
 
-            string souffleDir = Path.Combine(compilation.Options.BaseDirectory, "souffle");
+            string souffleDir = Path.Combine(compilation.Options.BaseDirectory, "souffle", "input");
             Directory.CreateDirectory(souffleDir);
             SouffleEncoder.Encode(compilation, souffleDir);
 

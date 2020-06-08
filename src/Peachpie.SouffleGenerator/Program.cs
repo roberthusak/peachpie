@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using Pchp.CodeAnalysis.Semantics;
 using Pchp.CodeAnalysis.Semantics.Graph;
-using Peachpie.CodeAnalysis.FlowAnalysis.Souffle;
+using Pchp.CodeAnalysis.FlowAnalysis.Souffle;
 
 namespace Peachpie.SouffleGenerator
 {

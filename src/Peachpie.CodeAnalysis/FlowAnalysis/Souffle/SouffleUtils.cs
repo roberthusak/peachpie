@@ -7,7 +7,7 @@ using System.Text;
 using Pchp.CodeAnalysis.Semantics;
 using Pchp.CodeAnalysis.Semantics.Graph;
 
-namespace Peachpie.CodeAnalysis.FlowAnalysis.Souffle
+namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 {
     internal static class SouffleUtils
     {
