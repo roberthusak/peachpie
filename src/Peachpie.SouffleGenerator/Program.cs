@@ -24,8 +24,14 @@ namespace Peachpie.SouffleGenerator
 
         private static void GenerateTypes(TextWriter writer)
         {
+            var types =
+                SouffleUtils.ExportedTypes
+                .Where(t => !t.IsAbstract)
+                .OrderBy(t => t.Name)
+                .ToArray();
+
             // Basic types
-            foreach (var opType in SouffleUtils.ExportedTypes.Where(t => !t.IsAbstract))
+            foreach (var opType in types)
             {
                 string name = SouffleUtils.GetOperationTypeName(opType, isBase: false);
                 writer.WriteLine($".type {name} <: symbol");
@@ -34,11 +40,12 @@ namespace Peachpie.SouffleGenerator
             writer.WriteLine();
 
             // Turn inheritance into union hierarchy
-            foreach (var opType in SouffleUtils.ExportedUnionTypes)
+            foreach (var opType in SouffleUtils.ExportedUnionTypes.OrderBy(t => t.Name))
             {
                 var subTypes =
                     SouffleUtils.ExportedTypes
                     .Where(t => t.BaseType == opType)
+                    .OrderBy(t => t.Name)
                     .Select(t => SouffleUtils.GetOperationTypeName(t))
                     .ToArray();
 
@@ -53,8 +60,13 @@ namespace Peachpie.SouffleGenerator
 
             writer.WriteLine();
 
+            var props =
+                SouffleUtils.ExportedProperties.Values
+                .OrderBy(p => p.Name)
+                .ToArray();
+
             // Turn properties containing operation types into relations
-            foreach (var relation in SouffleUtils.ExportedProperties.Values)
+            foreach (var relation in props)
             {
                 var parameters =
                     relation.Parameters

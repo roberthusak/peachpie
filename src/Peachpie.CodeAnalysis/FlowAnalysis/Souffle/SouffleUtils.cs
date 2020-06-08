@@ -100,22 +100,12 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             string name = exprType.Name;
 
             // Strip the Bound- prefix
-            if (name.StartsWith("Bound"))
-            {
-                name = name.Substring("Bound".Length);
-            }
+            name = RemovePrefix(name, "Bound");
 
-            // Unify by skipping the -Ex suffix if present
-            if (name.EndsWith("Ex"))
-            {
-                name = name.Substring(0, name.Length - "Ex".Length);
-            }
-
-            // The same with possible -Expression suffix as well
-            if (name.EndsWith("Expression") && name != "Expression")
-            {
-                name = name.Substring(0, name.Length - "Expression".Length);
-            }
+            // Unify by skipping possible suffixes present
+            name = RemoveSuffix(name, "Ex");
+            name = RemoveSuffix(name, "Expression");
+            name = RemoveSuffix(name, "Statement");
 
             // Distinguish Souffle type from union in non-abstract types by -Base suffix
             if (isBase && !exprType.IsAbstract)
@@ -123,13 +113,42 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 name += "Base";
             }
 
-            // Mark expressions by -Ex suffix
+            // Mark expressions and statements by short suffixes
             if (exprType.IsSubclassOf(typeof(BoundExpression)))
             {
                 name += "Ex";
             }
+            else if (exprType.IsSubclassOf(typeof(BoundStatement)) &&
+                !exprType.IsSubclassOf(typeof(BoundBlock)) && exprType != typeof(BoundBlock))
+            {
+                name += "St";
+            }
 
             return name;
+        }
+
+        private static string RemovePrefix(string subject, string prefix)
+        {
+            if (subject.StartsWith(prefix) && subject != prefix)
+            {
+                return subject.Substring(prefix.Length);
+            }
+            else
+            {
+                return subject;
+            }
+        }
+
+        private static string RemoveSuffix(string subject, string suffix)
+        {
+            if (subject.EndsWith(suffix) && subject != suffix)
+            {
+                return subject.Substring(0, subject.Length - suffix.Length);
+            }
+            else
+            {
+                return subject;
+            }
         }
     }
 }
