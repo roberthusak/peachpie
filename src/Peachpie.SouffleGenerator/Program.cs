@@ -54,41 +54,14 @@ namespace Peachpie.SouffleGenerator
             writer.WriteLine();
 
             // Turn properties containing operation types into relations
-            foreach (var parentType in SouffleUtils.ExportedTypes)
+            foreach (var relation in SouffleUtils.ExportedProperties.Values)
             {
-                string parentTypeName = SouffleUtils.GetOperationTypeName(parentType);
+                var parameters =
+                    relation.Parameters
+                    .Select(p => $"{p.Name}: {p.Type}");
 
-                var singleProps =
-                    parentType.GetProperties()
-                    .Where(p =>
-                        (p.PropertyType == typeof(BoundOperation) || p.PropertyType.IsSubclassOf(typeof(BoundOperation)) ||
-                        p.PropertyType == typeof(Edge) || p.PropertyType.IsSubclassOf(typeof(Edge))) &&
-                        p.DeclaringType == parentType && p.GetGetMethod().GetBaseDefinition().DeclaringType == parentType)
-                    .ToArray();
-
-                foreach (var prop in singleProps)
-                {
-                    string propTypeName = SouffleUtils.GetOperationTypeName(prop.PropertyType);
-                    writer.WriteLine($".decl {parentTypeName}_{prop.Name}(parent: {parentTypeName}, value: {propTypeName})");
-                    writer.WriteLine($".input {parentTypeName}_{prop.Name}");
-                }
-
-                var enumerableProps =
-                    parentType.GetProperties()
-                    .Where(p =>
-                        typeof(IEnumerable<BoundOperation>).IsAssignableFrom(p.PropertyType) &&                             // There are no Edge enumerables, no need to handle them
-                        p.DeclaringType == parentType && p.GetGetMethod().GetBaseDefinition().DeclaringType == parentType)
-                    .ToArray();
-
-                foreach (var prop in enumerableProps)
-                {
-                    var enumerableType = (prop.PropertyType.Name == "IEnumerable`1") ? prop.PropertyType : prop.PropertyType.GetInterface("IEnumerable`1");
-                    var itemType = enumerableType.GenericTypeArguments[0];
-                    string propTypeName = SouffleUtils.GetOperationTypeName(itemType);
-
-                    writer.WriteLine($".decl {parentTypeName}_{prop.Name}_Item(parent: {parentTypeName}, index: unsigned, value: {propTypeName})");
-                    writer.WriteLine($".input {parentTypeName}_{prop.Name}_Item");
-                }
+                writer.WriteLine($".decl {relation.Name}({string.Join(", ", parameters)})");
+                writer.WriteLine($".input {relation.Name}");
             }
         }
     }
