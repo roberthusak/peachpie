@@ -9,6 +9,7 @@ using Devsense.PHP.Syntax;
 using Devsense.PHP.Syntax.Ast;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Immutable;
+using System.Threading;
 
 namespace Pchp.CodeAnalysis.Semantics.Graph
 {
@@ -67,9 +68,19 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
         /// </summary>
         public virtual ImmutableArray<CaseBlock> CaseBlocks => ImmutableArray<CaseBlock>.Empty;
 
+        #region Souffle
+
+        private static int NextSerial;
+
+        internal int SerialNumber { get; }
+
+        #endregion
+
         internal Edge(BoundBlock/*!*/source)
         {
             Contract.ThrowIfNull(source);
+
+            SerialNumber = Interlocked.Increment(ref NextSerial);
         }
 
         protected Edge()

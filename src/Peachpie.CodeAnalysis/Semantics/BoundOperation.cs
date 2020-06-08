@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using Pchp.CodeAnalysis.Symbols;
@@ -21,6 +22,19 @@ namespace Pchp.CodeAnalysis.Semantics
         SemanticModel IOperation.SemanticModel => null;
 
         #endregion
+
+        #region Souffle
+
+        private static int NextSerial;
+
+        internal int SerialNumber { get; }
+
+        #endregion
+
+        public BoundOperation()
+        {
+            SerialNumber = Interlocked.Increment(ref NextSerial);
+        }
 
         public string Language => Constants.PhpLanguageName;
 
