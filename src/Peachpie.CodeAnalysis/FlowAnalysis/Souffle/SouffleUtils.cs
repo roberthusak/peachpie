@@ -29,10 +29,12 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 .Where(t1 => ExportedTypes.Any(t2 => t2.IsSubclassOf(t1)))
                 .ToImmutableHashSet();
 
+            var propertyFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+
             var singleProps =
                 ExportedTypes
                 .SelectMany(t =>
-                    t.GetProperties()
+                    t.GetProperties(propertyFlags)
                     .Where(p => IsExportedType(p.PropertyType) && !IsInheritedProperty(p, t))
                     .Select(p => new KeyValuePair<PropertyInfo, SouffleRelation>(
                         p,
@@ -47,7 +49,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             var enumerableProps =
                 ExportedTypes
                 .SelectMany(t =>
-                    t.GetProperties()
+                    t.GetProperties(propertyFlags)
                     .Where(p =>
                         (typeof(IEnumerable<BoundOperation>).IsAssignableFrom(p.PropertyType) ||
                         typeof(IEnumerable<Edge>).IsAssignableFrom(p.PropertyType)) &&
@@ -86,7 +88,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         private static bool IsInheritedProperty(PropertyInfo prop, Type type) =>
             prop.DeclaringType != type ||
-            prop.GetGetMethod().GetBaseDefinition().DeclaringType != type;
+            prop.GetMethod.GetBaseDefinition().DeclaringType != type;
 
         public static bool IsUnionType(Type type) => ExportedUnionTypes.Contains(type);
 
