@@ -18,6 +18,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
         private readonly Writers _writers;
 
         private readonly string _routineName;
+        private readonly Stack<object> _nodeStack = new Stack<object>();
 
         private SouffleEncoder(SourceRoutineSymbol routine, Writers writers)
         {
@@ -51,6 +52,29 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 Edge edge => $"{_routineName}:{edge.GetType().Name}#{edge.SerialNumber}",
                 _ => throw new NotSupportedException()
             };
+
+        private void Export(object node)
+        {
+            // Export the Next relation
+            if (_nodeStack.Count > 0)
+            {
+                ExportNext(_nodeStack.Peek(), node);
+            }
+
+            _nodeStack.Push(node);
+        }
+
+        private void RollbackExportStack(object node)
+        {
+            while (_nodeStack.Count > 0 && _nodeStack.Peek() != node)
+            {
+                _nodeStack.Pop();
+            }
+        }
+
+        private object GetLastExported() => _nodeStack.Peek();
+
+        private void ExportNext(object from, object to) => _writers.WriteNext(GetName(from), GetName(to));
 
         private void ExportProperty(string typeName, object parent, string propertyName, object property)
         {
@@ -101,8 +125,31 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             AcceptEdge(x, x.NextEdge);
         }
 
+        public override VoidStruct VisitCFGBlock(BoundBlock x)
+        {
+            Export(x);
+
+            DefaultVisitBlock(x);
+
+            return default;
+        }
+
+        public override VoidStruct VisitCFGStartBlock(StartBlock x)
+        {
+            return VisitCFGBlock(x);
+        }
+
+        public override VoidStruct VisitCFGExitBlock(ExitBlock x)
+        {
+            Export(x);
+
+            return DefaultVisitBlock(x);
+        }
+
         public override VoidStruct VisitCFGCatchBlock(CatchBlock x)
         {
+            Export(x);
+
             //ExportProperty(nameof(CatchBlock), x, nameof(CatchBlock.TypeRef), x.TypeRef);
             Accept(x.TypeRef);
 
@@ -116,6 +163,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         public override VoidStruct VisitCFGCaseBlock(CaseBlock x)
         {
+            Export(x);
+
             // TODO: Export
             if (!x.CaseValue.IsOnlyBoundElement) { VisitCFGBlock(x.CaseValue.PreBoundBlockFirst); }
             if (!x.CaseValue.IsEmpty) { Accept(x.CaseValue.BoundElement); }
@@ -131,6 +180,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         public override VoidStruct VisitCFGSimpleEdge(SimpleEdge x)
         {
+            Export(x);
+
             Debug.Assert(x.NextBlock != null && x.NextBlock == x.Target);
 
             ExportProperty(nameof(SimpleEdge), x, nameof(SimpleEdge.Target), x.Target);
@@ -143,10 +194,16 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         public override VoidStruct VisitCFGConditionalEdge(ConditionalEdge x)
         {
+            Export(x);
+
             Accept(x.Condition);
+
+            var lastConditionNode = GetLastExported();
 
             ExportProperty(nameof(ConditionalEdge), x, nameof(ConditionalEdge.TrueTarget), x.TrueTarget);
             x.TrueTarget.Accept(this);
+
+            RollbackExportStack(lastConditionNode);
 
             ExportProperty(nameof(ConditionalEdge), x, nameof(ConditionalEdge.FalseTarget), x.FalseTarget);
             x.FalseTarget.Accept(this);
@@ -156,12 +213,26 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         public override VoidStruct VisitCFGTryCatchEdge(TryCatchEdge x)
         {
+            Export(x);
+
+            // TODO: Capture that any thrown exception may lead directly to a catch block
             ExportProperty(nameof(TryCatchEdge), x, nameof(TryCatchEdge.BodyBlock), x.BodyBlock);
             x.BodyBlock.Accept(this);
 
+            var lastBodyNode = GetLastExported();
             ExportPropertyEnumerable(nameof(Edge), x, nameof(Edge.CatchBlocks), x.CatchBlocks);
-            foreach (var c in x.CatchBlocks)
-                c.Accept(this);
+            for (int i = 0; i < x.CatchBlocks.Length; i++)
+            {
+                var catchBlock = x.CatchBlocks[i];
+                catchBlock.Accept(this);
+
+                if (x.FinallyBlock != null)
+                {
+                    ExportNext(GetLastExported(), x.FinallyBlock);
+                }
+
+                RollbackExportStack(lastBodyNode);
+            }
 
             if (x.FinallyBlock != null)
             {
@@ -174,6 +245,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         public override VoidStruct VisitCFGForeachEnumereeEdge(ForeachEnumereeEdge x)
         {
+            Export(x);
+
             ExportProperty(nameof(ForeachEnumereeEdge), x, nameof(ForeachEnumereeEdge.Enumeree), x.Enumeree);
             Accept(x.Enumeree);
 
@@ -185,6 +258,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         public override VoidStruct VisitCFGForeachMoveNextEdge(ForeachMoveNextEdge x)
         {
+            Export(x);
+
             ExportProperty(nameof(ForeachMoveNextEdge), x, nameof(ForeachMoveNextEdge.ValueVariable), x.ValueVariable);
             Accept(x.ValueVariable);
 
@@ -194,6 +269,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(ForeachMoveNextEdge), x, nameof(ForeachMoveNextEdge.BodyBlock), x.BodyBlock);
             x.BodyBlock.Accept(this);
 
+            RollbackExportStack(x);
+
             ExportProperty(nameof(Edge), x, nameof(Edge.NextBlock), x.NextBlock);
             x.NextBlock.Accept(this);
 
@@ -202,14 +279,22 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         public override VoidStruct VisitCFGSwitchEdge(SwitchEdge x)
         {
+            Export(x);
+
             ExportProperty(nameof(SwitchEdge), x, nameof(SwitchEdge.SwitchValue), x.SwitchValue);
             Accept(x.SwitchValue);
+
+            var lastValueNode = GetLastExported();
 
             //
             ExportPropertyEnumerable(nameof(Edge), x, nameof(Edge.CaseBlocks), x.CaseBlocks);
             var arr = x.CaseBlocks;
             for (int i = 0; i < arr.Length; i++)
+            {
                 arr[i].Accept(this);
+
+                RollbackExportStack(lastValueNode);
+            }
 
             return default;
         }
@@ -236,6 +321,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 VisitArgument(args[i]);
             }
 
+            Export(x);
             return default;
         }
 
@@ -243,6 +329,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
         {
             //VisitLiteralExpression(x);
 
+            Export(x);
             return default;
         }
 
@@ -251,6 +338,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundCopyValue), x, nameof(BoundCopyValue.Expression), x.Expression);
             Accept(x.Expression);
 
+            Export(x);
             return default;
         }
 
@@ -259,11 +347,13 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundArgument), x, nameof(BoundArgument.Value), x.Value);
             Accept(x.Value);
 
+            Export(x);
             return default;
         }
 
         internal override VoidStruct VisitTypeRef(BoundTypeRef x)
         {
+            Export(x);
             return base.VisitTypeRef(x);
         }
 
@@ -272,6 +362,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundIndirectTypeRef), x, nameof(BoundIndirectTypeRef.TypeExpression), x.TypeExpression);
             Accept(x.TypeExpression);
 
+            Export(x);
             return base.VisitIndirectTypeRef(x);
         }
 
@@ -286,6 +377,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 x.TypeRefs[i].Accept(this);
             }
 
+            Export(x);
             return default;
         }
 
@@ -294,6 +386,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundRoutineName), x, nameof(BoundRoutineName.NameExpression), x.NameExpression);
             Accept(x.NameExpression);
 
+            Export(x);
             return default;
         }
 
@@ -386,6 +479,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundBinaryEx), x, nameof(BoundBinaryEx.Right), x.Right);
             Accept(x.Right);
 
+            // TODO: Handle short-circuit evaluation of && and ||
+            Export(x);
             return default;
         }
 
@@ -394,6 +489,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundUnaryEx), x, nameof(BoundUnaryEx.Operand), x.Operand);
             Accept(x.Operand);
 
+            Export(x);
             return default;
         }
 
@@ -405,6 +501,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundConversionEx), x, nameof(BoundConversionEx.TargetType), x.TargetType);
             Accept(x.TargetType);
 
+            Export(x);
             return default;
         }
 
@@ -416,6 +513,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundAssignEx), x, nameof(BoundAssignEx.Value), x.Value);
             Accept(x.Value);
 
+            Export(x);
             return default;
         }
 
@@ -430,6 +528,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundConditionalEx), x, nameof(BoundConditionalEx.IfFalse), x.IfFalse);
             Accept(x.IfFalse);
 
+            // TODO: Handle branching into true and false subexpressions
+            Export(x);
             return default;
         }
 
@@ -441,6 +541,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundAssignEx), x, nameof(BoundAssignEx.Value), x.Value);
             Accept(x.Value);
 
+            Export(x);
             return default;
         }
 
@@ -452,6 +553,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundAssignEx), x, nameof(BoundAssignEx.Value), x.Value);
             Accept(x.Value);
 
+            Export(x);
             return default;
         }
 
@@ -460,6 +562,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundVariableName), x, nameof(BoundVariableName.NameExpression), x.NameExpression);
             Accept(x.NameExpression);
 
+            Export(x);
             return default;
         }
 
@@ -468,6 +571,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundVariableRef), x, nameof(BoundVariableRef.Name), x.Name);
             Accept(x.Name);
 
+            Export(x);
             return default;
         }
 
@@ -488,6 +592,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 Accept(pair.Value);
             });
 
+            Export(x);
             return default;
         }
 
@@ -502,6 +607,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundFieldRef), x, nameof(BoundFieldRef.FieldName), x.FieldName);
             Accept(x.FieldName);
 
+            Export(x);
             return default;
         }
 
@@ -514,6 +620,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 Accept(pair.Value);
             });
 
+            Export(x);
             return default;
         }
 
@@ -525,6 +632,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundArrayItemEx), x, nameof(BoundArrayItemEx.Index), x.Index);
             Accept(x.Index);
 
+            Export(x);
             return default;
         }
 
@@ -536,6 +644,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundArrayItemEx), x, nameof(BoundArrayItemEx.Index), x.Index);
             Accept(x.Index);
 
+            Export(x);
             return default;
         }
 
@@ -547,11 +656,13 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             //ExportProperty(nameof(BoundInstanceOfEx), x, nameof(BoundInstanceOfEx.AsType), x.AsType);
             Accept(x.AsType);
 
+            Export(x);
             return default;
         }
 
         public override VoidStruct VisitGlobalConstUse(BoundGlobalConst x)
         {
+            Export(x);
             return default;
         }
 
@@ -560,11 +671,13 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundGlobalConstDeclStatement), x, nameof(BoundGlobalConstDeclStatement.Value), x.Value);
             Accept(x.Value);
 
+            Export(x);
             return default;
         }
 
         public override VoidStruct VisitPseudoConstUse(BoundPseudoConst x)
         {
+            Export(x);
             return default;
         }
 
@@ -573,6 +686,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             //ExportProperty(nameof(BoundPseudoClassConst), x, nameof(BoundPseudoClassConst.TargetType), x.TargetType);
             Accept(x.TargetType);
 
+            Export(x);
             return default;
         }
 
@@ -581,6 +695,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundIsEmptyEx), x, nameof(BoundIsEmptyEx.Operand), x.Operand);
             Accept(x.Operand);
 
+            Export(x);
             return default;
         }
 
@@ -589,6 +704,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundIsSetEx), x, nameof(BoundIsSetEx.VarReference), x.VarReference);
             Accept(x.VarReference);
 
+            Export(x);
             return default;
         }
 
@@ -600,6 +716,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundOffsetExists), x, nameof(BoundOffsetExists.Index), x.Index);
             Accept(x.Index);
 
+            Export(x);
             return default;
         }
 
@@ -614,11 +731,13 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundTryGetItem), x, nameof(BoundTryGetItem.Fallback), x.Fallback);
             Accept(x.Fallback);
 
+            Export(x);
             return default;
         }
 
         public override VoidStruct VisitLambda(BoundLambda x)
         {
+            Export(x);
             return default;
         }
 
@@ -627,12 +746,14 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundEvalEx), x, nameof(BoundEvalEx.CodeExpression), x.CodeExpression);
             Accept(x.CodeExpression);
 
+            Export(x);
             return default;
         }
 
 
-        public override VoidStruct VisitYieldEx(BoundYieldEx boundYieldEx)
+        public override VoidStruct VisitYieldEx(BoundYieldEx x)
         {
+            Export(x);
             return default;
         }
 
@@ -641,6 +762,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundYieldFromEx), x, nameof(BoundYieldFromEx.Operand), x.Operand);
             Accept(x.Operand);
 
+            Export(x);
             return default;
         }
 
@@ -653,11 +775,13 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundUnset), x, nameof(BoundUnset.Variable), x.Variable);
             Accept(x.Variable);
 
+            Export(x);
             return default;
         }
 
         public override VoidStruct VisitEmptyStatement(BoundEmptyStatement x)
         {
+            Export(x);
             return default;
         }
 
@@ -671,6 +795,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 Accept(x.Statements[i]);
             }
 
+            Export(x);
             return default;
         }
 
@@ -679,6 +804,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundExpressionStatement), x, nameof(BoundExpressionStatement.Expression), x.Expression);
             Accept(x.Expression);
 
+            Export(x);
             return default;
         }
 
@@ -687,6 +813,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundReturnStatement), x, nameof(BoundReturnStatement.Returned), x.Returned);
             Accept(x.Returned);
 
+            Export(x);
             return default;
         }
 
@@ -695,16 +822,19 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundThrowStatement), x, nameof(BoundThrowStatement.Thrown), x.Thrown);
             Accept(x.Thrown);
 
+            Export(x);
             return default;
         }
 
         public override VoidStruct VisitFunctionDeclaration(BoundFunctionDeclStatement x)
         {
+            Export(x);
             return default;
         }
 
         public override VoidStruct VisitTypeDeclaration(BoundTypeDeclStatement x)
         {
+            Export(x);
             return default;
         }
 
@@ -713,11 +843,13 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundGlobalVariableStatement), x, nameof(BoundGlobalVariableStatement.Variable), x.Variable);
             Accept(x.Variable);
 
+            Export(x);
             return default;
         }
 
         public override VoidStruct VisitStaticStatement(BoundStaticVariableStatement x)
         {
+            Export(x);
             return default;
         }
 
@@ -729,11 +861,13 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundYieldStatement), x, nameof(BoundYieldStatement.YieldedKey), x.YieldedKey);
             Accept(x.YieldedKey);
 
+            Export(x);
             return default;
         }
 
         public override VoidStruct VisitDeclareStatement(BoundDeclareStatement x)
         {
+            Export(x);
             return default;
         }
 

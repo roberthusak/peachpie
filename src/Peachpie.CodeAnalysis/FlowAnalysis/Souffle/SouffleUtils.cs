@@ -11,11 +11,22 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 {
     internal static class SouffleUtils
     {
+        public const string NodeTypeName = "Node";
+
         public static ImmutableHashSet<Type> ExportedTypes { get; }
 
         public static ImmutableHashSet<Type> ExportedUnionTypes { get; }
 
         public static ImmutableDictionary<PropertyInfo, SouffleRelation> ExportedProperties { get; }
+
+        public static SouffleRelation NextRelation { get; } =
+            new SouffleRelation(
+                "Next",
+                new[]
+                {
+                    new SouffleRelation.Parameter("from", NodeTypeName),
+                    new SouffleRelation.Parameter("to", NodeTypeName)
+                }.ToImmutableArray());
 
         static SouffleUtils()
         {

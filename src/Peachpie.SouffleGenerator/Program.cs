@@ -58,6 +58,9 @@ namespace Peachpie.SouffleGenerator
                 writer.WriteLine($".type {name} = " + string.Join(" | ", (object[])subTypes));
             }
 
+            // "Node" type unifying operations and edges
+            writer.WriteLine($".type {SouffleUtils.NodeTypeName} = {SouffleUtils.GetOperationTypeName(typeof(BoundOperation))} | {SouffleUtils.GetOperationTypeName(typeof(Edge))}");
+
             writer.WriteLine();
 
             var props =
