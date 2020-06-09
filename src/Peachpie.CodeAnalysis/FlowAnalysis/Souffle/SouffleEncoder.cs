@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Devsense.PHP.Syntax.Ast;
 using Pchp.CodeAnalysis.Semantics;
 using Pchp.CodeAnalysis.Semantics.Graph;
 using Pchp.CodeAnalysis.Semantics.TypeRef;
@@ -476,10 +477,15 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundBinaryEx), x, nameof(BoundBinaryEx.Left), x.Left);
             Accept(x.Left);
 
+            // Handle short-circuit evaluation of && and ||
+            if (x.Operation == Operations.And || x.Operation == Operations.Or)
+            {
+                ExportNext(GetLastExported(), x);
+            }
+
             ExportProperty(nameof(BoundBinaryEx), x, nameof(BoundBinaryEx.Right), x.Right);
             Accept(x.Right);
 
-            // TODO: Handle short-circuit evaluation of && and ||
             Export(x);
             return default;
         }
@@ -522,13 +528,17 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             ExportProperty(nameof(BoundConditionalEx), x, nameof(BoundConditionalEx.Condition), x.Condition);
             Accept(x.Condition);
 
+            var lastConditionNode = GetLastExported();
+
             ExportProperty(nameof(BoundConditionalEx), x, nameof(BoundConditionalEx.IfTrue), x.IfTrue);
             Accept(x.IfTrue);
+
+            ExportNext(GetLastExported(), x);
+            RollbackExportStack(lastConditionNode);
 
             ExportProperty(nameof(BoundConditionalEx), x, nameof(BoundConditionalEx.IfFalse), x.IfFalse);
             Accept(x.IfFalse);
 
-            // TODO: Handle branching into true and false subexpressions
             Export(x);
             return default;
         }
