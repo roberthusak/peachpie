@@ -17,6 +17,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         public static ImmutableHashSet<Type> ExportedUnionTypes { get; }
 
+        public static ImmutableDictionary<Type, SouffleRelation> ExportedTypeRelations { get; }
+
         public static ImmutableDictionary<PropertyInfo, SouffleRelation> ExportedProperties { get; }
 
         public static SouffleRelation NextRelation { get; } =
@@ -39,6 +41,18 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 ExportedTypes
                 .Where(t1 => ExportedTypes.Any(t2 => t2.IsSubclassOf(t1)))
                 .ToImmutableHashSet();
+
+            ExportedTypeRelations =
+                ExportedTypes
+                .Select(t => new KeyValuePair<Type, SouffleRelation>(
+                    t,
+                    new SouffleRelation(
+                        $"Is_{GetOperationTypeName(t, false)}",
+                        new[] {
+                            new SouffleRelation.Parameter("node", GetOperationTypeName(t)),
+                        }.ToImmutableArray())
+                    ))
+                .ToImmutableDictionary();
 
             var propertyFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly;
 

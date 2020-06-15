@@ -24,14 +24,14 @@ namespace Peachpie.SouffleGenerator
 
         private static void GenerateTypes(TextWriter writer)
         {
-            var types =
+            var basicTypes =
                 SouffleUtils.ExportedTypes
                 .Where(t => !t.IsAbstract)
                 .OrderBy(t => t.Name)
                 .ToArray();
 
             // Basic types
-            foreach (var opType in types)
+            foreach (var opType in basicTypes)
             {
                 string name = SouffleUtils.GetOperationTypeName(opType, isBase: false);
                 writer.WriteLine($".type {name} <: symbol");
@@ -63,6 +63,33 @@ namespace Peachpie.SouffleGenerator
 
             writer.WriteLine();
 
+            // Type relations
+            foreach (var opType in SouffleUtils.ExportedTypes.OrderBy(t => t.Name))
+            {
+                var typeRelation = SouffleUtils.ExportedTypeRelations[opType];
+                writer.WriteLine(typeRelation.GetDeclaration());
+
+                if (!opType.IsAbstract)
+                {
+                    // Non-abstract types are supplied directly, may be enriched from inherited classes
+                    writer.WriteLine($".input {typeRelation.Name}");
+                }
+
+                if (SouffleUtils.ExportedUnionTypes.Contains(opType))
+                {
+                    // Infer from the relations of inherited classes
+                    var subTypeRelations =
+                        SouffleUtils.ExportedTypes
+                        .Where(t => t.BaseType == opType)
+                        .OrderBy(t => t.Name)
+                        .Select(t => SouffleUtils.ExportedTypeRelations[t].Name + "(n)")
+                        .ToArray();
+                    writer.WriteLine($"{typeRelation.Name}(n) :- {string.Join("; ", subTypeRelations)}.");
+                }
+            }
+
+            writer.WriteLine();
+
             var props =
                 SouffleUtils.ExportedProperties.Values
                 .OrderBy(p => p.Name)
@@ -71,11 +98,7 @@ namespace Peachpie.SouffleGenerator
             // Turn properties containing operation types into relations
             foreach (var relation in props)
             {
-                var parameters =
-                    relation.Parameters
-                    .Select(p => $"{p.Name}: {p.Type}");
-
-                writer.WriteLine($".decl {relation.Name}({string.Join(", ", parameters)})");
+                writer.WriteLine(relation.GetDeclaration());
                 writer.WriteLine($".input {relation.Name}");
             }
         }

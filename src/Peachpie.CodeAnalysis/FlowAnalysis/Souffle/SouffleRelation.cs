@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Text;
 
 namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
@@ -28,6 +29,12 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
         {
             Name = name;
             Parameters = parameters;
+        }
+
+        public string GetDeclaration()
+        {
+            var parameters = Parameters.Select(p => $"{p.Name}: {p.Type}");
+            return $".decl {Name}({string.Join(", ", parameters)})";
         }
     }
 }

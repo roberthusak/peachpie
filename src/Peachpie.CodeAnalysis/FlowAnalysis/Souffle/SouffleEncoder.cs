@@ -56,6 +56,10 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         private void Export(object node)
         {
+            // Export the type relation
+            var type = node.GetType();
+            _writers.WriteType(type.Name, GetName(node));
+
             // Export the Next relation
             if (_nodeStack.Count > 0)
             {
