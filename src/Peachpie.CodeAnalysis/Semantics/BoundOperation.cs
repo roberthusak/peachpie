@@ -25,7 +25,7 @@ namespace Pchp.CodeAnalysis.Semantics
 
         #region Souffle
 
-        private static int NextSerial;
+        internal static int NextSerial;
 
         internal int SerialNumber { get; }
 

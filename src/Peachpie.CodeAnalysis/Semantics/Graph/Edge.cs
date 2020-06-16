@@ -70,8 +70,6 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
 
         #region Souffle
 
-        private static int NextSerial;
-
         internal int SerialNumber { get; }
 
         #endregion
@@ -80,7 +78,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
         {
             Contract.ThrowIfNull(source);
 
-            SerialNumber = Interlocked.Increment(ref NextSerial);
+            SerialNumber = Interlocked.Increment(ref BoundOperation.NextSerial);
         }
 
         protected Edge()
