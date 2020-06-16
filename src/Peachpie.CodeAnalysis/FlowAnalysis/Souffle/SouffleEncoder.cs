@@ -49,10 +49,29 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
         private string GetName(object obj) =>
             obj switch
             {
-                BoundOperation op => $"{_routineName}:{op.GetType().Name}#{op.SerialNumber}",
+                BoundBlock block => $"{_routineName}:{block.GetType().Name}#{block.SerialNumber}",
                 Edge edge => $"{_routineName}:{edge.GetType().Name}#{edge.SerialNumber}",
+                IPhpOperation phpOp => $"{_routineName}:{GetPhpOperationName(phpOp)}#{((BoundOperation)phpOp).SerialNumber}",
+                BoundOperation op => $"{_routineName}:{op.GetType().Name}#{op.SerialNumber}",
                 _ => throw new NotSupportedException()
             };
+
+        private static string GetPhpOperationName(IPhpOperation op)
+        {
+            string FormatCode(string str)
+            {
+                str = str.Replace('\t', ' ').Replace('\n', ' ').Replace('\r', ' ');     // \t is used as a separator in relation rows
+                if (str.Length > 30)
+                {
+                    str = str.Substring(0, 30) + "...";
+                }
+
+                return str;
+            }
+
+            string sourceCode = op.PhpSyntax?.ContainingSourceUnit?.GetSourceCode(op.PhpSyntax.Span);
+            return (sourceCode != null) ? FormatCode(sourceCode) : op.GetType().Name;
+        }
 
         private void Export(object node)
         {
