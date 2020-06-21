@@ -49,10 +49,10 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
         private string GetName(object obj) =>
             obj switch
             {
-                BoundBlock block => $"{_routineName}:{block.GetType().Name}#{block.SerialNumber}",
-                Edge edge => $"{_routineName}:{edge.GetType().Name}#{edge.SerialNumber}",
-                IPhpOperation phpOp => $"{_routineName}:{GetPhpOperationName(phpOp)}#{((BoundOperation)phpOp).SerialNumber}",
-                BoundOperation op => $"{_routineName}:{op.GetType().Name}#{op.SerialNumber}",
+                BoundBlock block => $"{block.GetType().Name}#{block.SerialNumber}",
+                Edge edge => $"{edge.GetType().Name}#{edge.SerialNumber}",
+                IPhpOperation phpOp => $"{GetPhpOperationName(phpOp)}#{((BoundOperation)phpOp).SerialNumber}",
+                BoundOperation op => $"{op.GetType().Name}#{op.SerialNumber}",
                 _ => throw new NotSupportedException()
             };
 
@@ -75,9 +75,14 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         private void Export(object node)
         {
+            var nodeName = GetName(node);
+
             // Export the type relation
             var type = node.GetType();
-            _writers.WriteType(type.Name, GetName(node));
+            _writers.WriteType(type.Name, nodeName);
+
+            // Export that it's contained in the routine
+            _writers.WriteRoutineNode(_routineName, nodeName);
 
             // Export the Next relation
             if (_nodeStack.Count > 0)

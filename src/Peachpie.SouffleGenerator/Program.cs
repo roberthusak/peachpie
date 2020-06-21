@@ -39,6 +39,11 @@ namespace Peachpie.SouffleGenerator
 
             writer.WriteLine();
 
+            // "Routine" type for unique routine names
+            writer.WriteLine($".type {SouffleUtils.RoutineTypeName} <: symbol");
+
+            writer.WriteLine();
+
             // Turn inheritance into union hierarchy
             foreach (var opType in SouffleUtils.ExportedUnionTypes.OrderBy(t => t.Name))
             {
@@ -87,6 +92,12 @@ namespace Peachpie.SouffleGenerator
                     writer.WriteLine($"{typeRelation.Name}(n) :- {string.Join("; ", subTypeRelations)}.");
                 }
             }
+
+            writer.WriteLine();
+
+            // "RoutineNode" relation for identifying nodes in routines
+            writer.WriteLine(SouffleUtils.RoutineNodeRelation.GetDeclaration());
+            writer.WriteLine($".input {SouffleUtils.RoutineNodeRelation.Name}");
 
             writer.WriteLine();
 

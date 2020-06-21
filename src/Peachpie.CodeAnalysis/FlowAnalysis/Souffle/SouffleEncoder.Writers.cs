@@ -14,6 +14,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
             private readonly string _basePath;
 
+            private readonly StreamWriter _routineNodeWriter;
             private readonly TextWriter _nextWriter;
 
             private readonly Dictionary<string, TextWriter> _typeWriters = new Dictionary<string, TextWriter>();
@@ -23,6 +24,9 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             public Writers(string basePath)
             {
                 _basePath = basePath;
+
+                // Writer of the RoutineNode relation
+                _routineNodeWriter = new StreamWriter(File.Open(Path.Combine(_basePath, SouffleUtils.RoutineNodeRelation.Name + FileSuffix), FileMode.Create));
 
                 // Writer of the Next relation
                 _nextWriter = new StreamWriter(File.Open(Path.Combine(_basePath, SouffleUtils.NextRelation.Name + FileSuffix), FileMode.Create));
@@ -44,6 +48,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
             public void Dispose()
             {
+                _routineNodeWriter.Dispose();
                 _nextWriter.Dispose();
 
                 foreach (var writer in _typeWriters.Values)
@@ -55,6 +60,13 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 {
                     writer.Dispose();
                 }
+            }
+
+            public void WriteRoutineNode(string routine, string node)
+            {
+                _routineNodeWriter.Write(routine);
+                _routineNodeWriter.Write('\t');
+                _routineNodeWriter.WriteLine(node);
             }
 
             public void WriteNext(string from, string to)
