@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Devsense.PHP.Syntax;
 using Devsense.PHP.Syntax.Ast;
 using Pchp.CodeAnalysis.Semantics;
 using Pchp.CodeAnalysis.Semantics.Graph;
@@ -53,6 +54,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 Edge edge => $"{edge.GetType().Name}#{edge.SerialNumber}",
                 IPhpOperation phpOp => $"{GetPhpOperationName(phpOp)}#{((BoundOperation)phpOp).SerialNumber}",
                 BoundOperation op => $"{op.GetType().Name}#{op.SerialNumber}",
+                VariableName varName => varName.Value,
                 _ => throw new NotSupportedException()
             };
 
@@ -599,6 +601,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
         {
             ExportProperty(nameof(BoundVariableName), x, nameof(BoundVariableName.NameExpression), x.NameExpression);
             Accept(x.NameExpression);
+
+            ExportProperty(nameof(BoundVariableName), x, nameof(BoundVariableName.NameValue), x.NameValue);
 
             Export(x);
             return default;

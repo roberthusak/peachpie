@@ -40,6 +40,12 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                     new SouffleRelation.Parameter("to", NodeTypeName)
                 }.ToImmutableArray());
 
+        private static readonly ImmutableHashSet<(string, string)> ExportedValuePropertyNames =
+            new[]
+            {
+                (nameof(BoundVariableName), nameof(BoundVariableName.NameValue))
+            }.ToImmutableHashSet();
+
         static SouffleUtils()
         {
             ExportedTypes =
@@ -70,7 +76,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 ExportedTypes
                 .SelectMany(t =>
                     t.GetProperties(propertyFlags)
-                    .Where(p => IsExportedType(p.PropertyType) && !IsInheritedProperty(p, t))
+                    .Where(p => IsExportedSingleProperty(p) && !IsInheritedProperty(p, t))
                     .Select(p => new KeyValuePair<PropertyInfo, SouffleRelation>(
                         p,
                         new SouffleRelation(
@@ -120,6 +126,9 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             type.IsSubclassOf(typeof(Edge)) ||
             type == typeof(BoundOperation) ||
             type == typeof(Edge);
+
+        private static bool IsExportedSingleProperty(PropertyInfo prop) =>
+            IsExportedType(prop.PropertyType) || ExportedValuePropertyNames.Contains((prop.DeclaringType.Name, prop.Name));
 
         private static bool IsInheritedProperty(PropertyInfo prop, Type type) =>
             prop.DeclaringType != type ||
