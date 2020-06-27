@@ -11,8 +11,9 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 {
     internal static class SouffleUtils
     {
-        public const string NodeTypeName = "Node";
-        public const string RoutineTypeName = "Routine";
+        public static SouffleType NodeType { get; }
+
+        public static SouffleType RoutineType { get; }
 
         public static ImmutableHashSet<Type> ExportedTypes { get; }
 
@@ -22,23 +23,9 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         public static ImmutableDictionary<PropertyInfo, SouffleRelation> ExportedProperties { get; }
 
-        public static SouffleRelation RoutineNodeRelation { get; } =
-            new SouffleRelation(
-                "RoutineNode",
-                new[]
-                {
-                    new SouffleRelation.Parameter("routine", RoutineTypeName),
-                    new SouffleRelation.Parameter("node", NodeTypeName)
-                }.ToImmutableArray());
+        public static SouffleRelation RoutineNodeRelation { get; }
 
-        public static SouffleRelation NextRelation { get; } =
-            new SouffleRelation(
-                "Next",
-                new[]
-                {
-                    new SouffleRelation.Parameter("from", NodeTypeName),
-                    new SouffleRelation.Parameter("to", NodeTypeName)
-                }.ToImmutableArray());
+        public static SouffleRelation NextRelation { get; }
 
         private static readonly ImmutableHashSet<(string, string)> ExportedValuePropertyNames =
             new[]
@@ -57,6 +44,18 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 ExportedTypes
                 .Where(t1 => ExportedTypes.Any(t2 => t2.IsSubclassOf(t1)))
                 .ToImmutableHashSet();
+
+            NodeType = new SouffleType(
+                "Node",
+                new[]
+                {
+                    GetOperationTypeName(typeof(BoundOperation)),
+                    GetOperationTypeName(typeof(Edge))
+                }.ToImmutableArray());
+
+            RoutineType = new SouffleType(
+                "Routine",
+                ImmutableArray<string>.Empty);
 
             ExportedTypeRelations =
                 ExportedTypes
@@ -119,6 +118,22 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
                 return GetOperationTypeName(itemType);
             }
+
+            RoutineNodeRelation = new SouffleRelation(
+                "RoutineNode",
+                new[]
+                {
+                    new SouffleRelation.Parameter("routine", RoutineType.Name),
+                    new SouffleRelation.Parameter("node", NodeType.Name)
+                }.ToImmutableArray());
+
+            NextRelation = new SouffleRelation(
+                "Next",
+                new[]
+                {
+                    new SouffleRelation.Parameter("from", NodeType.Name),
+                    new SouffleRelation.Parameter("to", NodeType.Name)
+                }.ToImmutableArray());
         }
 
         private static bool IsExportedType(Type type) =>

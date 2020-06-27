@@ -40,7 +40,7 @@ namespace Peachpie.SouffleGenerator
             writer.WriteLine();
 
             // "Routine" type for unique routine names
-            writer.WriteLine($".type {SouffleUtils.RoutineTypeName} <: symbol");
+            writer.WriteLine(SouffleUtils.RoutineType.GetDeclaration());
 
             writer.WriteLine();
 
@@ -64,7 +64,7 @@ namespace Peachpie.SouffleGenerator
             }
 
             // "Node" type unifying operations and edges
-            writer.WriteLine($".type {SouffleUtils.NodeTypeName} = {SouffleUtils.GetOperationTypeName(typeof(BoundOperation))} | {SouffleUtils.GetOperationTypeName(typeof(Edge))}");
+            writer.WriteLine(SouffleUtils.NodeType.GetDeclaration());
 
             writer.WriteLine();
 
