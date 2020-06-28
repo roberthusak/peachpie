@@ -15,6 +15,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         public static SouffleType RoutineType { get; }
 
+        public static SouffleType ParameterPassType { get; }
+
         public static ImmutableHashSet<Type> ExportedTypes { get; }
 
         public static ImmutableHashSet<Type> ExportedUnionTypes { get; }
@@ -45,12 +47,17 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 .Where(t1 => ExportedTypes.Any(t2 => t2.IsSubclassOf(t1)))
                 .ToImmutableHashSet();
 
+            ParameterPassType = new SouffleType(
+                "ParameterPass",
+                ImmutableArray<string>.Empty);
+
             NodeType = new SouffleType(
                 "Node",
                 new[]
                 {
                     GetOperationTypeName(typeof(BoundOperation)),
-                    GetOperationTypeName(typeof(Edge))
+                    GetOperationTypeName(typeof(Edge)),
+                    ParameterPassType.Name
                 }.ToImmutableArray());
 
             RoutineType = new SouffleType(

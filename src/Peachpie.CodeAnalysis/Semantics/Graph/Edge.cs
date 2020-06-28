@@ -78,7 +78,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
         {
             Contract.ThrowIfNull(source);
 
-            SerialNumber = Interlocked.Increment(ref BoundOperation.NextSerial);
+            SerialNumber = BoundOperation.GetFreeSerialNumber();
         }
 
         protected Edge()

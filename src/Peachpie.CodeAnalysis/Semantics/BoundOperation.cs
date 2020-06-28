@@ -25,7 +25,9 @@ namespace Pchp.CodeAnalysis.Semantics
 
         #region Souffle
 
-        internal static int NextSerial;
+        private static int NextSerial;
+
+        internal static int GetFreeSerialNumber() => Interlocked.Increment(ref NextSerial);
 
         internal int SerialNumber { get; }
 
@@ -33,7 +35,7 @@ namespace Pchp.CodeAnalysis.Semantics
 
         public BoundOperation()
         {
-            SerialNumber = Interlocked.Increment(ref NextSerial);
+            SerialNumber = GetFreeSerialNumber();
         }
 
         public string Language => Constants.PhpLanguageName;

@@ -55,6 +55,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 IPhpOperation phpOp => $"{GetPhpOperationName(phpOp)}#{((BoundOperation)phpOp).SerialNumber}",
                 BoundOperation op => $"{op.GetType().Name}#{op.SerialNumber}",
                 VariableName varName => varName.Value,
+                string pseudoNode => pseudoNode,
                 _ => throw new NotSupportedException()
             };
 
@@ -83,6 +84,23 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             var type = node.GetType();
             _writers.WriteType(type.Name, nodeName);
 
+            ExportCommonNodeProperties(node, nodeName);
+        }
+
+        private string ExportPseudoNode(SouffleType type, string label)
+        {
+            int id = BoundOperation.GetFreeSerialNumber();
+            string nodeName = $"{label}#{id}";
+
+            // TODO: Export pseudo Is_* relation if needed
+
+            ExportCommonNodeProperties(nodeName, nodeName);
+
+            return nodeName;
+        }
+
+        private void ExportCommonNodeProperties(object node, string nodeName)
+        {
             // Export that it's contained in the routine
             _writers.WriteRoutineNode(_routineName, nodeName);
 
@@ -167,7 +185,16 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         public override VoidStruct VisitCFGStartBlock(StartBlock x)
         {
-            return VisitCFGBlock(x);
+            Export(x);
+
+            foreach (var parameter in _routine.SourceParameters)
+            {
+                ExportPseudoNode(SouffleUtils.ParameterPassType, $"pass ${parameter.Name}");
+            }
+
+            DefaultVisitBlock(x);
+
+            return default;
         }
 
         public override VoidStruct VisitCFGExitBlock(ExitBlock x)
