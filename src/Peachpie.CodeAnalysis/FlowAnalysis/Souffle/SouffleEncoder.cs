@@ -254,6 +254,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
         {
             Export(x);
 
+            ExportProperty(nameof(Edge), x, nameof(Edge.Condition), x.Condition);
             Accept(x.Condition);
 
             var lastConditionNode = GetLastExported();
