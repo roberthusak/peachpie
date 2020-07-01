@@ -84,7 +84,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             var type = node.GetType();
             _writers.WriteType(type.Name, nodeName);
 
-            ExportCommonNodeProperties(node, nodeName);
+            ExportCommonNodeRelations(node, nodeName);
         }
 
         private string ExportPseudoNode(SouffleType type, string label)
@@ -94,12 +94,12 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
             // TODO: Export pseudo Is_* relation if needed
 
-            ExportCommonNodeProperties(nodeName, nodeName);
+            ExportCommonNodeRelations(nodeName, nodeName);
 
             return nodeName;
         }
 
-        private void ExportCommonNodeProperties(object node, string nodeName)
+        private void ExportCommonNodeRelations(object node, string nodeName)
         {
             // Export that it's contained in the routine
             _writers.WriteRoutineNode(_routineName, nodeName);
@@ -189,7 +189,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
             foreach (var parameter in _routine.SourceParameters)
             {
-                ExportPseudoNode(SouffleUtils.ParameterPassType, $"pass ${parameter.Name}");
+                var paramPass = ExportPseudoNode(SouffleUtils.ParameterPassType, $"pass ${parameter.Name}");
+                ExportProperty(SouffleUtils.ParameterPassType.Name, paramPass, nameof(SourceParameterSymbol.Name), parameter.Name);
             }
 
             DefaultVisitBlock(x);

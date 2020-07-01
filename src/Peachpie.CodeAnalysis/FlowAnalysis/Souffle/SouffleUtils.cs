@@ -30,6 +30,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         public static SouffleRelation NextRelation { get; }
 
+        public static SouffleRelation ParameterPassNameRelation { get; }
+
         private static readonly ImmutableHashSet<(string, string)> ExportedValuePropertyNames =
             new[]
             {
@@ -141,6 +143,14 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 {
                     new SouffleRelation.Parameter("from", NodeType.Name),
                     new SouffleRelation.Parameter("to", NodeType.Name)
+                }.ToImmutableArray());
+
+            ParameterPassNameRelation = new SouffleRelation(
+                "ParameterPass_Name",
+                new[]
+                {
+                    new SouffleRelation.Parameter("parameter", ParameterPassType.Name),
+                    new SouffleRelation.Parameter("name", SouffleType.SymbolTypeName)
                 }.ToImmutableArray());
         }
 

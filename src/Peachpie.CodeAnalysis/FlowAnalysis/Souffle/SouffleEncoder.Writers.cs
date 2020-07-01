@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Pchp.CodeAnalysis.Symbols;
 
 namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 {
@@ -26,24 +27,27 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 _basePath = basePath;
 
                 // Writer of the RoutineNode relation
-                _routineNodeWriter = new StreamWriter(File.Open(Path.Combine(_basePath, SouffleUtils.RoutineNodeRelation.Name + FileSuffix), FileMode.Create));
+                _routineNodeWriter = OpenWriter(SouffleUtils.RoutineNodeRelation.Name);
 
                 // Writer of the Next relation
-                _nextWriter = new StreamWriter(File.Open(Path.Combine(_basePath, SouffleUtils.NextRelation.Name + FileSuffix), FileMode.Create));
+                _nextWriter = OpenWriter(SouffleUtils.NextRelation.Name);
 
                 // Create all the necessary type relation writers
                 foreach (var kvp in SouffleUtils.ExportedTypeRelations.Where(t => !t.Key.IsAbstract))
                 {
-                    var writer = new StreamWriter(File.Open(Path.Combine(_basePath, kvp.Value.Name + FileSuffix), FileMode.Create));
-                    _typeWriters[kvp.Key.Name] = writer;
+                    _typeWriters[kvp.Key.Name] = OpenWriter(kvp.Value.Name);
                 }
 
                 // Create/erase all the property files in advance (even empty relations must exist) and open them for writing
                 foreach (var kvp in SouffleUtils.ExportedProperties)
                 {
-                    var writer = new StreamWriter(File.Open(Path.Combine(_basePath, kvp.Value.Name + FileSuffix), FileMode.Create));
-                    _propWriters[(kvp.Key.DeclaringType.Name, kvp.Key.Name)] = writer;
+                    _propWriters[(kvp.Key.DeclaringType.Name, kvp.Key.Name)] = OpenWriter(kvp.Value.Name);
                 }
+
+                // Add custom relations not based on existing properties
+                _propWriters[(SouffleUtils.ParameterPassType.Name, nameof(SourceParameterSymbol.Name))] = OpenWriter(SouffleUtils.ParameterPassNameRelation.Name);
+
+                StreamWriter OpenWriter(string fileBaseName) => new StreamWriter(File.Open(Path.Combine(_basePath, fileBaseName + FileSuffix), FileMode.Create));
             }
 
             public void Dispose()

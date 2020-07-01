@@ -95,9 +95,16 @@ namespace Peachpie.SouffleGenerator
 
             writer.WriteLine();
 
-            // "RoutineNode" relation for identifying nodes in routines
+            // Custom relations
+
             writer.WriteLine(SouffleUtils.RoutineNodeRelation.GetDeclaration());
             writer.WriteLine($".input {SouffleUtils.RoutineNodeRelation.Name}");
+
+            writer.WriteLine(SouffleUtils.NextRelation.GetDeclaration());
+            writer.WriteLine($".input {SouffleUtils.NextRelation.Name}");
+
+            writer.WriteLine(SouffleUtils.ParameterPassNameRelation.GetDeclaration());
+            writer.WriteLine($".input {SouffleUtils.ParameterPassNameRelation.Name}");
 
             writer.WriteLine();
 
