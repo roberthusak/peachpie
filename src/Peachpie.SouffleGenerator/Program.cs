@@ -42,6 +42,9 @@ namespace Peachpie.SouffleGenerator
             // "Routine" type for unique routine names
             writer.WriteLine(SouffleUtils.RoutineType.GetDeclaration());
 
+            // Pseudo type for parameter passing
+            writer.WriteLine(SouffleUtils.ParameterPassType.GetDeclaration());
+
             writer.WriteLine();
 
             // Turn inheritance into union hierarchy

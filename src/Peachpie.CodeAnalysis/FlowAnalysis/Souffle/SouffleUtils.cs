@@ -74,7 +74,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                     new SouffleRelation(
                         $"Is_{GetTypeName(t, false)}",
                         new[] {
-                            new SouffleRelation.Parameter("node", GetTypeName(t)),
+                            new SouffleRelation.Parameter("node", NodeType.Name),
                         }.ToImmutableArray())
                     ))
                 .ToImmutableDictionary();
