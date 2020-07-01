@@ -7,6 +7,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 {
     internal class SouffleType
     {
+        public const string SymbolTypeName = "symbol";
+
         public string Name { get; }
 
         public ImmutableArray<string> ChildTypes { get; }
@@ -21,7 +23,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
         {
             if (ChildTypes.Length == 0)
             {
-                return $".type {Name} <: symbol";
+                return $".type {Name} <: {SymbolTypeName}";
             }
             else
             {

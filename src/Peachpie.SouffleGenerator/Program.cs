@@ -33,7 +33,7 @@ namespace Peachpie.SouffleGenerator
             // Basic types
             foreach (var opType in basicTypes)
             {
-                string name = SouffleUtils.GetOperationTypeName(opType, isBase: false);
+                string name = SouffleUtils.GetTypeName(opType, isBase: false);
                 writer.WriteLine($".type {name} <: symbol");
             }
 
@@ -51,15 +51,15 @@ namespace Peachpie.SouffleGenerator
                     SouffleUtils.ExportedTypes
                     .Where(t => t.BaseType == opType)
                     .OrderBy(t => t.Name)
-                    .Select(t => SouffleUtils.GetOperationTypeName(t))
+                    .Select(t => SouffleUtils.GetTypeName(t))
                     .ToArray();
 
                 if (!opType.IsAbstract)
                 {
-                    subTypes = subTypes.Prepend(SouffleUtils.GetOperationTypeName(opType, isBase: false)).ToArray();
+                    subTypes = subTypes.Prepend(SouffleUtils.GetTypeName(opType, isBase: false)).ToArray();
                 }
 
-                string name = SouffleUtils.GetOperationTypeName(opType, isBase: true);
+                string name = SouffleUtils.GetTypeName(opType, isBase: true);
                 writer.WriteLine($".type {name} = " + string.Join(" | ", (object[])subTypes));
             }
 

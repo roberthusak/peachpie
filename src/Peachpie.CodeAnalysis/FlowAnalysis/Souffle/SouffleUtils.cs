@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using Devsense.PHP.Syntax;
 using Pchp.CodeAnalysis.Semantics;
 using Pchp.CodeAnalysis.Semantics.Graph;
 
@@ -55,8 +56,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 "Node",
                 new[]
                 {
-                    GetOperationTypeName(typeof(BoundOperation)),
-                    GetOperationTypeName(typeof(Edge)),
+                    GetTypeName(typeof(BoundOperation)),
+                    GetTypeName(typeof(Edge)),
                     ParameterPassType.Name
                 }.ToImmutableArray());
 
@@ -69,9 +70,9 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                 .Select(t => new KeyValuePair<Type, SouffleRelation>(
                     t,
                     new SouffleRelation(
-                        $"Is_{GetOperationTypeName(t, false)}",
+                        $"Is_{GetTypeName(t, false)}",
                         new[] {
-                            new SouffleRelation.Parameter("node", GetOperationTypeName(t)),
+                            new SouffleRelation.Parameter("node", GetTypeName(t)),
                         }.ToImmutableArray())
                     ))
                 .ToImmutableDictionary();
@@ -86,10 +87,10 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                     .Select(p => new KeyValuePair<PropertyInfo, SouffleRelation>(
                         p,
                         new SouffleRelation(
-                            $"{GetOperationTypeName(t)}_{p.Name}",
+                            $"{GetTypeName(t)}_{p.Name}",
                             new[] {
-                                new SouffleRelation.Parameter("parent", GetOperationTypeName(t)),
-                                new SouffleRelation.Parameter("value", GetOperationTypeName(p.PropertyType))
+                                new SouffleRelation.Parameter("parent", GetTypeName(t)),
+                                new SouffleRelation.Parameter("value", GetTypeName(p.PropertyType))
                             }.ToImmutableArray())
                     )));
 
@@ -104,9 +105,9 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
                     .Select(p => new KeyValuePair<PropertyInfo, SouffleRelation>(
                         p,
                         new SouffleRelation(
-                            $"{GetOperationTypeName(t)}_{p.Name}_Item",
+                            $"{GetTypeName(t)}_{p.Name}_Item",
                             new[] {
-                                new SouffleRelation.Parameter("parent", GetOperationTypeName(t)),
+                                new SouffleRelation.Parameter("parent", GetTypeName(t)),
                                 new SouffleRelation.Parameter("index", "unsigned"),
                                 new SouffleRelation.Parameter("value", GetEnumerablePropertyTypeName(p))
                             }.ToImmutableArray())
@@ -123,7 +124,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
                 var itemType = enumerableType.GenericTypeArguments[0];
 
-                return GetOperationTypeName(itemType);
+                return GetTypeName(itemType);
             }
 
             RoutineNodeRelation = new SouffleRelation(
@@ -158,12 +159,17 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
 
         public static bool IsUnionType(Type type) => ExportedUnionTypes.Contains(type);
 
-        public static string GetOperationTypeName(Type exprType) =>
-            GetOperationTypeName(exprType, IsUnionType(exprType));
+        public static string GetTypeName(Type type) =>
+            GetTypeName(type, IsUnionType(type));
 
-        public static string GetOperationTypeName(Type exprType, bool isBase)
+        public static string GetTypeName(Type type, bool isBase)
         {
-            string name = exprType.Name;
+            if (type == typeof(string) || type == typeof(VariableName))
+            {
+                return SouffleType.SymbolTypeName;
+            }
+
+            string name = type.Name;
 
             // Strip the Bound- prefix
             name = RemovePrefix(name, "Bound");
@@ -174,18 +180,18 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             name = RemoveSuffix(name, "Statement");
 
             // Distinguish Souffle type from union in non-abstract types by -Base suffix
-            if (isBase && !exprType.IsAbstract)
+            if (isBase && !type.IsAbstract)
             {
                 name += "Base";
             }
 
             // Mark expressions and statements by short suffixes
-            if (exprType.IsSubclassOf(typeof(BoundExpression)))
+            if (type.IsSubclassOf(typeof(BoundExpression)))
             {
                 name += "Ex";
             }
-            else if (exprType.IsSubclassOf(typeof(BoundStatement)) &&
-                !exprType.IsSubclassOf(typeof(BoundBlock)) && exprType != typeof(BoundBlock))
+            else if (type.IsSubclassOf(typeof(BoundStatement)) &&
+                !type.IsSubclassOf(typeof(BoundBlock)) && type != typeof(BoundBlock))
             {
                 name += "St";
             }
