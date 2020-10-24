@@ -18,18 +18,18 @@ namespace Pchp.CodeAnalysis.Semantics
     {
         #region Primitive Types
 
-        internal readonly BoundPrimitiveTypeRef/*!*/VoidTypeRef = new BoundPrimitiveTypeRef(PhpTypeCode.Void);
-        internal readonly BoundPrimitiveTypeRef/*!*/NullTypeRef = new BoundPrimitiveTypeRef(PhpTypeCode.Null);
-        internal readonly BoundPrimitiveTypeRef/*!*/BoolTypeRef = new BoundPrimitiveTypeRef(PhpTypeCode.Boolean);
-        internal readonly BoundPrimitiveTypeRef/*!*/LongTypeRef = new BoundPrimitiveTypeRef(PhpTypeCode.Long);
-        internal readonly BoundPrimitiveTypeRef/*!*/DoubleTypeRef = new BoundPrimitiveTypeRef(PhpTypeCode.Double);
-        internal readonly BoundPrimitiveTypeRef/*!*/StringTypeRef = new BoundPrimitiveTypeRef(PhpTypeCode.String);
-        internal readonly BoundPrimitiveTypeRef/*!*/ObjectTypeRef = new BoundPrimitiveTypeRef(PhpTypeCode.Object);
-        internal readonly BoundPrimitiveTypeRef/*!*/WritableStringRef = new BoundPrimitiveTypeRef(PhpTypeCode.WritableString);
-        internal readonly BoundPrimitiveTypeRef/*!*/ArrayTypeRef = new BoundPrimitiveTypeRef(PhpTypeCode.PhpArray);
-        internal readonly BoundPrimitiveTypeRef/*!*/IterableTypeRef = new BoundPrimitiveTypeRef(PhpTypeCode.Iterable);
-        internal readonly BoundPrimitiveTypeRef/*!*/CallableTypeRef = new BoundPrimitiveTypeRef(PhpTypeCode.Callable);
-        internal readonly BoundPrimitiveTypeRef/*!*/ResourceTypeRef = new BoundPrimitiveTypeRef(PhpTypeCode.Resource);
+        internal BoundPrimitiveTypeRef/*!*/VoidTypeRef => new BoundPrimitiveTypeRef(PhpTypeCode.Void);
+        internal BoundPrimitiveTypeRef/*!*/NullTypeRef => new BoundPrimitiveTypeRef(PhpTypeCode.Null);
+        internal BoundPrimitiveTypeRef/*!*/BoolTypeRef => new BoundPrimitiveTypeRef(PhpTypeCode.Boolean);
+        internal BoundPrimitiveTypeRef/*!*/LongTypeRef => new BoundPrimitiveTypeRef(PhpTypeCode.Long);
+        internal BoundPrimitiveTypeRef/*!*/DoubleTypeRef => new BoundPrimitiveTypeRef(PhpTypeCode.Double);
+        internal BoundPrimitiveTypeRef/*!*/StringTypeRef => new BoundPrimitiveTypeRef(PhpTypeCode.String);
+        internal BoundPrimitiveTypeRef/*!*/ObjectTypeRef => new BoundPrimitiveTypeRef(PhpTypeCode.Object);
+        internal BoundPrimitiveTypeRef/*!*/WritableStringRef => new BoundPrimitiveTypeRef(PhpTypeCode.WritableString);
+        internal BoundPrimitiveTypeRef/*!*/ArrayTypeRef => new BoundPrimitiveTypeRef(PhpTypeCode.PhpArray);
+        internal BoundPrimitiveTypeRef/*!*/IterableTypeRef => new BoundPrimitiveTypeRef(PhpTypeCode.Iterable);
+        internal BoundPrimitiveTypeRef/*!*/CallableTypeRef => new BoundPrimitiveTypeRef(PhpTypeCode.Callable);
+        internal BoundPrimitiveTypeRef/*!*/ResourceTypeRef => new BoundPrimitiveTypeRef(PhpTypeCode.Resource);
 
         #endregion
 
