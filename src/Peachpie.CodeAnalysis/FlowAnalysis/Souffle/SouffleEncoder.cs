@@ -888,9 +888,9 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Souffle
             return default;
         }
 
-        public override VoidStruct VisitThrow(BoundThrowStatement x)
+        public override VoidStruct VisitThrow(BoundThrowExpression x)
         {
-            ExportProperty(nameof(BoundThrowStatement), x, nameof(BoundThrowStatement.Thrown), x.Thrown);
+            ExportProperty(nameof(BoundThrowExpression), x, nameof(BoundThrowExpression.Thrown), x.Thrown);
             Accept(x.Thrown);
 
             Export(x);
