@@ -199,6 +199,7 @@ namespace Pchp.CodeAnalysis.CommandLine
             var autoload_files = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
             var autoload_psr4 = new List<(string prefix, string path)>();
             bool exportSouffleRelations = false;
+            ExperimentalOptimization experimentalOptimization = ExperimentalOptimization.None;
 
             if (sdkDirectoryOpt != null) referencePaths.Add(sdkDirectoryOpt);
             if (!string.IsNullOrEmpty(additionalReferenceDirectories)) referencePaths.AddRange(additionalReferenceDirectories.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
@@ -730,6 +731,10 @@ namespace Pchp.CodeAnalysis.CommandLine
                         exportSouffleRelations = false;
                         continue;
 
+                    case "experimentalopt":
+                        experimentalOptimization = (ExperimentalOptimization)Enum.Parse(typeof(ExperimentalOptimization), value);
+                        continue;
+
                     default:
                         break;
                 }
@@ -859,7 +864,8 @@ namespace Pchp.CodeAnalysis.CommandLine
                 //specificDiagnosticOptions: diagnosticOptions,
                 //reportSuppressedDiagnostics: reportSuppressedDiagnostics,
                 publicSign: publicSign,
-                exportSouffleRelations: exportSouffleRelations
+                exportSouffleRelations: exportSouffleRelations,
+                experimentalOptimization: experimentalOptimization
             )
             {
                 EventSources = evetsources.AsImmutableOrEmpty(),

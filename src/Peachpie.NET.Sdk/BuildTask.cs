@@ -131,6 +131,11 @@ namespace Peachpie.NET.Sdk.Tools
         /// </summary>
         public bool ExportSouffleRelations { get; set; }
 
+        /// <summary>
+        /// Enables to test experimental optimizations.
+        /// </summary>
+        public string ExperimentalOptimization { get; set; }
+
         /// <summary></summary>
         public override bool Execute()
         {
@@ -184,6 +189,7 @@ namespace Peachpie.NET.Sdk.Tools
             AddNoEmpty(args, "sourcelink", SourceLink);
             AddNoEmpty(args, "codepage", CodePage);
             AddNoEmpty(args, "subdir", PhpRelativePath);
+            AddNoEmpty(args, "experimentalopt", ExperimentalOptimization);
             
 			if (DefineConstants != null)
 			{

@@ -40,6 +40,19 @@ namespace Pchp.CodeAnalysis
     }
 
     /// <summary>
+    /// Options for enabling experimental optimization methods.
+    /// </summary>
+    public enum ExperimentalOptimization
+    {
+        None = default,
+
+        /// <summary>
+        /// Generates a type-specific overload for each routine with parameter types specified in PhpDocs.
+        /// </summary>
+        PhpDocOverloads,
+    }
+
+    /// <summary>
     /// Represents various options that affect compilation, such as 
     /// whether to emit an executable or a library, whether to optimize
     /// generated code, and so on.
@@ -146,6 +159,11 @@ namespace Pchp.CodeAnalysis
         /// </summary>
         public bool ExportSouffleRelations { get; private set; }
 
+        /// <summary>
+        /// Whether to enable a certain experimental optimization in the compiler.
+        /// </summary>
+        public ExperimentalOptimization ExperimentalOptimization { get; private set; }
+
         // Defaults correspond to the compiler's defaults or indicate that the user did not specify when that is significant.
         // That's significant when one option depends on another's setting. SubsystemVersion depends on Platform and Target.
         public PhpCompilationOptions(
@@ -184,7 +202,8 @@ namespace Pchp.CodeAnalysis
             PhpParseOptions parseOptions = null,
             ImmutableDictionary<string, string> defines = default,
             bool referencesSupersedeLowerVersions = false,
-            bool exportSouffleRelations = false)
+            bool exportSouffleRelations = false,
+            ExperimentalOptimization experimentalOptimization = ExperimentalOptimization.None)
             : this(outputKind, baseDirectory, sdkDirectory, subDirectory, targetFramework,
                    reportSuppressedDiagnostics, moduleName, mainTypeName, scriptClassName,
                    versionString,
@@ -207,7 +226,8 @@ namespace Pchp.CodeAnalysis
                    defines: defines,
                    parseOptions: parseOptions,
                    referencesSupersedeLowerVersions: referencesSupersedeLowerVersions,
-                   exportSouffleRelations: exportSouffleRelations)
+                   exportSouffleRelations: exportSouffleRelations,
+                   experimentalOptimization: experimentalOptimization)
         {
         }
 
@@ -250,7 +270,8 @@ namespace Pchp.CodeAnalysis
             PhpParseOptions parseOptions,
             ImmutableDictionary<string, string> defines,
             bool referencesSupersedeLowerVersions,
-            bool exportSouffleRelations)
+            bool exportSouffleRelations,
+            ExperimentalOptimization experimentalOptimization)
             : base(outputKind, reportSuppressedDiagnostics, moduleName, mainTypeName, scriptClassName,
                    cryptoKeyContainer, cryptoKeyFile, cryptoPublicKey, delaySign, publicSign, optimizationLevel.AsOptimizationLevel(), checkOverflow,
                    platform, generalDiagnosticOption, warningLevel, specificDiagnosticOptions.ToImmutableDictionaryOrEmpty(),
@@ -270,6 +291,7 @@ namespace Pchp.CodeAnalysis
             this.OptimizationLevel = optimizationLevel;
             this.Defines = defines;
             this.ExportSouffleRelations = exportSouffleRelations;
+            this.ExperimentalOptimization = experimentalOptimization;
         }
 
         private PhpCompilationOptions(PhpCompilationOptions other) : this(
@@ -310,7 +332,8 @@ namespace Pchp.CodeAnalysis
             parseOptions: other.ParseOptions,
             defines: other.Defines,
             referencesSupersedeLowerVersions: other.ReferencesSupersedeLowerVersions,
-            exportSouffleRelations: other.ExportSouffleRelations)
+            exportSouffleRelations: other.ExportSouffleRelations,
+            experimentalOptimization: other.ExperimentalOptimization)
         {
             EventSources = other.EventSources;
             Autoload_ClassMapFiles = other.Autoload_ClassMapFiles;
