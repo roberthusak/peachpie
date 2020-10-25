@@ -2309,21 +2309,41 @@ namespace Pchp.CodeAnalysis.Semantics
                 throw cg.NotImplementedException(op: this);
             }
 
-            var conv = cg.DeclaringCompilation.ClassifyExplicitConversion(t, target);
-            if (conv.Exists == false)
-            {
-
-            }
-
-            cg.EmitConversion(conv, t, target);
-
-            //
-
             if (Access.IsNone)
             {
-                cg.EmitPop(target);
+                cg.EmitPop(t);
                 return cg.CoreTypes.Void;
             }
+
+            var conv = cg.DeclaringCompilation.ClassifyExplicitConversion(t, target);
+            if (conv.Exists == false && t.IsVoid())
+            {
+                if (target.IsValueType)
+                {
+                    // 0
+                    cg.EmitLoadDefault(target);
+                }
+                else if (target.SpecialType == SpecialType.System_String)
+                {
+                    // ""
+                    cg.Builder.EmitStringConstant(string.Empty);
+                }
+                else if (target.Is_PhpArray())
+                {
+                    // PhpArray(0)
+                    cg.Emit_PhpArray_NewEmpty();
+                }
+                else
+                {
+                    throw cg.NotImplementedException($"Conversion from {t} to {target}");
+                }
+            }
+            else
+            {
+                cg.EmitConversion(conv, t, target);
+            }
+
+            //
 
             return target;
         }
@@ -2430,7 +2450,15 @@ namespace Pchp.CodeAnalysis.Semantics
                 return cg.EmitLoadConstant(ConstantValue.Value, this.Access.TargetType);
             }
 
-            return this.BindPlace(cg).EmitLoadValue(cg, Access);
+            var boundplace = this.BindPlace(cg);
+            if (boundplace != null)
+            {
+                return boundplace.EmitLoadValue(cg, Access);
+            }
+            else
+            {
+                throw cg.NotImplementedException($"IVariableReference of {this} is null!");
+            }
         }
     }
 
@@ -2583,12 +2611,12 @@ namespace Pchp.CodeAnalysis.Semantics
 
         TypeSymbol IVariableReference.EmitLoadValue(CodeGenerator cg, ref LhsStack lhsStack, BoundAccess access)
         {
-            throw new InvalidOperationException();
+            throw new InvalidOperationException("list() as R-Value at " + ExceptionUtilities.GuessSourceLocation(cg, this));
         }
 
         TypeSymbol IVariableReference.EmitLoadAddress(CodeGenerator cg, ref LhsStack lhsStack)
         {
-            throw new InvalidOperationException();
+            throw new InvalidOperationException("list() as R-Value at " + ExceptionUtilities.GuessSourceLocation(cg, this));
         }
 
         #endregion
@@ -3039,6 +3067,21 @@ namespace Pchp.CodeAnalysis.Semantics
         }
     }
 
+    partial class BoundThrowExpression
+    {
+        internal override TypeSymbol Emit(CodeGenerator cg)
+        {
+            cg.EmitConvert(Thrown, cg.CoreTypes.Exception);
+
+            // throw <stack>;
+            cg.Builder.EmitThrow(false);
+
+            // push a default value (void)
+            // stack is adjusted by caller if necessary
+            return cg.CoreTypes.Void;
+        }
+    }
+
     partial class BoundEcho
     {
         internal override TypeSymbol Emit(CodeGenerator cg)
@@ -3057,16 +3100,13 @@ namespace Pchp.CodeAnalysis.Semantics
 
     partial class BoundConcatEx
     {
-        static SpecialMember ResolveConcatMethod(int stringargs)
+        static SpecialMember? TryResolveConcatMethod(int stringargs) => stringargs switch
         {
-            switch (stringargs)
-            {
-                case 2: return SpecialMember.System_String__ConcatStringString;
-                case 3: return SpecialMember.System_String__ConcatStringStringString;
-                case 4: return SpecialMember.System_String__ConcatStringStringStringString;
-                default: throw new ArgumentOutOfRangeException();
-            }
-        }
+            2 => (SpecialMember?)SpecialMember.System_String__ConcatStringString,
+            3 => SpecialMember.System_String__ConcatStringStringString,
+            4 => SpecialMember.System_String__ConcatStringStringStringString,
+            _ => null,
+        };
 
         internal override TypeSymbol Emit(CodeGenerator cg)
         {
@@ -3079,30 +3119,41 @@ namespace Pchp.CodeAnalysis.Semantics
                 return cg.CoreTypes.String;
             }
 
-            if (args.Length <= 4 && (cg.IsReadonlyStringOnly(this.TypeRefMask) || this.Access.TargetType == cg.CoreTypes.String))
+            if (cg.IsReadonlyStringOnly(this.TypeRefMask) || this.Access.TargetType == cg.CoreTypes.String)
             {
-                // Template: System.String.Concat( ... )
-                foreach (var x in args)
-                {
-                    cg.EmitConvert(x.Value, cg.CoreTypes.String);
-                }
+                // the expression is annotated as it returns "System.String",
+                // all its arguments are UTF16 values
+                // perform standard System.String.Concat():
 
-                //
-                if (args.Length == 1)
+                var concat_method = TryResolveConcatMethod(args.Length);
+                if (concat_method.HasValue)
                 {
-                    // (string)arg[0]
+                    // Template: System.String.Concat( ... )
+                    foreach (var x in args)
+                    {
+                        cg.EmitConvert(x.Value, cg.CoreTypes.String);
+                    }
+
+                    // String.Concat( (string)0, (string)1, ... );
+                    return cg.EmitCall(ILOpCode.Call, (MethodSymbol)cg.DeclaringCompilation.GetSpecialTypeMember(concat_method.Value))
+                        .Expect(SpecialType.System_String);
+                }
+                else if (args.Length == 1)
+                {
+                    // Template: (string)arg[0]
+                    cg.EmitConvert(args[0].Value, cg.CoreTypes.String);
                     return cg.CoreTypes.String;
                 }
                 else
                 {
-                    // String.Concat( (string)0, (string)1, ... );
-                    var concat_method = ResolveConcatMethod(args.Length);
-                    return cg.EmitCall(ILOpCode.Call, (MethodSymbol)cg.DeclaringCompilation.GetSpecialTypeMember(concat_method))
+                    // Template: String.Concat( new []{ ... } )
+                    cg.Emit_NewArray(cg.CoreTypes.String, args);
+                    return cg.EmitCall(ILOpCode.Call, (MethodSymbol)cg.DeclaringCompilation.GetSpecialTypeMember(SpecialMember.System_String__ConcatStringArray))
                         .Expect(SpecialType.System_String);
                 }
-
-                throw null;
             }
+
+            // returning PhpString:
 
             if (args.Length == 1)
             {
@@ -3128,8 +3179,8 @@ namespace Pchp.CodeAnalysis.Semantics
                 }
 
                 //
-                cg.Builder.EmitOpCode(ILOpCode.Dup);        // <Blob>
-                cg.Emit_PhpStringBlob_Append(expr);// .Append( ... )
+                cg.Builder.EmitOpCode(ILOpCode.Dup);    // <Blob>
+                cg.Emit_PhpStringBlob_Append(expr);     // .Append( ... )
             }
 
             // new PhpString( <Blob> )
@@ -3161,7 +3212,7 @@ namespace Pchp.CodeAnalysis.Semantics
             Debug.Assert(_arguments[0].Value.Access.IsRead);
             Debug.Assert(Access.IsRead || Access.IsNone);
 
-            var method = this.Target;
+            var method = this.TargetMethod;
             if (method != null) // => IsResolved
             {
                 // emit condition for include_once/require_once
@@ -3895,7 +3946,7 @@ namespace Pchp.CodeAnalysis.Semantics
     {
         internal override TypeSymbol Emit(CodeGenerator cg)
         {
-            TypeSymbol result_type = cg.DeclaringCompilation.GetTypeFromTypeRef(cg.Routine, this.TypeRefMask);
+            TypeSymbol result_type = cg.DeclaringCompilation.GetTypeFromTypeRef(cg.TypeRefContext, this.TypeRefMask);
             bool result_isvoid = result_type.SpecialType == SpecialType.System_Void;
 
             object trueLbl = new object();
@@ -4991,20 +5042,32 @@ namespace Pchp.CodeAnalysis.Semantics
     {
         internal override TypeSymbol Emit(CodeGenerator cg)
         {
+            var il = cg.Builder;
             var t = cg.Emit(this.Operand);
 
             // resolve IsEmpty() operator
             var op = cg.Conversions.ResolveOperator(t, false, new[] { "IsEmpty" }, new[] { cg.CoreTypes.Operators.Symbol }, target: cg.CoreTypes.Boolean);
             if (op != null)
             {
-                // TODO: instance method call and possibly NULL => check (VALUE == NULL) || ...
-
-                cg.EmitConversion(new CommonConversion(true, false, false, false, false, op), t, cg.CoreTypes.Boolean);
+                // {t} reference type and possibly NULL,
+                // emit null check:
+                if (t.IsReferenceType && cg.CanBeNull(this.Operand.TypeRefMask) && !op.IsStatic)
+                {
+                    // https://github.com/peachpiecompiler/peachpie/issues/816
+                    // Template: <STACK> != null ? IsEmpty(STACK) : FALSE
+                    cg.EmitNullCoalescing(
+                        notnullemitter: () => cg.EmitConversion(new CommonConversion(true, false, false, false, false, op), t, cg.CoreTypes.Boolean),
+                        nullemitter: () => cg.Builder.EmitBoolConstant(true)
+                    );
+                }
+                else
+                {
+                    // Template: IsEmpty(STACK)
+                    cg.EmitConversion(new CommonConversion(true, false, false, false, false, op), t, cg.CoreTypes.Boolean);
+                }
             }
             else
             {
-                var il = cg.Builder;
-
                 //
                 switch (t.SpecialType)
                 {

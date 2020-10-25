@@ -50,38 +50,68 @@ namespace Pchp.CodeAnalysis.Symbols
         {
             get
             {
-                if (Interfaces.IsEmpty)
+                if (SpecialType == SpecialType.System_Object)
                 {
-                    // get interfaces of base type
-                    return (BaseType != null && BaseType != this)
-                        ? BaseType.AllInterfaces    // TODO: handle circular dependency, stack overflow
-                        : ImmutableArray<NamedTypeSymbol>.Empty;
+                    return ImmutableArray<NamedTypeSymbol>.Empty;
                 }
 
-                // collect all interfaces from this and base types
-
-                var todo = new Queue<NamedTypeSymbol>();
-
-                for (var b = this; b != null; b = b.BaseType)   // TODO: handle circular dependency, stack overflow
+                // Adds the type, its base and all interfaces recursively into the set,
+                // checks for cyclic dependency.
+                // Counts unique interfaces (except for the root type).
+                // In case there is just a single array with interfaces in whole hierarchy, returns it directly.
+                void CollectTypes(NamedTypeSymbol type, HashSet<NamedTypeSymbol> resolved, ref int interfaces, ref ImmutableArray<NamedTypeSymbol> onlyinterfaces)
                 {
-                    b.Interfaces.ForEach(todo.Enqueue);
-                }
-
-                // collect all interfaces and their interfaces,
-                // ignore duplicit items, handle cyclic dependencies
-
-                var result = new HashSet<NamedTypeSymbol>();
-
-                while (todo.Count != 0)
-                {
-                    var t = todo.Dequeue();
-                    if (result.Add(t))
+                    if (type != null && resolved.Add(type))
                     {
-                        t.Interfaces.ForEach(todo.Enqueue);
+                        if (type.IsInterface && resolved.Count != 1) // do not count itself
+                        {
+                            interfaces++;
+                        }
+
+                        var ifaces = type.Interfaces;
+                        if (ifaces.IsDefaultOrEmpty == false)
+                        {
+                            // if interfaces == 0
+                            // TODO: child interfaces might be duplicities, we don't have to drop the array we have
+                            onlyinterfaces = onlyinterfaces.IsDefault ? ifaces : ImmutableArray<NamedTypeSymbol>.Empty; // only if we reach a single array of interfaces in whole hierarchy
+
+                            foreach (var x in ifaces)
+                            {
+                                CollectTypes(x, resolved, ref interfaces, ref onlyinterfaces);
+                            }
+                        }
+
+                        CollectTypes(type.BaseType, resolved, ref interfaces, ref onlyinterfaces);
                     }
                 }
 
-                return result.AsImmutable();
+                var resolved = new HashSet<NamedTypeSymbol>(); // set of types (classes and interfaces) being collected
+                var interfaces = 0;
+                var onlyinterfaces = default(ImmutableArray<NamedTypeSymbol>);
+
+                CollectTypes(this as NamedTypeSymbol, resolved, ref interfaces, ref onlyinterfaces);
+
+                if (interfaces == 0)
+                {
+                    return ImmutableArray<NamedTypeSymbol>.Empty;
+                }
+
+                if (onlyinterfaces.IsDefaultOrEmpty == false) // there is a single array with interfaces
+                {
+                    return onlyinterfaces;
+                }
+
+                //
+                var builder = ImmutableArray.CreateBuilder<NamedTypeSymbol>(interfaces);
+                foreach (var x in resolved)
+                {
+                    if (x != this && x.IsInterface)
+                    {
+                        builder.Add(x);
+                    }
+                }
+
+                return builder.MoveToImmutable();
             }
         }
 
@@ -278,11 +308,14 @@ namespace Pchp.CodeAnalysis.Symbols
             return null;
         }
 
-        public MethodSymbol[] LookupMethods(string name)
+        /// <summary>
+        /// Resolves PHP method by its name.
+        /// </summary>
+        public List<MethodSymbol> LookupMethods(string name)
         {
             if (this.Is_PhpValue())
             {
-                return Array.Empty<MethodSymbol>();
+                return new List<MethodSymbol>();
             }
 
             TypeSymbol topPhpType = null; // deals with PHP-like overriding, once there is PHP method that override another method (even with a different signature) in a base PHP type
@@ -300,7 +333,10 @@ namespace Pchp.CodeAnalysis.Symbols
 
                 int count = set.Count;
 
-                set.UnionWith(t.GetMembersByPhpName(name).OfType<MethodSymbol>());
+                foreach (var c in t.GetMembersByPhpName(name))
+                {
+                    if (c is MethodSymbol m) set.Add(m);
+                }
 
                 // remember the top PHP class declaring the method:
                 if (topPhpType == null && count != set.Count && t.IsPhpType()) // some methods were found in PHP type
@@ -308,6 +344,9 @@ namespace Pchp.CodeAnalysis.Symbols
                     topPhpType = t;
                 }
             }
+
+            // remove php-hidden methods
+            set.RemoveWhere(m => m.IsPhpHidden); // TODO: other attributes: "private protected", "internal"
 
             if (set.Count == 0 || (this.IsAbstract && set.All(m => m.IsAbstract))) // abstract or interface, otherwise all methods should be declared on this already
             {
@@ -320,7 +359,7 @@ namespace Pchp.CodeAnalysis.Symbols
             }
 
             //
-            return set.ToArray();
+            return set.ToList();
         }
     }
 }

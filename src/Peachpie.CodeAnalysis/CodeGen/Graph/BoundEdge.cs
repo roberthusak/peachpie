@@ -219,13 +219,15 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
 
                 // forget finally block
                 cg.ExtraFinallyBlock = nextExtraFinallyBlock;
-                Debug.Assert(cg.ExtraFinallyStateVariable != null);
 
                 //
                 if (_finallyBlock != null)
                 {
+                    Debug.Assert(cg.ExtraFinallyStateVariable != null);
+
                     // emit finally block
                     cg.GenerateScope(_finallyBlock, NextBlock.Ordinal);
+                    cg.Builder.AssertStackEmpty();
 
                     // several "finally" states (cg.ExtraFinallyStateVariable):
                     // - 0: none; continue to NextBlock
@@ -257,6 +259,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
             var il = cg.Builder;
 
             // Template: catch (ScriptDiedException) { rethrow; }
+            il.AdjustStack(1); // Account for exception on the stack.
 
             il.OpenLocalScope(ScopeType.Catch, cg.CoreTypes.ScriptDiedException.Symbol);
             il.EmitThrow(true);
@@ -265,7 +268,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
 
         void EmitDefaultCatchBlock(CodeGenerator cg)
         {
-            if (!EmitCatchFinallyOutsideScope || _finallyBlock == null)
+            if (!EmitCatchFinallyOutsideScope || _finallyBlock?.FlowState == null)
             {
                 return;
             }
@@ -281,7 +284,9 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
             //   goto _finally;
             // }
 
-            il.OpenLocalScope(ScopeType.Catch, cg.CoreTypes.Exception.Symbol);
+            il.AdjustStack(1); // Account for exception on the stack.
+
+            il.OpenLocalScope(ScopeType.Catch, cg.Module.Translate(cg.CoreTypes.Exception.Symbol, null, cg.Diagnostics));
 
             // ExceptionToRethrow = ex;
             cg.ExceptionToRethrowVariable.EmitStore();
@@ -290,7 +295,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
             il.EmitIntConstant((int)CodeGenerator.ExtraFinallyState.Exception); // rethrow state
             cg.ExtraFinallyStateVariable.EmitStore();
 
-            // goto _finally;
+            // .leave _finally;
             il.EmitBranch(ILOpCode.Br, _finallyBlock);
 
             il.CloseLocalScope();
@@ -356,7 +361,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
 
         void EmitCatchBlock(CodeGenerator cg, CatchBlock catchBlock)
         {
-            Debug.Assert(catchBlock.Variable.Variable != null);
+            Debug.Assert(catchBlock.Variable == null || catchBlock.Variable.Variable != null);
 
             var il = cg.Builder;
             TypeSymbol extype;
@@ -429,7 +434,7 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
             if (EmitCatchFinallyOutsideScope)
             {
                 // .br
-                cg.Builder.EmitBranch(ILOpCode.Br, catchBlock);
+                il.EmitBranch(ILOpCode.Br, catchBlock);
             }
             else
             {

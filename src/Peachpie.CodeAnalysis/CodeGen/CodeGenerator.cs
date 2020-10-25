@@ -243,6 +243,13 @@ namespace Pchp.CodeAnalysis.CodeGen
         internal TemporaryLocalDefinition ExceptionToRethrowVariable { get; set; }
 
         /// <summary>
+        /// Local variable with array of all routine's arguments.
+        /// PhpValue[]
+        /// Initialized once when <see cref="SourceRoutineSymbol.Flags"/> has <see cref="RoutineFlags.UsesArgs"/>.
+        /// </summary>
+        internal LocalDefinition FunctionArgsArray { get; set; }
+
+        /// <summary>
         /// BoundBlock.Tag value indicating the block was emitted.
         /// </summary>
         readonly int _emmittedTag;
@@ -463,7 +470,7 @@ namespace Pchp.CodeAnalysis.CodeGen
             {
                 // declare PhpArray <locals>
                 var symbol = new SynthesizedLocalSymbol(Routine, "<locals>", CoreTypes.PhpArray);
-                var localsDef = this.Builder.LocalSlotManager.DeclareLocal((Cci.ITypeReference)symbol.Type, symbol, symbol.Name, SynthesizedLocalKind.OptimizerTemp, LocalDebugId.None, 0, LocalSlotConstraints.None, ImmutableArray<bool>.Empty, ImmutableArray<string>.Empty, false);
+                var localsDef = this.Builder.LocalSlotManager.DeclareLocal((Cci.ITypeReference)symbol.Type, symbol, symbol.Name, SynthesizedLocalKind.EmitterTemp, LocalDebugId.None, 0, LocalSlotConstraints.None, ImmutableArray<bool>.Empty, ImmutableArray<string>.Empty, false);
 
                 localsAlreadyInitialized = false;
                 return new LocalPlace(localsDef);

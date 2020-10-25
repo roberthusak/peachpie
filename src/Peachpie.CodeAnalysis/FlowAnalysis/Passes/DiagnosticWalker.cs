@@ -15,6 +15,7 @@ using Devsense.PHP.Syntax.Ast;
 using Peachpie.CodeAnalysis.Utilities;
 using Pchp.CodeAnalysis.Semantics.TypeRef;
 using Devsense.PHP.Syntax;
+using Pchp.CodeAnalysis.Utilities;
 
 namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
 {
@@ -452,9 +453,40 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
         public override T VisitInclude(BoundIncludeEx x)
         {
             // check arguments
-            return base.VisitRoutineCall(x);
+            base.VisitRoutineCall(x);
 
-            // do not check the TargetMethod
+            // check the target was not resolved
+            if (x.TargetMethod == null)
+            {
+                foreach (var arg in x.ArgumentsInSourceOrder)
+                {
+                    // in case the include is in form (__DIR__ . LITERAL)
+                    // it should get resolved
+                    if (arg.Value is BoundConcatEx concat &&
+                        concat.ArgumentsInSourceOrder.Length == 2 &&
+                        concat.ArgumentsInSourceOrder[0].Value is BoundPseudoConst pc &&
+                        pc.ConstType == PseudoConstUse.Types.Dir &&
+                        concat.ArgumentsInSourceOrder[1].Value.ConstantValue.TryConvertToString(out var relativePath) &&
+                        relativePath.Length != 0)
+                    {
+                        // WARNING: Script file '{0}' could not be resolved
+                        if (_routine != null)
+                        {
+                            relativePath = PhpFileUtilities.NormalizeSlashes(_routine.ContainingFile.DirectoryRelativePath + relativePath);
+
+                            if (Roslyn.Utilities.PathUtilities.IsAnyDirectorySeparator(relativePath[0]))
+                            {
+                                relativePath = relativePath.Substring(1); // trim leading slash
+                            }
+
+                            _diagnostics.Add(_routine, concat.PhpSyntax ?? x.PhpSyntax, ErrorCode.WRN_CannotIncludeFile, relativePath);
+                        }
+                    }
+                }
+            }
+
+            //
+            return default;
         }
 
         protected override T VisitRoutineCall(BoundRoutineCall x)
@@ -487,48 +519,42 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
                     }
                 }
 
-                var expectsmax = x.TargetMethod.HasParamsParameter()
+                var expectsmax = ps.Length != 0 && ps.Last().IsParams
                     ? int.MaxValue
                     : ps.Length - skippedps;
 
                 //
-                var routineName =
-                    (x is BoundNewEx)
-                    ? "new " + x.TargetMethod.ContainingType.PhpQualifiedName().ToString()
-                    : GetMemberNameForDiagnostic(x.TargetMethod, (x.Instance != null || x is BoundStaticFunctionCall));
-
-                //
                 if (x.ArgumentsInSourceOrder.Length < expectsmin)
                 {
-                    _diagnostics.Add(_routine, x.PhpSyntax, ErrorCode.WRN_MissingArguments, routineName, expectsmin, x.ArgumentsInSourceOrder.Length);
+                    _diagnostics.Add(_routine, x.PhpSyntax, ErrorCode.WRN_MissingArguments, GetMemberNameForDiagnostic(x), expectsmin, x.ArgumentsInSourceOrder.Length);
                 }
                 else if (x.ArgumentsInSourceOrder.Length > expectsmax)
                 {
-                    _diagnostics.Add(_routine, x.PhpSyntax, ErrorCode.WRN_TooManyArguments, routineName, expectsmax, x.ArgumentsInSourceOrder.Length);
+                    _diagnostics.Add(_routine, x.PhpSyntax, ErrorCode.WRN_TooManyArguments, GetMemberNameForDiagnostic(x), expectsmax, x.ArgumentsInSourceOrder.Length);
                 }
             }
 
             return default;
         }
 
-        //public override T VisitArgument(BoundArgument x)
-        //{
-        //    base.VisitArgument(x);
+        public override T VisitArgument(BoundArgument x)
+        {
+            base.VisitArgument(x);
 
-        //    if (!x.Value.TypeRefMask.IsRef && NOT PASSED BY REF) // if value is referenced, we dunno
-        //    {
-        //        // argument should not be 'void' (NULL in PHP)
-        //        if ((x.Type != null && x.Type.SpecialType == SpecialType.System_Void) ||
-        //            x.Value.TypeRefMask.IsVoid(TypeCtx))
-        //        {
-        //            // WRN: Argument has no value, parameter will be always NULL
-        //            _diagnostics.Add(_routine, x.Value.PhpSyntax, ErrorCode.WRN_ArgumentVoid);
-        //        }
-        //    }
+            //if (!x.Value.TypeRefMask.IsRef && NOT PASSED BY REF) // if value is referenced, we dunno
+            //{
+            //    // argument should not be 'void' (NULL in PHP)
+            //    if ((x.Type != null && x.Type.SpecialType == SpecialType.System_Void) ||
+            //        x.Value.TypeRefMask.IsVoid(TypeCtx))
+            //    {
+            //        // WRN: Argument has no value, parameter will be always NULL
+            //        _diagnostics.Add(_routine, x.Value.PhpSyntax, ErrorCode.WRN_ArgumentVoid);
+            //    }
+            //}
 
-        //    //
-        //    return default;
-        //}
+            //
+            return default;
+        }
 
         public override T VisitGlobalFunctionCall(BoundGlobalFunctionCall x)
         {
@@ -803,9 +829,28 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
             }
         }
 
-        static string GetMemberNameForDiagnostic(Symbol target, bool isMemberName)
+        static string GetMemberNameForDiagnostic(BoundRoutineCall x)
         {
-            string name = target.PhpName();
+            if (x.TargetMethod.IsValidMethod())
+            {
+                if (x is BoundNewEx)
+                {
+                    return "new " + x.TargetMethod.ContainingType.PhpName();
+                }
+                else
+                {
+                    return GetMemberNameForDiagnostic(x.TargetMethod, x.Instance != null || x is BoundStaticFunctionCall);
+                }
+            }
+            else
+            {
+                throw ExceptionUtilities.Unreachable;
+            }
+        }
+
+        static string GetMemberNameForDiagnostic(Symbol target, bool isMemberName = false)
+        {
+            var name = target.PhpName();
 
             if (isMemberName)
             {
@@ -833,6 +878,12 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
             var obsolete = target?.ObsoleteAttributeData;
             if (obsolete != null)
             {
+                // do not report the deprecation if the containing method itself is deprecated
+                if (_routine?.ObsoleteAttributeData != null)
+                {
+                    return;
+                }
+
                 _diagnostics.Add(_routine, GetMemberNameSpanForDiagnostic(syntax), ErrorCode.WRN_SymbolDeprecated, target.Kind.ToString(), GetMemberNameForDiagnostic(target, isMemberCall), obsolete.Message);
             }
         }

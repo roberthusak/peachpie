@@ -15,6 +15,7 @@ using AST = Devsense.PHP.Syntax.Ast;
 using Pchp.CodeAnalysis.Semantics.Graph;
 using Pchp.CodeAnalysis.FlowAnalysis;
 using Pchp.CodeAnalysis.Semantics.TypeRef;
+using Peachpie.CodeAnalysis.Syntax;
 
 namespace Pchp.CodeAnalysis.Semantics
 {
@@ -134,6 +135,12 @@ namespace Pchp.CodeAnalysis.Semantics
         /// </summary>
         bool EnableAssertExpression => Routine != null && Routine.DeclaringCompilation.Options.DebugPlusMode;
 
+        int _tmpVariableIndex = 0;
+
+        protected string NextTempVariableName() => "<sm>'" + _tmpVariableIndex++;
+
+        protected string NextMatchVariableName() => "<match>'" + _tmpVariableIndex++;
+
         #region Construction
 
         /// <summary>
@@ -236,7 +243,7 @@ namespace Pchp.CodeAnalysis.Semantics
 
             // trim trailing empty parameters (PHP >=7.3)
             var pcount = parameters.Length;
-            while (pcount > 0 && parameters[pcount - 1] == null)
+            while (pcount > 0 && parameters[pcount - 1].Expression == null)
             {
                 pcount--;
             }
@@ -253,7 +260,6 @@ namespace Pchp.CodeAnalysis.Semantics
             for (int i = 0; i < pcount; i++)
             {
                 var p = parameters[i];
-                Debug.Assert(p != null);
                 var arg = BindArgument(p.Expression, p.Ampersand, p.IsUnpack);
 
                 //
@@ -278,22 +284,31 @@ namespace Pchp.CodeAnalysis.Semantics
             return ImmutableArray.Create(arguments);
         }
 
-        protected ImmutableArray<BoundArgument> BindLambdaUseArguments(IEnumerable<AST.FormalParam> usevars)
+        protected ImmutableArray<BoundArgument> BindLambdaUseArguments(IList<AST.FormalParam> usevars)
         {
-            return usevars.Select(v =>
+            if (usevars != null && usevars.Count != 0)
             {
-                var varuse = new AST.DirectVarUse(v.Name.Span, v.Name.Name);
-                return BindExpression(varuse, v.PassedByRef ? BoundAccess.ReadRef : BoundAccess.Read);
-            })
-            .Select(BoundArgument.Create)
-            .ToImmutableArray();
+                return usevars.SelectAsArray(v =>
+                {
+                    var varuse = new AST.DirectVarUse(v.Name.Span, v.Name.Name);
+                    var boundvar = BindExpression(varuse, v.PassedByRef ? BoundAccess.ReadRef : BoundAccess.Read);
+
+                    return BoundArgument.Create(boundvar);
+                });
+            }
+            else
+            {
+                return ImmutableArray<BoundArgument>.Empty;
+            }
         }
 
-        protected Location GetLocation(AST.ILangElement expr) => ContainingFile.GetLocation(expr);
+        protected Location GetLocation(AST.ITreeNode expr) => ContainingFile.GetLocation(expr);
 
         #endregion
 
-        public virtual BoundItemsBag<BoundStatement> BindWholeStatement(AST.Statement stmt, IEnumerable<TryCatchEdge> tryScopes) => BindStatement(stmt);
+        public virtual void WithTryScopes(IEnumerable<TryCatchEdge> tryScopes) { }
+
+        public virtual BoundItemsBag<BoundStatement> BindWholeStatement(AST.Statement stmt) => BindStatement(stmt);
 
         protected virtual BoundStatement BindStatement(AST.Statement stmt) => BindStatementCore(stmt).WithSyntax(stmt);
 
@@ -309,7 +324,6 @@ namespace Pchp.CodeAnalysis.Semantics
             if (stmt is AST.GlobalStmt glStmt) return BindGlobalStmt(glStmt);
             if (stmt is AST.StaticStmt staticStm) return BindStaticStmt(staticStm);
             if (stmt is AST.UnsetStmt unsetStm) return BindUnsetStmt(unsetStm);
-            if (stmt is AST.ThrowStmt throwStm) return new BoundThrowStatement(BindExpression(throwStm.Expression, BoundAccess.Read));
             if (stmt is AST.PHPDocStmt) return new BoundEmptyStatement();
             if (stmt is AST.DeclareStmt declareStm) return new BoundDeclareStatement();
 
@@ -447,9 +461,16 @@ namespace Pchp.CodeAnalysis.Semantics
 
         public BoundVariableRef BindCatchVariable(AST.CatchItem x)
         {
-            return new BoundVariableRef(new BoundVariableName(x.Variable.VarName))
-                .WithSyntax(x.Variable)
-                .WithAccess(BoundAccess.Write);
+            if (x.Variable == null)
+            {
+                return null;
+            }
+            else
+            {
+                return new BoundVariableRef(new BoundVariableName(x.Variable.VarName))
+                    .WithSyntax(x.Variable)
+                    .WithAccess(BoundAccess.Write);
+            }
         }
 
         public virtual BoundItemsBag<BoundExpression> BindWholeExpression(AST.Expression expr, BoundAccess access) => BindExpression(expr, access);
@@ -464,6 +485,11 @@ namespace Pchp.CodeAnalysis.Semantics
             if (expr is AST.ConstantUse) return BindConstUse((AST.ConstantUse)expr).WithAccess(access);
             if (expr is AST.VarLikeConstructUse)
             {
+                if (((AST.VarLikeConstructUse)expr).IsNullSafeObjectOperation)
+                {
+                    Diagnostics.Add(GetLocation(expr), Errors.ErrorCode.ERR_NotYetImplemented, $"null-safe object operator");
+                }
+
                 if (expr is AST.SimpleVarUse) return BindSimpleVarUse((AST.SimpleVarUse)expr, access);
                 if (expr is AST.FunctionCall) return BindFunctionCall((AST.FunctionCall)expr).WithAccess(access);
                 if (expr is AST.NewEx) return BindNew((AST.NewEx)expr, access);
@@ -482,12 +508,14 @@ namespace Pchp.CodeAnalysis.Semantics
             if (expr is AST.PseudoConstUse) return BindPseudoConst((AST.PseudoConstUse)expr).WithAccess(access);
             if (expr is AST.IssetEx) return BindIsSet((AST.IssetEx)expr).WithAccess(access);
             if (expr is AST.ExitEx) return BindExitEx((AST.ExitEx)expr).WithAccess(access);
+            if (expr is AST.ThrowEx throwEx) return new BoundThrowExpression(BindExpression(throwEx.Expression, BoundAccess.Read));
             if (expr is AST.EmptyEx) return BindIsEmptyEx((AST.EmptyEx)expr).WithAccess(access);
             if (expr is AST.LambdaFunctionExpr) return BindLambda((AST.LambdaFunctionExpr)expr).WithAccess(access);
             if (expr is AST.EvalEx) return BindEval((AST.EvalEx)expr).WithAccess(access);
             if (expr is AST.YieldEx) return BindYieldEx((AST.YieldEx)expr, access).WithAccess(access);
             if (expr is AST.YieldFromEx) return BindYieldFromEx((AST.YieldFromEx)expr, access).WithAccess(access);
             if (expr is AST.ShellEx) return BindShellEx((AST.ShellEx)expr).WithAccess(access);
+            if (expr is AST.MatchEx) return BindMatchEx((AST.MatchEx)expr, access);
 
             //
             Diagnostics.Add(GetLocation(expr), Errors.ErrorCode.ERR_NotYetImplemented, $"Expression of type '{expr.GetType().Name}'");
@@ -506,8 +534,34 @@ namespace Pchp.CodeAnalysis.Semantics
 
         protected BoundLambda BindLambda(AST.LambdaFunctionExpr expr)
         {
+            IList<AST.FormalParam> useparams;
+
+            // arrow function gets captured variables implicitly
+            if (expr is AST.ArrowFunctionExpr fn)
+            {
+                var captured = new HashSet<VariableName>();
+
+                foreach (var v in fn.Expression.SelectLocalVariables())
+                {
+                    captured.Add(v.VarName);
+                }
+
+                foreach (var p in fn.Signature.FormalParams)
+                {
+                    captured.Remove(p.Name.Name);
+                }
+
+                useparams = captured
+                    .Select(vname => new AST.FormalParam(Span.Invalid, vname.Value, Span.Invalid, null, AST.FormalParam.Flags.Default, null))
+                    .ToList();
+            }
+            else
+            {
+                useparams = expr.UseParams ?? Array.Empty<AST.FormalParam>();
+            }
+
             // Syntax is bound by caller, needed to resolve lambda symbol in analysis
-            return new BoundLambda(BindLambdaUseArguments(expr.UseParams));
+            return new BoundLambda(BindLambdaUseArguments(useparams));
         }
 
         protected BoundExpression BindEval(AST.EvalEx expr)
@@ -720,6 +774,12 @@ namespace Pchp.CodeAnalysis.Semantics
                     {
                         // remember we need varargs:
                         Routine.Flags |= RoutineFlags.UsesArgs;
+
+                        // cannot use in global scope
+                        if (Routine.IsGlobalScope)
+                        {
+                            Diagnostics.Add(GetLocation(x), Errors.ErrorCode.WRN_CalledFromGlobalScope);
+                        }
                     }
 
                     if (fname.IsAssertFunctionName())
@@ -772,12 +832,11 @@ namespace Pchp.CodeAnalysis.Semantics
                 throw new NotImplementedException(x.GetType().FullName);
             }
 
-            if (x.CallSignature.GenericParams.Length != 0)
+            var genericparams = x.GetGenericParams();
+            if (genericparams.Count != 0)
             {
                 // bind type arguments (CLR)
-                result.TypeArguments = x.CallSignature.GenericParams
-                    .Select(t => BindTypeRef(t, false))
-                    .AsImmutable();
+                result.TypeArguments = genericparams.SelectAsArray(t => BindTypeRef(t, false));
             }
 
             //
@@ -803,6 +862,69 @@ namespace Pchp.CodeAnalysis.Semantics
 
             //
             return type;
+        }
+
+        protected BoundExpression BindMatchEx(AST.MatchEx expr, BoundAccess access)
+        {
+            Debug.Assert(access.IsRead || access.IsNone);
+            //if (!access.IsRead || access.IsReadRef && !access.IsNone)
+            //{
+            //    // TODO: Diagnostics.Add(GetLocation(expr), "match can only be read");
+            //}
+
+            // Template: match (A) { B => C, D => E, }
+            // ($tmp = A) === B ? C : $tmp === D ? E : throw new UnhandledMatchError
+
+            AST.Expression BindArm(AST.Expression value, AST.MatchArm[] arms)
+            {
+                AST.Expression BindArm(AST.Expression value, AST.MatchArm arm, AST.Expression falseExpr)
+                {
+                    // value === arm.Condition ? arm.Expression : falseExpr
+
+                    AST.Expression condition = null;
+
+                    for (int i = 0; i < arm.ConditionList.Length; i++)
+                    {
+                        // value === condition[i]
+                        var cond = new AST.BinaryEx(arm.ConditionList[i].Span, AST.Operations.Identical, value, arm.ConditionList[i]) { ContainingElement = arm };
+
+                        condition = condition == null
+                            ? cond
+                            : new AST.BinaryEx(Span.Invalid, AST.Operations.Or, condition, cond) { ContainingElement = arm };
+                    }
+
+                    if (condition == null)
+                    {
+                        return arm.Expression;
+                    }
+                    else
+                    {
+                        return new AST.ConditionalEx(condition, arm.Expression, falseExpr) { ContainingElement = arm };
+                    }
+                }
+
+                var tmpname = NextMatchVariableName();
+
+                // Template: $tmp = A
+                var tmpvar = new AST.DirectVarUse(value.Span, tmpname) { ContainingElement = value };
+                var assignment = new AST.ValueAssignEx(value.Span, AST.Operations.AssignValue, tmpvar, value) { ContainingElement = value };
+
+                // Template: throw new UnhandledMatchError                 
+                AST.Expression result = new AST.ThrowEx(value.Span,
+                    new AST.NewEx(value.Span,
+                        new AST.ClassTypeRef(Span.Invalid, NameUtils.SpecialNames.UnhandledMatchError),
+                        Array.Empty<AST.ActualParam>(), Span.Invalid));
+
+                for (int i = arms.Length - 1; i >= 0; i--)
+                {
+                    result = BindArm(i == 0 ? (AST.Expression)assignment : tmpvar, arms[i], result);
+                }
+
+                return result;
+            }
+
+            //
+            return BindExpression(BindArm(expr.MatchValue, expr.MatchItems), access);
         }
 
         protected virtual BoundExpression BindConditionalEx(AST.ConditionalEx expr, BoundAccess access)
@@ -983,11 +1105,15 @@ namespace Pchp.CodeAnalysis.Semantics
                     if (varname.NameValue.IsThisVariableName)
                     {
                         // $this is read-only
-                        if (access.IsEnsure)
+                        if (access.EnsureObject || access.EnsureArray)
+                        {
                             access = BoundAccess.Read;
+                        }
 
                         if (access.IsWrite || access.IsUnset)
+                        {
                             Diagnostics.Add(GetLocation(expr), Errors.ErrorCode.ERR_CannotAssignToThis);
+                        }
 
                         // $this is only valid in global code and instance methods:
                         if (Routine != null && Routine.IsStatic && !Routine.IsGlobalScope && !(Routine is SourceLambdaSymbol lambda && lambda.UseThis))
@@ -998,11 +1124,17 @@ namespace Pchp.CodeAnalysis.Semantics
                             // Diagnostics.Add(GetLocation(expr), Errors.ErrorCode.ERR_ThisOutOfObjectContext);
                         }
                     }
+                    else if (varname.NameValue.Value.StartsWith("<match>'"))
+                    {
+                        return new BoundTemporalVariableRef(varname.NameValue).WithAccess(access);
+                    }
                 }
                 else
                 {
                     if (Routine != null)
+                    {
                         Routine.Flags |= RoutineFlags.HasIndirectVar;
+                    }
                 }
 
                 return new BoundVariableRef(varname).WithAccess(access);
@@ -1293,7 +1425,6 @@ namespace Pchp.CodeAnalysis.Semantics
         readonly List<BoundYieldStatement> _yields = new List<BoundYieldStatement>();
 
         readonly HashSet<AST.LangElement> _yieldsToStatementRootPath = new HashSet<AST.LangElement>();
-        int _rewriterVariableIndex = 0;
         int _underYieldLikeExLevel = -1;
 
         #endregion
@@ -1321,11 +1452,6 @@ namespace Pchp.CodeAnalysis.Semantics
             _yields.Add(yieldStmt);
 
             return yieldStmt;
-        }
-
-        string GetTempVariableName()
-        {
-            return "<sm>" + _rewriterVariableIndex++;
         }
 
         void InitPreBoundBlocks()
@@ -1392,6 +1518,11 @@ namespace Pchp.CodeAnalysis.Semantics
 
         #region GeneralOverrides
 
+        public override void WithTryScopes(IEnumerable<TryCatchEdge> tryScopes)
+        {
+            _tryScopes = tryScopes;
+        }
+
         public override BoundItemsBag<BoundExpression> BindWholeExpression(AST.Expression expr, BoundAccess access)
         {
             Debug.Assert(!AnyPreBoundItems);
@@ -1404,16 +1535,12 @@ namespace Pchp.CodeAnalysis.Semantics
             return boundBag;
         }
 
-        public override BoundItemsBag<BoundStatement> BindWholeStatement(AST.Statement stmt, IEnumerable<TryCatchEdge> tryScopes)
+        public override BoundItemsBag<BoundStatement> BindWholeStatement(AST.Statement stmt)
         {
             Debug.Assert(!AnyPreBoundItems);
 
-            _tryScopes = tryScopes;
-
             var boundItem = BindStatement(stmt);
             var boundBag = new BoundItemsBag<BoundStatement>(boundItem, _preBoundBlockFirst, _preBoundBlockLast);
-
-            _tryScopes = null;
 
             ClearPreBoundBlocks();
             return boundBag;
@@ -1588,7 +1715,7 @@ namespace Pchp.CodeAnalysis.Semantics
              * return <tmp>.getReturn()
              */
 
-            string valueVarName = GetTempVariableName();
+            string valueVarName = NextTempVariableName();
             string keyVarName = valueVarName + "k";
 
             var move = NewBlock();
@@ -1646,7 +1773,7 @@ namespace Pchp.CodeAnalysis.Semantics
             // no need to do anything if the expression is constant because neither multiple evaluation nor different order of eval is a problem
             if (boundExpr.IsConstant()) { return boundExpr; }
 
-            var assignVarTouple = CreateAndAssignSynthesizedVariable(boundExpr, access, GetTempVariableName());
+            var assignVarTouple = CreateAndAssignSynthesizedVariable(boundExpr, access, NextTempVariableName());
 
             CurrentPreBoundBlock.Add(new BoundExpressionStatement(assignVarTouple.Assignment)); // assigment
             return assignVarTouple.BoundExpr; // temp variable ref

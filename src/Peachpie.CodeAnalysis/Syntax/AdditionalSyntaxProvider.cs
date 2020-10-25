@@ -39,7 +39,11 @@ namespace Peachpie.CodeAnalysis.Syntax
 
         #region ITokenProvider
 
-        public TValue TokenValue => _provider.TokenValue;
+        public TValue TokenValue
+        {
+            get => _provider.TokenValue;
+            set => _provider.TokenValue = value;
+        }
 
         public TSpan TokenPosition => _provider.TokenPosition;
 
@@ -131,6 +135,20 @@ namespace Peachpie.CodeAnalysis.Syntax
                         return true;
                     }
                 }
+            }
+
+            // T_FN in a qualified name
+            // allows to compile older pre-fn syntax
+
+            // \Fn
+            // class Fn
+            if (t == Tokens.T_FN && (_lastToken == Tokens.T_NS_SEPARATOR || _lastToken == Tokens.T_CLASS))
+            {
+                // TODO: warning, use of reserved identifier "fn"
+                var text = _provider.TokenText;
+
+                _provider.UpdateToken(new CompleteToken(Tokens.T_STRING, new TValue { String = text }, _provider.TokenPosition, text));
+                return true;
             }
 
             //
@@ -516,9 +534,10 @@ namespace Peachpie.CodeAnalysis.Syntax
         /// </summary>
         bool MatchGenericTypes(ref int idx, out List<TypeRef> types)
         {
+            types = null;
+
             if (MatchToken(ref idx, Tokens.T_LT))
             {
-                types = null;
 
                 for (; ; )
                 {
@@ -533,7 +552,7 @@ namespace Peachpie.CodeAnalysis.Syntax
                             tref = new GenericTypeRef(tref.Span, tref, nested);
                         }
 
-                        if (types == null) types = new List<TypeRef>(1);
+                        types ??= new List<TypeRef>(1);
                         types.Add(tref);
 
                         if (MatchToken(ref idx, Tokens.T_COMMA))
@@ -554,7 +573,6 @@ namespace Peachpie.CodeAnalysis.Syntax
             }
 
             //
-            types = default;
             return false;
         }
 

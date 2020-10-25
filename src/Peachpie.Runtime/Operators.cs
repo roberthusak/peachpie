@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using Pchp.Core.Reflection;
+using Pchp.Core.Resources;
 
 namespace Pchp.Core
 {
@@ -191,9 +192,7 @@ namespace Pchp.Core
 
             if ((info & Convert.NumberInfo.IsPhpArray) != 0)
             {
-                //PhpException.UnsupportedOperandTypes();
-                //return PhpNumber.Create(0.0);
-                throw new NotImplementedException();     // PhpException
+                throw PhpException.ErrorException(ErrResources.unsupported_operand_types);
             }
 
             // TODO: // division by zero:
@@ -561,11 +560,11 @@ namespace Pchp.Core
 
         public static IPhpArray EnsureArray(object obj)
         {
-            // ArrayAccess
-            if (obj is ArrayAccess) return EnsureArray((ArrayAccess)obj);
-
             // IPhpArray
             if (obj is IPhpArray) return (IPhpArray)obj;
+
+            // ArrayAccess
+            if (obj is ArrayAccess) return EnsureArray((ArrayAccess)obj);
 
             // IList
             if (obj is IList) return new ListAsPhpArray((IList)obj);
@@ -872,12 +871,22 @@ namespace Pchp.Core
                 return PhpValue.Null;
             }
 
+            // TODO: IDictionary
+
+            // get_Item
+            if (obj != null)
+            {
+                var getter = obj.GetPhpTypeInfo().RuntimeMethods[TypeMethods.MagicMethods.get_item];
+                if (getter != null)
+                {
+                    return getter.Invoke(null, obj, index);
+                }
+            }
+
             //
             if (!quiet)
             {
-                PhpException.Throw(
-                    PhpError.Error,
-                    Resources.ErrResources.object_used_as_array, obj != null ? obj.GetPhpTypeInfo().Name : PhpVariable.TypeNameNull);
+                PhpException.ObjectUsedAsArray(PhpVariable.GetClassName(obj));
             }
 
             //

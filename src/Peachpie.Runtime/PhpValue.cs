@@ -17,7 +17,7 @@ namespace Pchp.Core
     /// Represents a PHP value.
     /// </summary>
     /// <remarks>
-    /// Note, <c>default(PhpValue)</c> does not represent a valid state of the object.
+    /// Note, <c>default(PhpValue)</c> represents a <c>NULL</c> value, equivalent to <see cref="PhpValue.Null"/>.
     /// </remarks>
     [StructLayout(LayoutKind.Sequential)]
     public readonly partial struct PhpValue : IPhpConvertible, IEquatable<PhpValue> // <T>
@@ -131,7 +131,15 @@ namespace Pchp.Core
         /// <summary>
         /// Gets value indicating the value represents an object.
         /// </summary>
+        /// <remarks>
+        /// Note, the object instance may be a <see cref="PhpResource"/> (<c>resource</c>) instance as well.
+        /// </remarks>
         public bool IsObject => _type == PhpTypeCode.Object;
+
+        /// <summary>
+        /// Gets value indicating the value represents a <c>resource</c> object.
+        /// </summary>
+        public bool IsResource => _obj.@object is PhpResource;
 
         /// <summary>
         /// Gets value indicating the value represents PHP array.
@@ -233,7 +241,7 @@ namespace Pchp.Core
         /// <summary>
         /// Gets the underlaying value type.
         /// </summary>
-        public PhpTypeCode TypeCode => _type;
+        public readonly PhpTypeCode TypeCode => _type;
 
         /// <summary>
         /// Explicit conversion to <see cref="bool"/>.
@@ -408,6 +416,8 @@ namespace Pchp.Core
         public static explicit operator long(PhpValue value) => value.ToLong();
 
         public static explicit operator ushort(PhpValue value) => checked((ushort)(long)value);
+
+        public static explicit operator short(PhpValue value) => checked((short)(long)value);
 
         public static explicit operator int(PhpValue value) => checked((int)(long)value);
 
@@ -851,7 +861,7 @@ namespace Pchp.Core
         /// Dereferences in case of an alias.
         /// </summary>
         /// <returns>Not aliased value.</returns>
-        public PhpValue GetValue() => Object is PhpAlias alias ? alias.Value : this;
+        public readonly PhpValue GetValue() => Object is PhpAlias alias ? alias.Value : this;
 
         /// <summary>
         /// Accesses the value as an array and gets item at given index.
@@ -866,34 +876,32 @@ namespace Pchp.Core
         /// In case of array or string, its copy is returned.
         /// In case of aliased value, the same alias is returned.
         /// </summary>
-        public PhpValue DeepCopy()
+        public readonly PhpValue DeepCopy()
         {
-            switch (TypeCode)
+            if (((1 << (int)_type) & ((1 << (int)PhpTypeCode.PhpArray) | (1 << (int)PhpTypeCode.MutableString) | (1 << (int)PhpTypeCode.Alias))) != 0)
             {
-                case PhpTypeCode.Null:
-                case PhpTypeCode.Boolean:
-                case PhpTypeCode.Long:
-                case PhpTypeCode.Double:
-                    return this;
+                return DeepCopyImpl();
+            }
+            else
+            {
+                // value is immutable (scalar, class):
+                return this;
+            }
+        }
 
+        readonly PhpValue DeepCopyImpl()
+        {
+            switch (_type)
+            {
                 case PhpTypeCode.PhpArray:
                     return Array.DeepCopy();
-
-                case PhpTypeCode.String:
-                    return this;
-
                 case PhpTypeCode.MutableString:
                     return new PhpValue(MutableStringBlob.AddRef());
-
-                case PhpTypeCode.Object:
-                    return this;
-
                 case PhpTypeCode.Alias:
                     return Alias.DeepCopy();
-
-                default:
-                    throw InvalidTypeCodeException();
             }
+
+            return this;
         }
 
         /// <summary>

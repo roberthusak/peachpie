@@ -56,6 +56,7 @@ namespace Pchp.CodeAnalysis.Semantics
     {
         internal override void Emit(CodeGenerator cg)
         {
+            cg.Builder.AssertStackEmpty();
             cg.EmitSequencePoint(this.PhpSyntax);
 
             // if generator method -> return via storing the value in generator
@@ -105,20 +106,6 @@ namespace Pchp.CodeAnalysis.Semantics
 
             // .ret
             cg.EmitRet(rtype);
-        }
-    }
-
-    partial class BoundThrowStatement
-    {
-        internal override void Emit(CodeGenerator cg)
-        {
-            cg.EmitSequencePoint(this.PhpSyntax);
-
-            //
-            cg.EmitConvert(Thrown, cg.CoreTypes.Exception);
-
-            // throw <stack>;
-            cg.Builder.EmitThrow(false);
         }
     }
 
