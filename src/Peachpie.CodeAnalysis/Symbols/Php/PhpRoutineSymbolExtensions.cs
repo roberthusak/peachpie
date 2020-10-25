@@ -73,7 +73,7 @@ namespace Pchp.CodeAnalysis.Symbols
                 if (routine.PHPDocBlock != null && (compilation.Options.PhpDocTypes & PhpDocTypes.ReturnTypes) != 0)
                 {
                     var returnTag = routine.PHPDocBlock.Returns;
-                    if (returnTag != null && returnTag.TypeNames.Length != 0)
+                    if (returnTag != null && returnTag.TypeNamesArray.Length != 0)
                     {
                         var tmask = PHPDoc.GetTypeMask(typeCtx, returnTag.TypeNamesArray, routine.GetNamingContext());
                         if (!tmask.IsVoid && !tmask.IsAnyType)
