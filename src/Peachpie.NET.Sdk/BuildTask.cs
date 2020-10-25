@@ -126,6 +126,11 @@ namespace Peachpie.NET.Sdk.Tools
         /// </summary>
         public bool DebuggerAttach { get; set; } = false;
 
+        /// <summary>
+        /// Whether to generate a set of relations for the Souffle Datalog engine.
+        /// </summary>
+        public bool ExportSouffleRelations { get; set; }
+
         /// <summary></summary>
         public override bool Execute()
         {
@@ -251,6 +256,11 @@ namespace Peachpie.NET.Sdk.Tools
                 {
                     args.Add(s);
                 }
+            }
+
+            if (ExportSouffleRelations)
+            {
+                args.Add("/souffle+");
             }
 
 #if DEBUG

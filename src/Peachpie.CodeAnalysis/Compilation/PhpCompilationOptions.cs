@@ -141,6 +141,11 @@ namespace Pchp.CodeAnalysis
         ///// </summary>
         //internal BinderFlags TopLevelBinderFlags { get; private set; }
 
+        /// <summary>
+        /// Whether to generate a set of relations for the Souffle Datalog engine.
+        /// </summary>
+        public bool ExportSouffleRelations { get; private set; }
+
         // Defaults correspond to the compiler's defaults or indicate that the user did not specify when that is significant.
         // That's significant when one option depends on another's setting. SubsystemVersion depends on Platform and Target.
         public PhpCompilationOptions(
@@ -178,7 +183,8 @@ namespace Pchp.CodeAnalysis
             ImmutableArray<Diagnostic> diagnostics = default,
             PhpParseOptions parseOptions = null,
             ImmutableDictionary<string, string> defines = default,
-            bool referencesSupersedeLowerVersions = false)
+            bool referencesSupersedeLowerVersions = false,
+            bool exportSouffleRelations = false)
             : this(outputKind, baseDirectory, sdkDirectory, subDirectory, targetFramework,
                    reportSuppressedDiagnostics, moduleName, mainTypeName, scriptClassName,
                    versionString,
@@ -200,7 +206,8 @@ namespace Pchp.CodeAnalysis
                    diagnostics: diagnostics,
                    defines: defines,
                    parseOptions: parseOptions,
-                   referencesSupersedeLowerVersions: referencesSupersedeLowerVersions)
+                   referencesSupersedeLowerVersions: referencesSupersedeLowerVersions,
+                   exportSouffleRelations: exportSouffleRelations)
         {
         }
 
@@ -242,7 +249,8 @@ namespace Pchp.CodeAnalysis
             ImmutableArray<Diagnostic> diagnostics,
             PhpParseOptions parseOptions,
             ImmutableDictionary<string, string> defines,
-            bool referencesSupersedeLowerVersions)
+            bool referencesSupersedeLowerVersions,
+            bool exportSouffleRelations)
             : base(outputKind, reportSuppressedDiagnostics, moduleName, mainTypeName, scriptClassName,
                    cryptoKeyContainer, cryptoKeyFile, cryptoPublicKey, delaySign, publicSign, optimizationLevel.AsOptimizationLevel(), checkOverflow,
                    platform, generalDiagnosticOption, warningLevel, specificDiagnosticOptions.ToImmutableDictionaryOrEmpty(),
@@ -261,6 +269,7 @@ namespace Pchp.CodeAnalysis
             this.VersionString = versionString;
             this.OptimizationLevel = optimizationLevel;
             this.Defines = defines;
+            this.ExportSouffleRelations = exportSouffleRelations;
         }
 
         private PhpCompilationOptions(PhpCompilationOptions other) : this(
@@ -300,7 +309,8 @@ namespace Pchp.CodeAnalysis
             diagnostics: other.Diagnostics,
             parseOptions: other.ParseOptions,
             defines: other.Defines,
-            referencesSupersedeLowerVersions: other.ReferencesSupersedeLowerVersions)
+            referencesSupersedeLowerVersions: other.ReferencesSupersedeLowerVersions,
+            exportSouffleRelations: other.ExportSouffleRelations)
         {
             EventSources = other.EventSources;
             Autoload_ClassMapFiles = other.Autoload_ClassMapFiles;

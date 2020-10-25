@@ -276,6 +276,7 @@
                Autoload_Files="@(Autoload_Files)"
                DebuggerAttach="$(DebuggerAttach)"
                GenerateFullPaths="$(GenerateFullPaths)"
+               ExportSouffleRelations="$(ExportSouffleRelations)"
                />
 
     <Copy SourceFiles="$(TempOutputDir)$(DocumentationFile)" DestinationFolder="$(OutputPath)" Condition=" '$(GenerateDocumentation)'=='true' " />

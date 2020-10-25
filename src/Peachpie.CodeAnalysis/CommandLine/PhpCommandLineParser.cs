@@ -198,6 +198,7 @@ namespace Pchp.CodeAnalysis.CommandLine
             var autoload_classmapfiles = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
             var autoload_files = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
             var autoload_psr4 = new List<(string prefix, string path)>();
+            bool exportSouffleRelations = false;
 
             if (sdkDirectoryOpt != null) referencePaths.Add(sdkDirectoryOpt);
             if (!string.IsNullOrEmpty(additionalReferenceDirectories)) referencePaths.AddRange(additionalReferenceDirectories.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
@@ -715,6 +716,20 @@ namespace Pchp.CodeAnalysis.CommandLine
                         diagnostics.Add(Errors.MessageProvider.Instance.CreateDiagnostic(Errors.ErrorCode.ERR_BadCompilationOptionValue, Location.None, name, value));
                         break;
 
+                    case "souffle+":
+                        if (value != null)
+                            break;
+
+                        exportSouffleRelations = true;
+                        continue;
+
+                    case "souffle-":
+                        if (value != null)
+                            break;
+
+                        exportSouffleRelations = false;
+                        continue;
+
                     default:
                         break;
                 }
@@ -843,7 +858,8 @@ namespace Pchp.CodeAnalysis.CommandLine
                 //warningLevel: warningLevel,
                 //specificDiagnosticOptions: diagnosticOptions,
                 //reportSuppressedDiagnostics: reportSuppressedDiagnostics,
-                publicSign: publicSign
+                publicSign: publicSign,
+                exportSouffleRelations: exportSouffleRelations
             )
             {
                 EventSources = evetsources.AsImmutableOrEmpty(),

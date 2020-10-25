@@ -473,9 +473,13 @@ namespace Pchp.CodeAnalysis
                 compiler.WalkTypes(compiler.EnqueueFieldsInitializer, allowParallel: true);
             }
 
-            string souffleDir = Path.Combine(compilation.Options.BaseDirectory, "souffle", "input");
-            Directory.CreateDirectory(souffleDir);
-            SouffleEncoder.Encode(compilation, souffleDir);
+            if (compilation.Options.ExportSouffleRelations)
+            {
+                // 1c. If requested, export the CFGs into datalog relations for Souffle
+                string souffleDir = Path.Combine(compilation.Options.BaseDirectory, "souffle", "input");
+                Directory.CreateDirectory(souffleDir);
+                SouffleEncoder.Encode(compilation, souffleDir);
+            }
 
             // Repeat analysis and transformation until either the limit is met or there are no more changes
             int transformation = 0;
