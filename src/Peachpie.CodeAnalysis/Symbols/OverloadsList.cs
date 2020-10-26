@@ -86,7 +86,7 @@ namespace Pchp.CodeAnalysis.Symbols
         /// - <see cref="AmbiguousMethodSymbol"/>
         /// - <see cref="InaccessibleMethodSymbol"/>
         /// </returns>
-        public MethodSymbol/*!*/Resolve(TypeRefContext typeCtx, ImmutableArray<BoundArgument> args, VisibilityScope scope, InvocationKindFlags flags)
+        public MethodSymbol/*!*/Resolve(TypeRefContext typeCtx, ImmutableArray<BoundArgument> args, VisibilityScope scope, InvocationKindFlags flags, ExperimentalOptimization optimization = default)
         {
             if (_single != null)
             {
@@ -200,8 +200,23 @@ namespace Pchp.CodeAnalysis.Symbols
                 }
             }
 
-            //
-            return (result2.Count == 1) ? result2[0] : new AmbiguousMethodSymbol(result.AsImmutable(), true);
+            if (result2.Count == 1)
+            {
+                return result2[0];
+            }
+            else if (optimization == ExperimentalOptimization.PhpDocOverloadsStatic && result2.Count == 2 &&
+                     result2[1] is SourceRoutineSymbol origRoutine && origRoutine.SpecializedOverloads.Length > 0 &&
+                     origRoutine.SpecializedOverloads[0] == result2[0])
+            {
+                // If unable to statically determine better specialized overload, resort to the original
+                return origRoutine;
+
+                // TODO: Generalize for multiple overloads and orders (now it is strongly coupled with SourceSymbolProvider.ResolveFunction)
+            }
+            else
+            {
+                return new AmbiguousMethodSymbol(result.AsImmutable(), true);
+            }
         }
 
         static bool IsNonPublic(MethodSymbol m) => m.DeclaredAccessibility != Accessibility.Public;

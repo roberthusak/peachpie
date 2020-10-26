@@ -47,9 +47,22 @@ namespace Pchp.CodeAnalysis
         None = default,
 
         /// <summary>
-        /// Generates a type-specific overload for each routine with parameter types specified in PhpDocs.
+        /// Generates a type-specific overload for each routine with parameter types specified in PhpDocs,
+        /// calls them only in situations when we know the types match.
         /// </summary>
-        PhpDocOverloads,
+        PhpDocOverloadsStatic,
+
+        /// <summary>
+        /// Generates a type-specific overload for each routine with parameter types specified in PhpDocs,
+        /// attempts to call them as much as possible using dynamic call sites.
+        /// </summary>
+        PhpDocOverloadsDynamic,
+    }
+
+    public static class ExperimentalOptimizationExtensions
+    {
+        public static bool HasPhpDocOverloads(this ExperimentalOptimization optimization) =>
+            optimization == ExperimentalOptimization.PhpDocOverloadsStatic || optimization == ExperimentalOptimization.PhpDocOverloadsDynamic;
     }
 
     /// <summary>
