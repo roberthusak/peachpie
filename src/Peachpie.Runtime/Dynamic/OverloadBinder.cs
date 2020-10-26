@@ -517,7 +517,7 @@ namespace Pchp.Core.Dynamic
                                 _tmpvars[key2] = value2;
                             }
 
-                            return value2.Expression;   // already converted to targetparam.ParameterType
+                            return ConvertExpression.Bind(value2.Expression, targetparam.ParameterType, _ctx);   // might need conversion due to specialized overloads and caching
                         }
                     }
 

@@ -771,9 +771,10 @@ namespace Pchp.Core.Dynamic
                     return Expression.Constant(ConversionCost.Warning); // conversion to string is always possible /w warning
                 }
 
-                // object -> array|bool|resource
+                // object -> array|bool|long|resource
                 if (target == typeof(PhpArray) ||
                     target == typeof(bool) ||
+                    target == typeof(long) ||
                     target == typeof(PhpResource))
                 {
                     return Expression.Constant(ConversionCost.NoConversion);

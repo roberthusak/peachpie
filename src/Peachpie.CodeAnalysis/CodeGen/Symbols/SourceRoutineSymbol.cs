@@ -92,7 +92,17 @@ namespace Pchp.CodeAnalysis.Symbols
             EmitParametersDefaultValue(module, diagnostic);
 
             // TODO: resolve this already in SourceTypeSymbol.GetMembers(), now it does not get overloaded properly
-            return SynthesizeOverloadsWithOptionalParameters(module, diagnostic);
+            var overloads = SynthesizeOverloadsWithOptionalParameters(module, diagnostic);
+
+            // Propagate overloads to the RoutineInfo static field
+            if (this.SpecializedOverloads.Length > 0)
+            {
+                var overloadList = overloads.ToList();              // It might have been an ImmutableArray
+                overloadList.AddRange(this.SpecializedOverloads);
+                overloads = overloadList;
+            }
+
+            return overloads;
         }
 
         /// <summary>
