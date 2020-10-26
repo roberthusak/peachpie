@@ -66,7 +66,8 @@ namespace Pchp.CodeAnalysis
 
         void WalkMethods(Action<SourceRoutineSymbol> action, bool allowParallel = false)
         {
-            var routines = _compilation.SourceSymbolCollection.AllRoutines;
+            var baseRoutines = _compilation.SourceSymbolCollection.AllRoutines;
+            var routines = baseRoutines.Concat(baseRoutines.SelectMany(r => r.SpecializedOverloads));
 
             if (ConcurrentBuild && allowParallel)
             {

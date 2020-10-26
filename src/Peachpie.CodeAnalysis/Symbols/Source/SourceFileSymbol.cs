@@ -365,10 +365,21 @@ namespace Pchp.CodeAnalysis.Symbols
 
         internal override ImmutableArray<NamedTypeSymbol> GetInterfacesToEmit() => ImmutableArray<NamedTypeSymbol>.Empty;
 
-        internal override IEnumerable<IMethodSymbol> GetMethodsToEmit() =>
-            GetMembers()
-            .Where(m => m.Kind == SymbolKind.Method && !m.IsUnreachable)
-            .Cast<IMethodSymbol>();
+        internal override IEnumerable<IMethodSymbol> GetMethodsToEmit()
+        {
+            var routines =
+                GetMembers()
+                .Where(m => m.Kind == SymbolKind.Method && !m.IsUnreachable)
+                .Cast<IMethodSymbol>();
+
+            var overloads =
+                routines
+                .OfType<SourceRoutineSymbol>()
+                .SelectMany(r => r.SpecializedOverloads)
+                .Cast<IMethodSymbol>();
+
+            return routines.Concat(overloads);
+        }
     }
 
     /// <summary>

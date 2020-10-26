@@ -7,6 +7,7 @@ using Devsense.PHP.Syntax;
 using Microsoft.CodeAnalysis;
 using Roslyn.Utilities;
 using Pchp.CodeAnalysis.Utilities;
+using System.Collections.Immutable;
 
 namespace Pchp.CodeAnalysis.Semantics.Model
 {
@@ -47,7 +48,16 @@ namespace Pchp.CodeAnalysis.Semantics.Model
 
         public IPhpRoutineSymbol ResolveFunction(QualifiedName name)
         {
-            return _table.GetFunction(name);
+            var method = _table.GetFunction(name);
+
+            if (method is SourceRoutineSymbol sourceRoutine && sourceRoutine.SpecializedOverloads.Length > 0)
+            {
+                return new AmbiguousMethodSymbol(ImmutableArray<MethodSymbol>.CastUp(sourceRoutine.SpecializedOverloads.Add(sourceRoutine)), true);
+            }
+            else
+            {
+                return method;
+            }
         }
 
         public IPhpValue ResolveConstant(string name) => null;

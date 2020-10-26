@@ -33,6 +33,11 @@ namespace Pchp.CodeAnalysis.Symbols
         /// <summary>Internal true/false values. Initially all false.</summary>
         protected CommonFlags _commonflags;
 
+        // TODO: Put to CommonFlags
+        internal bool IsSpecializedOverload { get; set; }
+
+        internal ImmutableArray<SourceRoutineSymbol> SpecializedOverloads { get; set; } = ImmutableArray<SourceRoutineSymbol>.Empty;
+
         ControlFlowGraph _cfg;
         LocalsTable _locals;
 

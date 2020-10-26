@@ -507,25 +507,28 @@ namespace Pchp.CodeAnalysis.Symbols
             var overloads = base.SynthesizeStubs(module, diagnostic);
 
             // synthesize RoutineInfo:
-            var cctor = module.GetStaticCtorBuilder(_file);
-            lock (cctor)
+            if (!this.IsSpecializedOverload)    // Prevent initializing the static field multiple times
             {
-                using (var cg = new CodeGenerator(
-                        cctor, module, diagnostic, PhpOptimizationLevel.Release, false, this.ContainingType,
-                        contextPlace: null, thisPlace: null, routine: this))
+                var cctor = module.GetStaticCtorBuilder(_file);
+                lock (cctor)
                 {
-                    var field = new FieldPlace(null, this.EnsureRoutineInfoField(module), module);
+                    using (var cg = new CodeGenerator(
+                            cctor, module, diagnostic, PhpOptimizationLevel.Release, false, this.ContainingType,
+                            contextPlace: null, thisPlace: null, routine: this))
+                    {
+                        var field = new FieldPlace(null, this.EnsureRoutineInfoField(module), module);
 
-                    // {RoutineInfoField} = RoutineInfo.CreateUserRoutine(name, handle, overloads[])
-                    field.EmitStorePrepare(cctor);
+                        // {RoutineInfoField} = RoutineInfo.CreateUserRoutine(name, handle, overloads[])
+                        field.EmitStorePrepare(cctor);
 
-                    cctor.EmitStringConstant(this.QualifiedName.ToString());
-                    cctor.EmitLoadToken(module, DiagnosticBag.GetInstance(), this, null);
-                    cg.Emit_NewArray(cg.CoreTypes.RuntimeMethodHandle, overloads.AsImmutable(), m => cg.EmitLoadToken(m, null));
+                        cctor.EmitStringConstant(this.QualifiedName.ToString());
+                        cctor.EmitLoadToken(module, DiagnosticBag.GetInstance(), this, null);
+                        cg.Emit_NewArray(cg.CoreTypes.RuntimeMethodHandle, overloads.AsImmutable(), m => cg.EmitLoadToken(m, null));
 
-                    cctor.EmitCall(module, DiagnosticBag.GetInstance(), ILOpCode.Call, cg.CoreMethods.Reflection.CreateUserRoutine_string_RuntimeMethodHandle_RuntimeMethodHandleArr);
+                        cctor.EmitCall(module, DiagnosticBag.GetInstance(), ILOpCode.Call, cg.CoreMethods.Reflection.CreateUserRoutine_string_RuntimeMethodHandle_RuntimeMethodHandleArr);
 
-                    field.EmitStore(cctor);
+                        field.EmitStore(cctor);
+                    }
                 }
             }
 

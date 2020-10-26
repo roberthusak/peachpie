@@ -14,6 +14,7 @@ using Devsense.PHP.Syntax;
 using Devsense.PHP.Syntax.Ast;
 using static Pchp.CodeAnalysis.AstUtils;
 using Pchp.CodeAnalysis.FlowAnalysis;
+using Peachpie.CodeAnalysis.Utilities;
 
 namespace Pchp.CodeAnalysis.Symbols
 {
@@ -265,6 +266,12 @@ namespace Pchp.CodeAnalysis.Symbols
 
                 f.SetProperty(routine); // remember bound function symbol
                 fsymbol.AddFunction(routine);
+
+                if (Compilation.Options.ExperimentalOptimization == ExperimentalOptimization.PhpDocOverloads
+                    && (Compilation.Options.PhpDocTypes & PhpDocTypes.ParameterTypes) == 0)
+                {
+                    routine.TryCreatePhpDocOverload();
+                }
             }
 
             //

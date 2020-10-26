@@ -10,6 +10,7 @@ using Devsense.PHP.Syntax.Ast;
 using Devsense.PHP.Syntax;
 using Pchp.CodeAnalysis.Semantics;
 using System.Threading;
+using Peachpie.CodeAnalysis.Utilities;
 
 namespace Pchp.CodeAnalysis.Symbols
 {
@@ -235,15 +236,10 @@ namespace Pchp.CodeAnalysis.Symbols
             var result = DeclaringCompilation.GetTypeFromTypeRef(typeHint, _routine.ContainingType as SourceTypeSymbol, nullable: DefaultsToNull);
 
             // 2. optionally type specified in PHPDoc
-            if (result == null && _ptagOpt != null && _ptagOpt.TypeNamesArray.Length != 0
-                && (DeclaringCompilation.Options.PhpDocTypes & PhpDocTypes.ParameterTypes) != 0)
+            if (result == null &&
+                ((DeclaringCompilation.Options.PhpDocTypes & PhpDocTypes.ParameterTypes) != 0 || Routine.IsSpecializedOverload))
             {
-                var typectx = _routine.TypeRefContext;
-                var tmask = FlowAnalysis.PHPDoc.GetTypeMask(typectx, _ptagOpt.TypeNamesArray, _routine.GetNamingContext());
-                if (!tmask.IsVoid && !tmask.IsAnyType)
-                {
-                    result = DeclaringCompilation.GetTypeFromTypeRef(typectx, tmask);
-                }
+                this.TryGetTypeFromPhpDoc(out result);
             }
 
             // 3 default:
