@@ -88,7 +88,7 @@ namespace Pchp.CodeAnalysis.Symbols
 
                     // determine the field container:
                     NamedTypeSymbol fieldcontainer = ContainingType; // by default in the containing class/trait/file
-                    string fieldname = $"<{ContainingSymbol.Name}.{Name}>_DefaultValue";
+                    string fieldname = $"<{ContainingSymbol.Name}.{Name}>_DefaultValue{(Routine.IsSpecializedOverload ? "_Spec" : "")}";    // TODO: Reuse or specialize in specialized overload instead
 
                     //if (fieldcontainer.IsInterface)
                     //{
