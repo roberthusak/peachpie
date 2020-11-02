@@ -134,6 +134,28 @@ namespace Pchp.CodeAnalysis.Emit
             AddMember(container, nestedType);
         }
 
+        public NamedTypeSymbol GetOrAddNestedType(Cci.ITypeDefinition container, NamedTypeSymbol nestedType, Predicate<Symbol> match)
+        {
+            Contract.ThrowIfNull(nestedType);
+            Debug.Assert(nestedType.IsImplicitlyDeclared);
+            Debug.Assert((container as ISymbol)?.ContainingType == null); // can't nest in nested type
+
+            var members = EnsureList(container);
+            lock (members)
+            {
+                int index = members.FindIndex(match);
+                if (index < 0)
+                {
+                    members.Add(nestedType);
+                    return nestedType;
+                }
+                else
+                {
+                    return (NamedTypeSymbol)members[index];
+                }
+            }
+        }
+
         /// <summary>
         /// Adds a synthesized method to the class.
         /// </summary>

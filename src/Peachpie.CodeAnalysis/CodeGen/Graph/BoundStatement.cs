@@ -165,9 +165,17 @@ namespace Pchp.CodeAnalysis.Semantics
         {
             cg.EmitSequencePoint(this.PhpSyntax);
 
-            // synthesize the holder class H { PhpAlias value }
-            var holder = _holderClass;
-            cg.Module.SynthesizedManager.AddNestedType(holder.ContainingType, holder);
+            // synthesize the holder class H { PhpAlias value } if it's not already present there from the specialized overload
+
+            bool ExistingHolderMatch(Symbol symbol) =>
+                symbol is SynthesizedStaticLocHolder h && h.DeclaringMethod.Name == _holderClass.DeclaringMethod.Name && h.VariableName == _holderClass.VariableName;
+
+            var holder = (SynthesizedStaticLocHolder)cg.Module.SynthesizedManager.GetOrAddNestedType(_holderClass.ContainingType, _holderClass, ExistingHolderMatch);
+            if (holder == _holderClass)
+            {
+                // Initialization routine of the holder nested class
+                EmitInit(cg.Module, cg.Diagnostics, cg.DeclaringCompilation, _holderClass, Declaration.InitialValue, routine: cg.Routine);
+            }
 
             // Context.GetStatic<H>()
             var getmethod = cg.CoreMethods.Context.GetStatic_T.Symbol.Construct(holder);
@@ -184,9 +192,6 @@ namespace Pchp.CodeAnalysis.Semantics
 
             local.EmitStore(cg, ref lhs, holder.ValueField.Type, access);
             lhs.Dispose();
-
-            // holder initialization routine
-            EmitInit(cg.Module, cg.Diagnostics, cg.DeclaringCompilation, holder, Declaration.InitialValue, routine: cg.Routine);
         }
 
         void EmitInit(Emit.PEModuleBuilder module, DiagnosticBag diagnostic, PhpCompilation compilation, SynthesizedStaticLocHolder holder, BoundExpression initializer, SourceRoutineSymbol routine)
