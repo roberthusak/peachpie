@@ -204,18 +204,9 @@ namespace Pchp.CodeAnalysis.Symbols
             {
                 return result2[0];
             }
-            else if (optimization == ExperimentalOptimization.PhpDocOverloadsStatic && result2.Count == 2 &&
-                     result2[1] is SourceRoutineSymbol origRoutine && origRoutine.SpecializedOverloads.Length > 0 &&
-                     origRoutine.SpecializedOverloads[0] == result2[0])
-            {
-                // If unable to statically determine better specialized overload, resort to the original
-                return origRoutine;
-
-                // TODO: Generalize for multiple overloads and orders (now it is strongly coupled with SourceSymbolProvider.ResolveFunction)
-            }
             else
             {
-                return new AmbiguousMethodSymbol(result.AsImmutable(), true);
+                return new AmbiguousMethodSymbol(result.AsImmutable(), true).TryReduceOverloadAmbiguity(optimization);
             }
         }
 

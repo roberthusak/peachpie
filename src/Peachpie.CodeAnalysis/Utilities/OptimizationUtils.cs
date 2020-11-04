@@ -15,7 +15,7 @@ namespace Peachpie.CodeAnalysis.Utilities
 {
     internal static class OptimizationUtils
     {
-        internal static SourceFunctionSymbol? TryCreatePhpDocOverload(this SourceFunctionSymbol routine)
+        public static SourceFunctionSymbol? TryCreatePhpDocOverload(this SourceFunctionSymbol routine)
         {
             if (routine.SourceParameters.Any(CanBeParameterSpecialized))
             {
@@ -34,7 +34,7 @@ namespace Peachpie.CodeAnalysis.Utilities
             }
         }
 
-        internal static bool TryGetTypeFromPhpDoc(this SourceParameterSymbol parameter, out TypeSymbol? type)
+        public static bool TryGetTypeFromPhpDoc(this SourceParameterSymbol parameter, out TypeSymbol? type)
         {
             if (parameter.PHPDocOpt != null && parameter.PHPDocOpt.TypeNamesArray.Length != 0)
             {
@@ -49,6 +49,25 @@ namespace Peachpie.CodeAnalysis.Utilities
 
             type = null;
             return false;
+        }
+
+        public static MethodSymbol TryReduceOverloadAmbiguity(this AmbiguousMethodSymbol ambiguousRoutine, ExperimentalOptimization optimization)
+        {
+            // If unable to statically determine better specialized overload where we aim at static specialization resolving,
+            // resort to the original (general) definition
+
+            // TODO: Generalize for multiple overloads and orders (now it is strongly coupled with SourceSymbolProvider.ResolveFunction)
+            var ambiguities = ambiguousRoutine.Ambiguities;
+            if (optimization == ExperimentalOptimization.PhpDocOverloadsStatic && ambiguities.Length == 2 &&
+                     ambiguities[1] is SourceRoutineSymbol origRoutine && origRoutine.SpecializedOverloads.Length > 0 &&
+                     origRoutine.SpecializedOverloads[0] == ambiguities[0])
+            {
+                return origRoutine;
+            }
+            else
+            {
+                return ambiguousRoutine;
+            }
         }
 
         private static bool CanBeParameterSpecialized(SourceParameterSymbol parameter)

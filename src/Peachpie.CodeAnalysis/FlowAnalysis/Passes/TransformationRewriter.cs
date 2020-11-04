@@ -598,6 +598,11 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
                 {
                     var fnQName = NameUtils.MakeQualifiedName(fnName, true);
                     symbol = (MethodSymbol)DeclaringCompilation.ResolveFunction(fnQName, _routine);
+
+                    if (symbol is AmbiguousMethodSymbol ambigSymbol)
+                    {
+                        symbol = ambigSymbol.TryReduceOverloadAmbiguity(DeclaringCompilation.Options.ExperimentalOptimization);
+                    }
                 }
                 else
                 {
