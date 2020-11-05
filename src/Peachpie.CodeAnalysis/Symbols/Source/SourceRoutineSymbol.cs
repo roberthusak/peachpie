@@ -36,6 +36,8 @@ namespace Pchp.CodeAnalysis.Symbols
         // TODO: Put to CommonFlags
         internal bool IsSpecializedOverload { get; set; }
 
+        public override bool IsPhpHidden => IsSpecializedOverload;
+
         internal ImmutableArray<SourceRoutineSymbol> SpecializedOverloads { get; set; } = ImmutableArray<SourceRoutineSymbol>.Empty;
 
         ControlFlowGraph _cfg;
@@ -487,6 +489,15 @@ namespace Pchp.CodeAnalysis.Symbols
                 }
 
                 // ...
+            }
+
+            if (IsPhpHidden)
+            {
+                // [PhpHiddenAttribute]
+                attrs = attrs.Add(new SynthesizedAttributeData(
+                    DeclaringCompilation.CoreMethods.Ctors.PhpHiddenAttribute,
+                    ImmutableArray<TypedConstant>.Empty,
+                    ImmutableArray<KeyValuePair<string, TypedConstant>>.Empty));
             }
 
             //
