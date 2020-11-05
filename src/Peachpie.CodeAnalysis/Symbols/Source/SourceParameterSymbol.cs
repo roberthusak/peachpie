@@ -237,7 +237,7 @@ namespace Pchp.CodeAnalysis.Symbols
 
             // 2. optionally type specified in PHPDoc
             if (result == null &&
-                ((DeclaringCompilation.Options.PhpDocTypes & PhpDocTypes.ParameterTypes) != 0 || Routine.IsSpecializedOverload))
+                ((DeclaringCompilation.Options.PhpDocTypes & PhpDocTypes.ParameterTypes) != 0 && Routine.CanUsePhpDocTypes() || Routine.IsSpecializedOverload))
             {
                 this.TryGetTypeFromPhpDoc(out result);
             }

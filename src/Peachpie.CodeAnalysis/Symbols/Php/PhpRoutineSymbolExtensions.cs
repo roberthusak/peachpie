@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis;
 using Pchp.CodeAnalysis.FlowAnalysis;
 using Pchp.CodeAnalysis.Semantics;
 using Peachpie.CodeAnalysis.Symbols;
+using Peachpie.CodeAnalysis.Utilities;
 using Roslyn.Utilities;
 using System;
 using System.Collections.Generic;
@@ -70,7 +71,7 @@ namespace Pchp.CodeAnalysis.Symbols
             {
                 // /** @return */
                 var typeCtx = routine.TypeRefContext;
-                if (routine.PHPDocBlock != null && (compilation.Options.PhpDocTypes & PhpDocTypes.ReturnTypes) != 0)
+                if (routine.PHPDocBlock != null && (compilation.Options.PhpDocTypes & PhpDocTypes.ReturnTypes) != 0 && routine.CanUsePhpDocTypes())
                 {
                     var returnTag = routine.PHPDocBlock.Returns;
                     if (returnTag != null && returnTag.TypeNamesArray.Length != 0)
@@ -159,7 +160,7 @@ namespace Pchp.CodeAnalysis.Symbols
             }
             else
             {
-                throw ExceptionUtilities.UnexpectedValue(symbol);
+                throw Roslyn.Utilities.ExceptionUtilities.UnexpectedValue(symbol);
             }
 
             // create the type mask from the CLR type symbol

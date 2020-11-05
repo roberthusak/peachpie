@@ -57,6 +57,12 @@ namespace Pchp.CodeAnalysis
         /// attempts to call them as much as possible using dynamic call sites.
         /// </summary>
         PhpDocOverloadsDynamic,
+
+        /// <summary>
+        /// When <see cref="PhpDocTypes.ParameterTypes"/> or <see cref="PhpDocTypes.ReturnTypes"/> are used,
+        /// this switch cause them to be applied only on global functions, not on methods.
+        /// </summary>
+        PhpDocForceOnlyFunctions,
     }
 
     public static class ExperimentalOptimizationExtensions

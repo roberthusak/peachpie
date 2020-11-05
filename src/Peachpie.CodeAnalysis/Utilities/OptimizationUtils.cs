@@ -15,6 +15,10 @@ namespace Peachpie.CodeAnalysis.Utilities
 {
     internal static class OptimizationUtils
     {
+        public static bool CanUsePhpDocTypes(this SourceRoutineSymbol routine) =>
+            routine.DeclaringCompilation.Options.ExperimentalOptimization != ExperimentalOptimization.PhpDocForceOnlyFunctions
+            || routine is SourceFunctionSymbol;
+
         public static SourceFunctionSymbol? TryCreatePhpDocOverload(this SourceFunctionSymbol routine)
         {
             if (routine.SourceParameters.Any(CanBeParameterSpecialized))
