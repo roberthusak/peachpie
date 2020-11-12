@@ -26,7 +26,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
             { "long", ctx => ctx.GetLongTypeMask()},
             { "number", ctx => ctx.GetNumberTypeMask()},
             { "numeric", ctx => ctx.GetNumberTypeMask()},
-            { "string", ctx => ctx.GetStringTypeMask()},
+            { "string", ctx => ctx.GetWritableStringTypeMask()},
             { "bool", ctx => ctx.GetBooleanTypeMask()},
             { "boolean", ctx => ctx.GetBooleanTypeMask()},
             { "false", ctx => ctx.GetBooleanTypeMask()},
