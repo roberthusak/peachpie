@@ -44,6 +44,13 @@ namespace Peachpie.CodeAnalysis.Utilities
             {
                 var typectx = parameter.Routine.TypeRefContext;
                 var tmask = PHPDoc.GetTypeMask(typectx, parameter.PHPDocOpt.TypeNamesArray, parameter.Routine.GetNamingContext());
+
+                // Add null as a type if it is specified as a default value
+                if (parameter.Initializer?.ConstantValue.IsNull() == true)
+                {
+                    tmask |= typectx.GetNullTypeMask();
+                }
+
                 if (!tmask.IsVoid && !tmask.IsAnyType)
                 {
                     type = parameter.DeclaringCompilation.GetTypeFromTypeRef(typectx, tmask);
