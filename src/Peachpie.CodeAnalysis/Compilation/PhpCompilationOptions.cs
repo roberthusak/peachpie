@@ -59,6 +59,12 @@ namespace Pchp.CodeAnalysis
         PhpDocOverloadsDynamic,
 
         /// <summary>
+        /// Generates a type-specific overload for each routine with parameter types specified in PhpDocs,
+        /// attempts to call them as much as possible by explicit type checking at call sites.
+        /// </summary>
+        PhpDocOverloadsBranch,
+
+        /// <summary>
         /// When <see cref="PhpDocTypes.ParameterTypes"/> or <see cref="PhpDocTypes.ReturnTypes"/> are used,
         /// this switch cause them to be applied only on global functions, not on methods.
         /// </summary>
@@ -68,7 +74,9 @@ namespace Pchp.CodeAnalysis
     public static class ExperimentalOptimizationExtensions
     {
         public static bool HasPhpDocOverloads(this ExperimentalOptimization optimization) =>
-            optimization == ExperimentalOptimization.PhpDocOverloadsStatic || optimization == ExperimentalOptimization.PhpDocOverloadsDynamic;
+            optimization == ExperimentalOptimization.PhpDocOverloadsStatic ||
+            optimization == ExperimentalOptimization.PhpDocOverloadsDynamic ||
+            optimization == ExperimentalOptimization.PhpDocOverloadsBranch;
     }
 
     /// <summary>

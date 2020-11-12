@@ -95,7 +95,7 @@ namespace Pchp.CodeAnalysis.Symbols
             var overloads = SynthesizeOverloadsWithOptionalParameters(module, diagnostic);
 
             // Propagate overloads to the RoutineInfo static field (if we are not using only static overload resolution)
-            if (this.SpecializedOverloads.Length > 0 && this.DeclaringCompilation.Options.ExperimentalOptimization != ExperimentalOptimization.PhpDocOverloadsStatic)
+            if (this.SpecializedOverloads.Length > 0 && this.DeclaringCompilation.Options.ExperimentalOptimization == ExperimentalOptimization.PhpDocOverloadsDynamic)
             {
                 var overloadList = overloads.ToList();              // It might have been an ImmutableArray
                 overloadList.AddRange(this.SpecializedOverloads);
