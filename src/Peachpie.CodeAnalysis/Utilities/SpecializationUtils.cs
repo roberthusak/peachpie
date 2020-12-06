@@ -21,11 +21,10 @@ namespace Peachpie.CodeAnalysis.Utilities
         Always
     }
 
-    internal delegate void TypeCheckEmitter(CodeGenerator cg, BoundReferenceExpression expr, TypeSymbol to);
+    internal delegate TypeRefMask TypeCheckEmitter(CodeGenerator cg, BoundReferenceExpression expr, TypeSymbol to);
 
     internal struct SpecializationInfo
     {
-
         public SpecializationInfo(SpecializationKind kind, TypeCheckEmitter? emitter = null)
         {
             this.Kind = kind;
@@ -39,7 +38,7 @@ namespace Peachpie.CodeAnalysis.Utilities
 
     internal static class SpecializationUtils
     {
-        private static TypeCheckEmitter GetTypeCodeEmitter(int typeCode)
+        private static TypeCheckEmitter GetTypeCodeEmitter(int typeCode, Func<TypeRefContext, TypeRefMask, TypeRefMask> maskSelector)
         {
             // NOTE: PhpTypeCode enum in CodeAnalysis and Runtime is different, we use integers here instead
 
@@ -57,17 +56,19 @@ namespace Peachpie.CodeAnalysis.Utilities
 
                 cg.Builder.EmitIntConstant(typeCode);
                 cg.Builder.EmitOpCode(ILOpCode.Ceq);
+
+                return maskSelector(cg.TypeRefContext, expr.TypeRefMask);
             };
         }
 
         // TODO: Aliases are not handled, the dynamic overloading is skipped instead. Handle them as well.
-        private readonly static TypeCheckEmitter PhpValueBoolCheckEmitter = GetTypeCodeEmitter(1);
-        private readonly static TypeCheckEmitter PhpValueLongCheckEmitter = GetTypeCodeEmitter(2);
-        private readonly static TypeCheckEmitter PhpValueDoubleCheckEmitter = GetTypeCodeEmitter(3);
-        private readonly static TypeCheckEmitter PhpValuePhpArrayCheckEmitter = GetTypeCodeEmitter(4);
-        private readonly static TypeCheckEmitter PhpValueStringCheckEmitter = GetTypeCodeEmitter(5);
-        private readonly static TypeCheckEmitter PhpValuePhpStringCheckEmitter = GetTypeCodeEmitter(6);
-        private readonly static TypeCheckEmitter PhpValueObjectCheckEmitter = GetTypeCodeEmitter(7);
+        private readonly static TypeCheckEmitter PhpValueBoolCheckEmitter = GetTypeCodeEmitter(1, (c, _) => c.GetBooleanTypeMask());
+        private readonly static TypeCheckEmitter PhpValueLongCheckEmitter = GetTypeCodeEmitter(2, (c, _) => c.GetLongTypeMask());
+        private readonly static TypeCheckEmitter PhpValueDoubleCheckEmitter = GetTypeCodeEmitter(3, (c, _) => c.GetDoubleTypeMask());
+        private readonly static TypeCheckEmitter PhpValuePhpArrayCheckEmitter = GetTypeCodeEmitter(4, (c, _) => c.GetArrayTypeMask());
+        private readonly static TypeCheckEmitter PhpValueStringCheckEmitter = GetTypeCodeEmitter(5, (c, _) => c.GetStringTypeMask());
+        private readonly static TypeCheckEmitter PhpValuePhpStringCheckEmitter = GetTypeCodeEmitter(6, (c, _) => c.GetWritableStringTypeMask());
+        private readonly static TypeCheckEmitter PhpValueObjectCheckEmitter = GetTypeCodeEmitter(7, (c, m) => c.GetObjectsFromMask(m));
 
         public static SpecializationInfo GetInfo(TypeRefContext typeCtx, BoundExpression expr, TypeSymbol to, TypeRefMask toMask)
         {

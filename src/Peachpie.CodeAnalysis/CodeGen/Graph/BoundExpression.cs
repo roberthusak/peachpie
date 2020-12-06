@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeGen;
 using Microsoft.CodeAnalysis.Operations;
 using Pchp.CodeAnalysis.CodeGen;
+using Pchp.CodeAnalysis.FlowAnalysis;
 using Pchp.CodeAnalysis.Symbols;
 using Peachpie.CodeAnalysis.Utilities;
 using System;
@@ -2843,7 +2844,7 @@ namespace Pchp.CodeAnalysis.Semantics
             // The return type of the original overload should be the most general
             var returnType = origOverload.ReturnType;
 
-            List<(int, SpecializationInfo)> diffParamInfo = null;
+            List<(int, SpecializationInfo, TypeRefMask)> diffParamInfo = null;
             var argumentBuilder = _arguments.ToBuilder();   // To evaluate complicated expressions to a temporary variable before passing as arguments
 
             // TODO Generalize for multiple overloads
@@ -2882,8 +2883,8 @@ namespace Pchp.CodeAnalysis.Semantics
                             argumentBuilder[i] = _arguments[i].Update(tempRef, _arguments[i].ArgumentKind);
                         }
 
-                        diffParamInfo ??= new List<(int, SpecializationInfo)>();
-                        diffParamInfo.Add((i, specInfo));
+                        diffParamInfo ??= new List<(int, SpecializationInfo, TypeRefMask)>();
+                        diffParamInfo.Add((i, specInfo, argVal.TypeRefMask));
                     }
                 }
             }
@@ -2897,17 +2898,29 @@ namespace Pchp.CodeAnalysis.Semantics
 
             if (diffParamInfo?.Count > 0)
             {
-                foreach ((int i, var specInfo) in diffParamInfo)
+                foreach ((int i, var specInfo, var _) in diffParamInfo)
                 {
                     Debug.Assert(specInfo.Kind == SpecializationKind.RuntimeDependent);
 
-                    specInfo.Emitter(cg, (BoundReferenceExpression)arguments[i].Value, specializedOverload.Parameters[i].Type);
+                    var arg = (BoundReferenceExpression)arguments[i].Value;
+                    var trgType = specializedOverload.Parameters[i].Type;
+
+                    var specializedMask = specInfo.Emitter(cg, arg, trgType);
                     cg.Builder.EmitBranch(ILOpCode.Brfalse, falseLbl);
+
+                    // Temporarily specialize the expression type mask to ease casting
+                    arg.TypeRefMask = specializedMask;
                 }
 
                 var specReturnType = cg.EmitCall(opcode, specializedOverload, this.Instance, arguments, staticType);
                 cg.EmitConvert(specReturnType, default, returnType);
                 cg.Builder.EmitBranch(ILOpCode.Br, endLbl);
+
+                // Restore the original expression type masks
+                foreach ((int i, var _, var origMask) in diffParamInfo)
+                {
+                    arguments[i].Value.TypeRefMask = origMask;
+                }
             }
 
             cg.Builder.MarkLabel(falseLbl);
