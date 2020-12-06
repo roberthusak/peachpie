@@ -190,7 +190,9 @@ namespace Pchp.CodeAnalysis.Symbols
                 {
                     // TODO: this is naive implementation of overload resolution,
                     // make it properly using Conversion Cost
-                    if (match && !hasparams)
+
+                    // Do not resort immediately to the original overload if it has any specialized ones (it will be handled later)
+                    if (match && !hasparams && !(m is SourceRoutineSymbol sr && sr.SpecializedOverloads.Length > 0))
                     {
                         return m;   // perfect match
                     }
@@ -206,7 +208,7 @@ namespace Pchp.CodeAnalysis.Symbols
             }
             else
             {
-                return new AmbiguousMethodSymbol(result.AsImmutable(), true).TryReduceOverloadAmbiguity(optimization);
+                return new AmbiguousMethodSymbol(result.AsImmutable(), true).TryReduceOverloadAmbiguity(optimization, typeCtx, args);
             }
         }
 
@@ -233,7 +235,7 @@ namespace Pchp.CodeAnalysis.Symbols
                 m.DeclaredAccessibility != Accessibility.Internal && // "internal"
                 (scope.ScopeIsDynamic || m.IsAccessible(scope.Scope)) &&  // method is accessible (or might be in runtime)
                 !m.IsInitFieldsOnly &&    // method is not a special .ctor which is not accessible from user's code
-                !m.IsPhpHidden() // ignore [PhpHidden] methods
+                (!m.IsPhpHidden() || (m is SourceRoutineSymbol sourceSymbol && sourceSymbol.IsSpecializedOverload)) // ignore [PhpHidden] methods unless it's a specialized overload
                 );
         }
     }

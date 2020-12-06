@@ -601,7 +601,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
 
                     if (symbol is AmbiguousMethodSymbol ambigSymbol)
                     {
-                        symbol = ambigSymbol.TryReduceOverloadAmbiguity(DeclaringCompilation.Options.ExperimentalOptimization);
+                        symbol = ambigSymbol.TryReduceOverloadAmbiguity(DeclaringCompilation.Options.ExperimentalOptimization, this._routine.TypeRefContext);
                     }
                 }
                 else

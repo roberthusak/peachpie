@@ -513,6 +513,7 @@ namespace Pchp.CodeAnalysis.Symbols
                 String = ct.PhpValue.Property("String");
                 Object = ct.PhpValue.Property("Object");
                 Array = ct.PhpValue.Property("Array");
+                TypeCode = ct.PhpValue.Property("TypeCode");
 
                 Create_Boolean = ct.PhpValue.Method("Create", ct.Boolean);
                 Create_Long = ct.PhpValue.Method("Create", ct.Long);
@@ -547,7 +548,7 @@ namespace Pchp.CodeAnalysis.Symbols
                 Void, Null, True, False;
 
             public readonly CoreProperty
-                Object, Long, Double, Boolean, String, Array;
+                Object, Long, Double, Boolean, String, Array, TypeCode;
 
         }
 

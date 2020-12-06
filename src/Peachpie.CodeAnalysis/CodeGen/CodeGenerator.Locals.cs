@@ -179,6 +179,8 @@ namespace Pchp.CodeAnalysis.CodeGen
 
         int _tempLocalCounter;
 
+        public string GetFreeTemporaryLocalName() => $"<>{_tempLocalCounter++}";
+
         /// <summary>
         /// Returns a temporary local variable of a specified <see cref="TypeSymbol"/>.
         /// </summary>
@@ -189,7 +191,7 @@ namespace Pchp.CodeAnalysis.CodeGen
         {
             if (longlive && !immediateReturn && this.TemporalLocalsPlace != null)
             {
-                return new TemporaryLocalDefinition(this, $"<>{_tempLocalCounter++}", type);
+                return new TemporaryLocalDefinition(this, GetFreeTemporaryLocalName(), type);
             }
             else
             {

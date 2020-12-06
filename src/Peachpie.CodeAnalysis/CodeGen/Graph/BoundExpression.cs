@@ -2824,6 +2824,104 @@ namespace Pchp.CodeAnalysis.Semantics
             }
         }
 
+        internal TypeSymbol EmitSpecializedBranchedCall(CodeGenerator cg, SourceRoutineSymbol origOverload, ImmutableArray<SourceRoutineSymbol> specializedOverloads)
+        {
+            Debug.Assert(!specializedOverloads.IsDefault);
+            Debug.Assert(!specializedOverloads.IsEmpty);
+
+            // TODO: Solve for other routines than global functions (and constructors as well, see ILBuilderExtension.EmitCall)
+            Debug.Assert(origOverload is SourceFunctionSymbol);
+            var opcode = ILOpCode.Call;
+            var staticType = (BoundTypeRef)LateStaticTypeRef;
+
+            // Do not handle complicated cases
+            if (this.HasArgumentsUnpacking || origOverload.SourceParameters.Any(p => p.RefKind != RefKind.None))
+            {
+                return EmitDirectCall(cg, opcode, origOverload, staticType);
+            }
+            
+            // The return type of the original overload should be the most general
+            var returnType = origOverload.ReturnType;
+
+            List<(int, SpecializationInfo)> diffParamInfo = null;
+            var argumentBuilder = _arguments.ToBuilder();   // To evaluate complicated expressions to a temporary variable before passing as arguments
+
+            // TODO Generalize for multiple overloads
+            var specializedOverload = specializedOverloads.Single();
+
+            Debug.Assert(origOverload.SourceParameters.Length == specializedOverload.SourceParameters.Length);
+            for (int i = 0; i < Math.Min(origOverload.SourceParameters.Length, _arguments.Length); i++)
+            {
+                if (origOverload.SourceParameters[i].Type != specializedOverload.SourceParameters[i].Type)
+                {
+                    var specInfo = SpecializationUtils.GetInfo(
+                        cg.Routine.TypeRefContext,
+                        _arguments[i].Value,
+                        specializedOverload.SourceParameters[i].Type,
+                        default);
+                    
+                    Debug.Assert(specInfo.Kind != SpecializationKind.Never);
+
+                    if (specInfo.Kind == SpecializationKind.RuntimeDependent)
+                    {
+                        // TODO: Handle constants and type analysis facts in the overload resolution phase, not here (use SpecializationUtils)
+                        var argVal = _arguments[i].Value;
+                        if (!(argVal is BoundVariableRef))
+                        {
+                            // Evaluate, store to a temporary local variable and replace it in the arguments
+
+                            var tempRef = new BoundTemporalVariableRef(cg.GetFreeTemporaryLocalName()).WithContext(argVal);
+                            tempRef.TypeRefMask = argVal.TypeRefMask;
+                            tempRef.ConstantValue = argVal.ConstantValue;
+                            tempRef.Variable = cg.Routine.LocalsTable.BindTemporalVariable(tempRef.Name.NameValue);
+
+                            tempRef.Place().EmitStorePrepare(cg.Builder);
+                            var argType = cg.Emit(argVal);
+                            tempRef.Place().EmitStore(cg.Builder);
+
+                            argumentBuilder[i] = _arguments[i].Update(tempRef, _arguments[i].ArgumentKind);
+                        }
+
+                        diffParamInfo ??= new List<(int, SpecializationInfo)>();
+                        diffParamInfo.Add((i, specInfo));
+                    }
+                }
+            }
+
+            var arguments = argumentBuilder.MoveToImmutable();
+
+            // (arg1.Is... && arg3.Is...) ? SpecializedOverload(arg1, arg2, arg3) : OrigOverload(arg1, arg2, arg3)
+            
+            object falseLbl = new object();
+            object endLbl = new object();
+
+            if (diffParamInfo?.Count > 0)
+            {
+                foreach ((int i, var specInfo) in diffParamInfo)
+                {
+                    Debug.Assert(specInfo.Kind == SpecializationKind.RuntimeDependent);
+
+                    specInfo.Emitter(cg, (BoundReferenceExpression)arguments[i].Value, specializedOverload.Parameters[i].Type);
+                    cg.Builder.EmitBranch(ILOpCode.Brfalse, falseLbl);
+                }
+
+                var specReturnType = cg.EmitCall(opcode, specializedOverload, this.Instance, arguments, staticType);
+                cg.EmitConvert(specReturnType, default, returnType);
+                cg.Builder.EmitBranch(ILOpCode.Br, endLbl);
+            }
+
+            cg.Builder.MarkLabel(falseLbl);
+
+            var realReturnType = cg.EmitCall(opcode, origOverload, this.Instance, arguments, staticType);
+            Debug.Assert(realReturnType == returnType);
+
+            cg.Builder.MarkLabel(endLbl);
+
+
+            //
+            return (this.ResultType = cg.EmitMethodAccess(returnType, origOverload, Access));
+        }
+
         internal TypeSymbol EmitCallsiteCall(CodeGenerator cg)
         {
             // callsite
@@ -2895,7 +2993,21 @@ namespace Pchp.CodeAnalysis.Semantics
         {
             if (_name.IsDirect)
             {
-                return EmitCallsiteCall(cg);
+                if (cg.DeclaringCompilation.Options.ExperimentalOptimization == ExperimentalOptimization.PhpDocOverloadsBranch &&
+                    TargetMethod is AmbiguousMethodSymbol ambig &&
+                    OptimizationUtils.TryExtractOriginalFromSpecializedOverloads(ambig.Ambiguities, out var origOverload))
+                {
+                    var specializedOverloads =
+                        ambig.Ambiguities
+                        .Where(a => a != origOverload)
+                        .OfType<SourceRoutineSymbol>()
+                        .ToImmutableArray();
+                    return EmitSpecializedBranchedCall(cg, origOverload, specializedOverloads);
+                }
+                else
+                {
+                    return EmitCallsiteCall(cg); 
+                }
             }
             else
             {

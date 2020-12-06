@@ -147,7 +147,7 @@ namespace Pchp.CodeAnalysis.Symbols
             Dynamic_NameParam_T, Dynamic_TargetTypeParam, Dynamic_LateStaticTypeParam, Dynamic_CallerTypeParam, Dynamic_UnpackingParam_T,
             RuntimeChain_ChainEnd, RuntimeChain_Value_T, RuntimeChain_Property_T, RuntimeChain_ArrayItem_T, RuntimeChain_ArrayNewItem_T,
             PhpTypeInfoExtension, PhpTypeInfo, CommonPhpArrayKeys,
-            PhpNumber, PhpValue, PhpAlias, PhpString, PhpArray, PhpResource, IPhpArray, IPhpEnumerable, IPhpCallable, IPhpConvertible, PhpString_Blob,
+            PhpNumber, PhpValue, PhpAlias, PhpString, PhpArray, PhpResource, IPhpArray, IPhpEnumerable, IPhpCallable, IPhpConvertible, PhpString_Blob, PhpTypeCode,
             IntStringKey, PhpHashtable, ImportValueAttribute, DummyFieldsOnlyCtor,
             Void, Object, Byte, Int32, Long, Double, Boolean, String, Exception,
             RuntimeTypeHandle, RuntimeMethodHandle,
@@ -182,6 +182,7 @@ namespace Pchp.CodeAnalysis.Symbols
             IPhpCallable = Create("IPhpCallable");
             IPhpConvertible = Create("IPhpConvertible");
             PhpString_Blob = Create("PhpString+Blob");
+            PhpTypeCode = Create("PhpTypeCode");
             IntStringKey = Create("IntStringKey");
             PhpHashtable = Create("PhpHashtable");
             ScriptDiedException = Create("ScriptDiedException");
