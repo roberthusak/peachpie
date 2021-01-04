@@ -84,7 +84,7 @@ namespace Peachpie.CodeAnalysis.Utilities
             }
 
             // TODO: Clean this up
-            if (expr.Type?.Is_PhpValue() == true || expr.TypeRefMask.IsAnyType)
+            if (expr.Type?.Is_PhpValue() == true || (expr.TypeRefMask.IsAnyType && !expr.TypeRefMask.IsRef))
             {
                 if (to.SpecialType == SpecialType.System_Boolean)
                 {

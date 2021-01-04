@@ -94,7 +94,7 @@ namespace Peachpie.CodeAnalysis.Utilities
                 return ambiguousRoutine;
             }
 
-            if (arguments.IsDefault || arguments.Any(a => a.IsUnpacking) || origOverload!.SourceParameters.Any(p => p.RefKind != RefKind.None))
+            if (arguments.IsDefault || arguments.Any(a => a.IsUnpacking) || origOverload!.SourceParameters.Any(p => p.Syntax.PassedByRef))
             {
                 // TODO: Statically compile a disambiguation routine and use it in general places like this
 

@@ -2876,6 +2876,7 @@ namespace Pchp.CodeAnalysis.Semantics
                             tempRef.ConstantValue = argVal.ConstantValue;
                             tempRef.Variable = cg.Routine.LocalsTable.BindTemporalVariable(tempRef.Name.NameValue);
 
+                            ((LocalVariableReference)tempRef.Variable).EmitInit(cg);
                             tempRef.Place().EmitStorePrepare(cg.Builder);
                             var argType = cg.Emit(argVal);
                             tempRef.Place().EmitStore(cg.Builder);
