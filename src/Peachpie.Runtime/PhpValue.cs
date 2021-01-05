@@ -1102,6 +1102,8 @@ namespace Pchp.Core
             };
         }
 
+        public bool IsStringNoAlias() => TypeCode == PhpTypeCode.MutableString || TypeCode == PhpTypeCode.String;
+
         [MethodImpl(MethodImplOptions.NoInlining)]
         static Exception InvalidTypeCodeException() => new InvalidOperationException();
 

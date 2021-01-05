@@ -42,7 +42,7 @@ namespace Peachpie.CodeAnalysis.Utilities
         {
             // NOTE: PhpTypeCode enum in CodeAnalysis and Runtime is different, we use integers here instead
 
-            return (CodeGenerator cg, BoundReferenceExpression expr, TypeSymbol to) =>
+            return (cg, expr, to) =>
             {
                 // arg.TypeCode == typeCode
 
@@ -61,14 +61,33 @@ namespace Peachpie.CodeAnalysis.Utilities
             };
         }
 
+        private static TypeCheckEmitter GetMethodEmitter(Func<CodeGenerator, MethodSymbol> methodSelector, Func<TypeRefContext, TypeRefMask, TypeRefMask> maskSelector)
+        {
+            return (cg, expr, to) =>
+            {
+                // arg.Method()
+
+                var place = expr.BindPlace(cg);
+                Debug.Assert(place.Type.Is_PhpValue());
+
+                LhsStack lhs = default;
+                place.EmitLoadAddress(cg, ref lhs);
+                cg.EmitCall(ILOpCode.Call, methodSelector(cg));
+                lhs.Dispose();
+
+                return maskSelector(cg.TypeRefContext, expr.TypeRefMask);
+            };
+        }
+
         // TODO: Aliases are not handled, the dynamic overloading is skipped instead. Handle them as well.
-        private readonly static TypeCheckEmitter PhpValueBoolCheckEmitter = GetTypeCodeEmitter(1, (c, _) => c.GetBooleanTypeMask());
-        private readonly static TypeCheckEmitter PhpValueLongCheckEmitter = GetTypeCodeEmitter(2, (c, _) => c.GetLongTypeMask());
-        private readonly static TypeCheckEmitter PhpValueDoubleCheckEmitter = GetTypeCodeEmitter(3, (c, _) => c.GetDoubleTypeMask());
-        private readonly static TypeCheckEmitter PhpValuePhpArrayCheckEmitter = GetTypeCodeEmitter(4, (c, _) => c.GetArrayTypeMask());
-        private readonly static TypeCheckEmitter PhpValueStringCheckEmitter = GetTypeCodeEmitter(5, (c, _) => c.GetStringTypeMask());
-        private readonly static TypeCheckEmitter PhpValuePhpStringCheckEmitter = GetTypeCodeEmitter(6, (c, _) => c.GetWritableStringTypeMask());
-        private readonly static TypeCheckEmitter PhpValueObjectCheckEmitter = GetTypeCodeEmitter(7, (c, m) => c.GetObjectsFromMask(m));
+        private static readonly TypeCheckEmitter PhpValueBoolCheckEmitter = GetTypeCodeEmitter(1, (c, _) => c.GetBooleanTypeMask());
+        private static readonly TypeCheckEmitter PhpValueLongCheckEmitter = GetTypeCodeEmitter(2, (c, _) => c.GetLongTypeMask());
+        private static readonly TypeCheckEmitter PhpValueDoubleCheckEmitter = GetTypeCodeEmitter(3, (c, _) => c.GetDoubleTypeMask());
+        private static readonly TypeCheckEmitter PhpValuePhpArrayCheckEmitter = GetTypeCodeEmitter(4, (c, _) => c.GetArrayTypeMask());
+        private static readonly TypeCheckEmitter PhpValueStringCheckEmitter = GetTypeCodeEmitter(5, (c, _) => c.GetStringTypeMask());
+        private static readonly TypeCheckEmitter PhpValueObjectCheckEmitter = GetTypeCodeEmitter(7, (c, m) => c.GetObjectsFromMask(m));
+
+        private static readonly TypeCheckEmitter PhpValuePhpStringCheckEmitter = GetMethodEmitter(cg => cg.CoreMethods.PhpValue.IsStringNoAlias, (c, _) => c.GetWritableStringTypeMask());
 
         public static SpecializationInfo GetInfo(TypeRefContext typeCtx, BoundExpression expr, TypeSymbol to, TypeRefMask toMask)
         {
@@ -108,7 +127,6 @@ namespace Peachpie.CodeAnalysis.Utilities
                 }
                 else if (to.Is_PhpString())
                 {
-                    // TODO: Both System.String and PhpString
                     return new SpecializationInfo(SpecializationKind.RuntimeDependent, PhpValuePhpStringCheckEmitter);
                 }
                 else if (to.SpecialType == SpecialType.System_Object)
@@ -117,6 +135,14 @@ namespace Peachpie.CodeAnalysis.Utilities
                 }
 
                 // TODO: Specific classes etc. (.AsObject() is ...)
+            }
+            else if (expr.Type?.Is_PhpString() == true || expr.Type?.SpecialType == SpecialType.System_String || (!expr.TypeRefMask.IsRef && typeCtx.IsOnlyAString(expr.TypeRefMask)))
+            {
+                // We can always convert between .NET and PHP strings
+                if (to.Is_PhpString() || to.SpecialType == SpecialType.System_String)
+                {
+                    return new SpecializationInfo(SpecializationKind.Always);
+                }
             }
 
             return new SpecializationInfo(SpecializationKind.Never);
