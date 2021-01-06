@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Text;
 using Devsense.PHP.Syntax;
 using Devsense.PHP.Syntax.Ast;
 using Microsoft.CodeAnalysis;
 using Pchp.CodeAnalysis;
+using Pchp.CodeAnalysis.CodeGen;
 using Pchp.CodeAnalysis.FlowAnalysis;
 using Pchp.CodeAnalysis.Semantics;
 using Pchp.CodeAnalysis.Symbols;
@@ -172,6 +174,16 @@ namespace Peachpie.CodeAnalysis.Utilities
             }
 
             return false;
+        }
+
+        [Conditional("DEBUG")]
+        public static void TryEmitRuntimeCounterMark(CodeGenerator cg, CoreMethod incrementMethod)
+        {
+            Debug.Assert(incrementMethod.DeclaringClass == cg.CoreTypes.RuntimeCounters.Symbol);
+
+            var ret = cg.EmitCall(ILOpCode.Call, incrementMethod.Symbol);
+
+            Debug.Assert(ret.IsVoid());
         }
     }
 }

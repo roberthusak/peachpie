@@ -11,6 +11,7 @@ using Devsense.PHP.Text;
 using Pchp.CodeAnalysis.Symbols;
 using Cci = Microsoft.Cci;
 using System.Collections.Immutable;
+using Peachpie.CodeAnalysis.Utilities;
 
 namespace Pchp.CodeAnalysis.Semantics.Graph
 {
@@ -60,6 +61,16 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
                 }
 
                 // TODO: emit parameters checks
+            }
+
+            // In case of a routine with specialized overloads, emit counter increment for both the original method and the overload
+            if (!cg.Routine.SpecializedOverloads.IsEmpty)
+            {
+                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkOriginalOverloadCall);
+            }
+            else if (cg.Routine.IsSpecializedOverload)
+            {
+                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkSpecializedOverloadCall);
             }
 
             // in case of script, declare the script, functions and types

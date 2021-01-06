@@ -2902,6 +2902,8 @@ namespace Pchp.CodeAnalysis.Semantics
 
             if (diffParamInfo?.Count > 0)
             {
+                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallCheck);
+
                 foreach ((int i, var specInfo, var _) in diffParamInfo)
                 {
                     Debug.Assert(specInfo.Kind == SpecializationKind.RuntimeDependent);
@@ -2916,6 +2918,8 @@ namespace Pchp.CodeAnalysis.Semantics
                     arg.TypeRefMask = specializedMask;
                 }
 
+                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallSpecializedSelect);
+
                 var specReturnType = cg.EmitCall(opcode, specializedOverload, this.Instance, arguments, staticType);
                 cg.EmitConvert(specReturnType, default, returnType);
                 cg.Builder.EmitBranch(ILOpCode.Br, endLbl);
@@ -2928,6 +2932,8 @@ namespace Pchp.CodeAnalysis.Semantics
             }
 
             cg.Builder.MarkLabel(falseLbl);
+
+            OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallOriginalSelect);
 
             var realReturnType = cg.EmitCall(opcode, origOverload, this.Instance, arguments, staticType);
             Debug.Assert(realReturnType == returnType);

@@ -237,6 +237,7 @@ namespace Pchp.CodeAnalysis.Symbols
         public readonly ContextHolder Context;
         public readonly DynamicHolder Dynamic;
         public readonly ReflectionHolder Reflection;
+        public readonly RuntimeCountersHolder RuntimeCounters;
 
         /// <summary>Property name of <c>ScriptAttribute.IsAutoloaded</c>.</summary>
         public static string ScriptAttribute_IsAutoloaded => "IsAutoloaded";
@@ -258,6 +259,7 @@ namespace Pchp.CodeAnalysis.Symbols
             Context = new ContextHolder(types);
             Dynamic = new DynamicHolder(types);
             Reflection = new ReflectionHolder(types);
+            RuntimeCounters = new RuntimeCountersHolder(types);
         }
 
         public struct OperatorsHolder
@@ -1022,6 +1024,23 @@ namespace Pchp.CodeAnalysis.Symbols
                 }
             }
             MethodSymbol _lazyCreateUserRoutine_String_MethodInfoArray;
+        }
+
+        public readonly struct RuntimeCountersHolder
+        {
+            public RuntimeCountersHolder(CoreTypes ct)
+            {
+                MarkBranchedCallCheck = ct.RuntimeCounters.Method(nameof(MarkBranchedCallCheck));
+                MarkBranchedCallOriginalSelect = ct.RuntimeCounters.Method(nameof(MarkBranchedCallOriginalSelect));
+                MarkBranchedCallSpecializedSelect = ct.RuntimeCounters.Method(nameof(MarkBranchedCallSpecializedSelect));
+
+                MarkOriginalOverloadCall = ct.RuntimeCounters.Method(nameof(MarkOriginalOverloadCall));
+                MarkSpecializedOverloadCall = ct.RuntimeCounters.Method(nameof(MarkSpecializedOverloadCall));
+            }
+
+            public readonly CoreMethod
+                MarkBranchedCallCheck, MarkBranchedCallOriginalSelect, MarkBranchedCallSpecializedSelect,
+                MarkOriginalOverloadCall, MarkSpecializedOverloadCall;
         }
     }
 }

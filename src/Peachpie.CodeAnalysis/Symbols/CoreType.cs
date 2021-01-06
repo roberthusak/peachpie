@@ -151,7 +151,8 @@ namespace Pchp.CodeAnalysis.Symbols
             IntStringKey, PhpHashtable, ImportValueAttribute, DummyFieldsOnlyCtor,
             Void, Object, Byte, Int32, Long, Double, Boolean, String, Exception,
             RuntimeTypeHandle, RuntimeMethodHandle,
-            stdClass, ArrayAccess, Closure, Generator, Iterator, Traversable, Stringable, GeneratorStateMachineDelegate, MainDelegate, IntPtr;
+            stdClass, ArrayAccess, Closure, Generator, Iterator, Traversable, Stringable, GeneratorStateMachineDelegate, MainDelegate, IntPtr,
+            RuntimeCounters;
 
         public CoreTypes(PhpCompilation compilation)
         {
@@ -241,6 +242,8 @@ namespace Pchp.CodeAnalysis.Symbols
 
             MainDelegate = Create("Context+MainDelegate");
             IntPtr = CreateFromFullName("System.IntPtr");
+
+            RuntimeCounters = Create("RuntimeCounters");
         }
 
         #region Table of types
