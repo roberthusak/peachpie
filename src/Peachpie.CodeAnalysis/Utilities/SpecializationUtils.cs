@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Reflection.Metadata;
 using System.Text;
 using Microsoft.CodeAnalysis;
+using Pchp.CodeAnalysis;
 using Pchp.CodeAnalysis.CodeGen;
 using Pchp.CodeAnalysis.FlowAnalysis;
 using Pchp.CodeAnalysis.Semantics;
@@ -89,7 +90,7 @@ namespace Peachpie.CodeAnalysis.Utilities
 
         private static readonly TypeCheckEmitter PhpValuePhpStringCheckEmitter = GetMethodEmitter(cg => cg.CoreMethods.PhpValue.IsStringNoAlias, (c, _) => c.GetWritableStringTypeMask());
 
-        public static SpecializationInfo GetInfo(TypeRefContext typeCtx, BoundExpression expr, TypeSymbol to, TypeRefMask toMask)
+        public static SpecializationInfo GetInfo(PhpCompilation compilation, TypeRefContext typeCtx, BoundExpression expr, TypeSymbol to)
         {
             // TODO: Try this after passing parameter's TypeRefMask
             //if (expr.TypeRefMask.IsRef || !typeCtx.CanBeSameType(expr.TypeRefMask, toMask))
@@ -97,13 +98,19 @@ namespace Peachpie.CodeAnalysis.Utilities
             //    return new SpecializationInfo(SpecializationKind.Never);
             //}
 
+            if (expr.TypeRefMask.IsRef)
+            {
+                // Aliases are currently not supported (their values can be influenced by evaluating other arguments)
+                return new SpecializationInfo(SpecializationKind.Never);
+            }
+
             if (to.Is_PhpValue())
             {
                 return new SpecializationInfo(SpecializationKind.Always);
             }
 
-            // TODO: Clean this up
-            if (expr.Type?.Is_PhpValue() == true || (expr.TypeRefMask.IsAnyType && !expr.TypeRefMask.IsRef))
+            var exprType = expr.Type ?? compilation.GetTypeFromTypeRef(typeCtx, expr.TypeRefMask);
+            if (exprType.Is_PhpValue())
             {
                 if (to.SpecialType == SpecialType.System_Boolean)
                 {
@@ -136,7 +143,7 @@ namespace Peachpie.CodeAnalysis.Utilities
 
                 // TODO: Specific classes etc. (.AsObject() is ...)
             }
-            else if (expr.Type?.Is_PhpString() == true || expr.Type?.SpecialType == SpecialType.System_String || (!expr.TypeRefMask.IsRef && typeCtx.IsOnlyAString(expr.TypeRefMask)))
+            else if (exprType.Is_PhpString() || exprType.SpecialType == SpecialType.System_String)
             {
                 // We can always convert between .NET and PHP strings
                 if (to.Is_PhpString() || to.SpecialType == SpecialType.System_String)

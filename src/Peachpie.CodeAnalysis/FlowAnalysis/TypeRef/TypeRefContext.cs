@@ -885,8 +885,6 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
         /// </summary>
         public bool IsAString(TypeRefMask mask) { return (mask.Mask & IsAStringMask) != 0; }
 
-        public bool IsOnlyAString(TypeRefMask mask) { return IsAString(mask) && !mask.IsVoid && (mask.TypesMask & ~IsAStringMask) == 0; }
-
         /// <summary>
         /// Gets value indicating whether given type mask represents UTF16 readonly string.
         /// </summary>

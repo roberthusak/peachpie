@@ -130,7 +130,7 @@ namespace Peachpie.CodeAnalysis.Utilities
                         var arg = arguments[i];
                         //var argType = typeRefContext.
                         var param = specializedOverload.SourceParameters[i];
-                        var specInfo = SpecializationUtils.GetInfo(typeRefContext, arg.Value, param.Type, /*TODO*/ default);
+                        var specInfo = SpecializationUtils.GetInfo(ambiguousRoutine.Ambiguities[0].DeclaringCompilation, typeRefContext, arg.Value, param.Type);
                         allAlways &= specInfo.Kind == SpecializationKind.Always;
                         anyNever |= specInfo.Kind == SpecializationKind.Never;
                     }

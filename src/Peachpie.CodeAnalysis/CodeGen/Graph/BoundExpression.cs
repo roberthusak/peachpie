@@ -2844,7 +2844,7 @@ namespace Pchp.CodeAnalysis.Semantics
             // The return type of the original overload should be the most general
             var returnType = origOverload.ReturnType;
 
-            List<(int, SpecializationInfo, TypeRefMask)> diffParamInfo = null;
+            var diffParamInfo = new List<(int, SpecializationInfo, TypeRefMask)>();
             var argumentBuilder = _arguments.ToBuilder();   // To evaluate complicated expressions to a temporary variable before passing as arguments
 
             // TODO Generalize for multiple overloads
@@ -2878,16 +2878,15 @@ namespace Pchp.CodeAnalysis.Semantics
                 if (origOverload.SourceParameters[i].Type != specializedOverload.SourceParameters[i].Type)
                 {
                     var specInfo = SpecializationUtils.GetInfo(
+                        cg.DeclaringCompilation,
                         cg.Routine.TypeRefContext,
                         _arguments[i].Value,
-                        specializedOverload.SourceParameters[i].Type,
-                        default);
+                        specializedOverload.SourceParameters[i].Type);
                     
                     Debug.Assert(specInfo.Kind != SpecializationKind.Never);
 
                     if (specInfo.Kind == SpecializationKind.RuntimeDependent)
                     {
-                        diffParamInfo ??= new List<(int, SpecializationInfo, TypeRefMask)>();
                         diffParamInfo.Add((i, specInfo, argVal.TypeRefMask));
                     }
                 }
@@ -2900,35 +2899,34 @@ namespace Pchp.CodeAnalysis.Semantics
             object falseLbl = new object();
             object endLbl = new object();
 
-            if (diffParamInfo?.Count > 0)
+            Debug.Assert(diffParamInfo.Count > 0);
+
+            OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallCheck);
+
+            foreach ((int i, var specInfo, var _) in diffParamInfo)
             {
-                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallCheck);
+                Debug.Assert(specInfo.Kind == SpecializationKind.RuntimeDependent);
 
-                foreach ((int i, var specInfo, var _) in diffParamInfo)
-                {
-                    Debug.Assert(specInfo.Kind == SpecializationKind.RuntimeDependent);
+                var arg = (BoundReferenceExpression)arguments[i].Value;
+                var trgType = specializedOverload.Parameters[i].Type;
 
-                    var arg = (BoundReferenceExpression)arguments[i].Value;
-                    var trgType = specializedOverload.Parameters[i].Type;
+                var specializedMask = specInfo.Emitter(cg, arg, trgType);
+                cg.Builder.EmitBranch(ILOpCode.Brfalse, falseLbl);
 
-                    var specializedMask = specInfo.Emitter(cg, arg, trgType);
-                    cg.Builder.EmitBranch(ILOpCode.Brfalse, falseLbl);
+                // Temporarily specialize the expression type mask to ease casting
+                arg.TypeRefMask = specializedMask;
+            }
 
-                    // Temporarily specialize the expression type mask to ease casting
-                    arg.TypeRefMask = specializedMask;
-                }
+            OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallSpecializedSelect);
 
-                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallSpecializedSelect);
+            var specReturnType = cg.EmitCall(opcode, specializedOverload, this.Instance, arguments, staticType);
+            cg.EmitConvert(specReturnType, default, returnType);
+            cg.Builder.EmitBranch(ILOpCode.Br, endLbl);
 
-                var specReturnType = cg.EmitCall(opcode, specializedOverload, this.Instance, arguments, staticType);
-                cg.EmitConvert(specReturnType, default, returnType);
-                cg.Builder.EmitBranch(ILOpCode.Br, endLbl);
-
-                // Restore the original expression type masks
-                foreach ((int i, var _, var origMask) in diffParamInfo)
-                {
-                    arguments[i].Value.TypeRefMask = origMask;
-                }
+            // Restore the original expression type masks
+            foreach ((int i, var _, var origMask) in diffParamInfo)
+            {
+                arguments[i].Value.TypeRefMask = origMask;
             }
 
             cg.Builder.MarkLabel(falseLbl);
