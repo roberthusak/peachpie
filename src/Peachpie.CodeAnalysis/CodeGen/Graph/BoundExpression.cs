@@ -2853,6 +2853,28 @@ namespace Pchp.CodeAnalysis.Semantics
             Debug.Assert(origOverload.SourceParameters.Length == specializedOverload.SourceParameters.Length);
             for (int i = 0; i < Math.Min(origOverload.SourceParameters.Length, _arguments.Length); i++)
             {
+                var argVal = _arguments[i].Value;
+                if (!argVal.IsConstant() && !(argVal is BoundVariableRef))
+                {
+                    // Evaluate, store to a temporary local variable and replace it in the arguments
+
+                    var tempRef = new BoundTemporalVariableRef(cg.GetFreeTemporaryLocalName()).WithContext(argVal);
+                    tempRef.TypeRefMask = argVal.TypeRefMask;
+                    tempRef.ConstantValue = argVal.ConstantValue;
+                    tempRef.Variable = cg.Routine.LocalsTable.BindTemporalVariable(tempRef.Name.NameValue);
+
+                    // Set the variable to a proper type
+                    var flowCtx = cg.Routine.ControlFlowGraph.FlowContext;
+                    flowCtx.AddVarType(flowCtx.GetVarIndex(tempRef.Name.NameValue), argVal.TypeRefMask);
+
+                    ((LocalVariableReference)tempRef.Variable).EmitInit(cg);
+                    tempRef.Place().EmitStorePrepare(cg.Builder);
+                    var argType = cg.Emit(argVal);
+                    tempRef.Place().EmitStore(cg.Builder);
+
+                    argumentBuilder[i] = _arguments[i].Update(tempRef, _arguments[i].ArgumentKind);
+                }
+
                 if (origOverload.SourceParameters[i].Type != specializedOverload.SourceParameters[i].Type)
                 {
                     var specInfo = SpecializationUtils.GetInfo(
@@ -2865,25 +2887,6 @@ namespace Pchp.CodeAnalysis.Semantics
 
                     if (specInfo.Kind == SpecializationKind.RuntimeDependent)
                     {
-                        // TODO: Handle constants and type analysis facts in the overload resolution phase, not here (use SpecializationUtils)
-                        var argVal = _arguments[i].Value;
-                        if (!(argVal is BoundVariableRef))
-                        {
-                            // Evaluate, store to a temporary local variable and replace it in the arguments
-
-                            var tempRef = new BoundTemporalVariableRef(cg.GetFreeTemporaryLocalName()).WithContext(argVal);
-                            tempRef.TypeRefMask = argVal.TypeRefMask;
-                            tempRef.ConstantValue = argVal.ConstantValue;
-                            tempRef.Variable = cg.Routine.LocalsTable.BindTemporalVariable(tempRef.Name.NameValue);
-
-                            ((LocalVariableReference)tempRef.Variable).EmitInit(cg);
-                            tempRef.Place().EmitStorePrepare(cg.Builder);
-                            var argType = cg.Emit(argVal);
-                            tempRef.Place().EmitStore(cg.Builder);
-
-                            argumentBuilder[i] = _arguments[i].Update(tempRef, _arguments[i].ArgumentKind);
-                        }
-
                         diffParamInfo ??= new List<(int, SpecializationInfo, TypeRefMask)>();
                         diffParamInfo.Add((i, specInfo, argVal.TypeRefMask));
                     }
