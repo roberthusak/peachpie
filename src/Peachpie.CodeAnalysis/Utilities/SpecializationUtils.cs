@@ -90,69 +90,91 @@ namespace Peachpie.CodeAnalysis.Utilities
 
         private static readonly TypeCheckEmitter PhpValuePhpStringCheckEmitter = GetMethodEmitter(cg => cg.CoreMethods.PhpValue.IsStringNoAlias, (c, _) => c.GetWritableStringTypeMask());
 
-        public static SpecializationInfo GetInfo(PhpCompilation compilation, TypeRefContext typeCtx, BoundExpression expr, TypeSymbol to)
+        public static SpecializationInfo GetInfo(PhpCompilation compilation, TypeRefContext typeCtx, BoundExpression expr, TypeSymbol paramType)
         {
-            // TODO: Try this after passing parameter's TypeRefMask
-            //if (expr.TypeRefMask.IsRef || !typeCtx.CanBeSameType(expr.TypeRefMask, toMask))
-            //{
-            //    return new SpecializationInfo(SpecializationKind.Never);
-            //}
+            var exprMask = expr.TypeRefMask;
+            var paramMask = TypeRefFactory.CreateMask(typeCtx, paramType);
 
-            if (expr.TypeRefMask.IsRef)
+            // Estimate the resulting type of the expression
+            var exprTypeEst = EstimateExpressionType(compilation, typeCtx, expr);
+
+            // References are not supported, exclude also obviously different types
+            if (exprMask.IsRef || !typeCtx.CanBeSameType(expr.TypeRefMask, paramMask))
             {
-                // Aliases are currently not supported (their values can be influenced by evaluating other arguments)
                 return new SpecializationInfo(SpecializationKind.Never);
             }
 
-            if (to.Is_PhpValue())
+            if (paramType.Is_PhpValue())
             {
                 return new SpecializationInfo(SpecializationKind.Always);
             }
 
-            var exprType = expr.Type ?? compilation.GetTypeFromTypeRef(typeCtx, expr.TypeRefMask);
-            if (exprType.Is_PhpValue())
+            if (((exprMask & ~paramMask) == 0 && !exprMask.IsVoid) || exprTypeEst == paramType)
             {
-                if (to.SpecialType == SpecialType.System_Boolean)
+                return new SpecializationInfo(SpecializationKind.Always);
+            }
+            else if (exprTypeEst.Is_PhpValue())
+            {
+                if (paramType.SpecialType == SpecialType.System_Boolean)
                 {
                     return new SpecializationInfo(SpecializationKind.RuntimeDependent, PhpValueBoolCheckEmitter);
                 }
-                else if (to.SpecialType == SpecialType.System_Int64)
+                else if (paramType.SpecialType == SpecialType.System_Int64)
                 {
                     return new SpecializationInfo(SpecializationKind.RuntimeDependent, PhpValueLongCheckEmitter);
                 }
-                else if (to.SpecialType == SpecialType.System_Double)
+                else if (paramType.SpecialType == SpecialType.System_Double)
                 {
                     return new SpecializationInfo(SpecializationKind.RuntimeDependent, PhpValueDoubleCheckEmitter);
                 }
-                else if (to.Is_PhpArray())
+                else if (paramType.Is_PhpArray())
                 {
                     return new SpecializationInfo(SpecializationKind.RuntimeDependent, PhpValuePhpArrayCheckEmitter);
                 }
-                else if (to.SpecialType == SpecialType.System_String)
+                else if (paramType.SpecialType == SpecialType.System_String)
                 {
                     return new SpecializationInfo(SpecializationKind.RuntimeDependent, PhpValueStringCheckEmitter);
                 }
-                else if (to.Is_PhpString())
+                else if (paramType.Is_PhpString())
                 {
                     return new SpecializationInfo(SpecializationKind.RuntimeDependent, PhpValuePhpStringCheckEmitter);
                 }
-                else if (to.SpecialType == SpecialType.System_Object)
+                else if (paramType.SpecialType == SpecialType.System_Object)
                 {
                     return new SpecializationInfo(SpecializationKind.RuntimeDependent, PhpValueObjectCheckEmitter);
                 }
 
                 // TODO: Specific classes etc. (.AsObject() is ...)
             }
-            else if (exprType.Is_PhpString() || exprType.SpecialType == SpecialType.System_String)
+            else if (exprTypeEst.Is_PhpString() || exprTypeEst.SpecialType == SpecialType.System_String)
             {
                 // We can always convert between .NET and PHP strings
-                if (to.Is_PhpString() || to.SpecialType == SpecialType.System_String)
+                if (paramType.Is_PhpString() || paramType.SpecialType == SpecialType.System_String)
                 {
                     return new SpecializationInfo(SpecializationKind.Always);
                 }
             }
 
             return new SpecializationInfo(SpecializationKind.Never);
+        }
+
+        private static TypeSymbol EstimateExpressionType(PhpCompilation compilation, TypeRefContext typeCtx, BoundExpression expr)
+        {
+            if (expr.Type is TypeSymbol resolvedType)
+            {
+                // The actually emitted type
+                return resolvedType;
+            }
+            else
+            {
+                // Estimate the type from the common cases
+                return expr switch
+                {
+                    BoundVariableRef { Variable: { Type: { } type } } => type,
+                    BoundRoutineCall { TargetMethod: { ReturnType: { } type } method } => method.CastToFalse ? compilation.CoreTypes.PhpValue : type,
+                    _ => compilation.GetTypeFromTypeRef(typeCtx, expr.TypeRefMask)
+                };
+            }
         }
     }
 }

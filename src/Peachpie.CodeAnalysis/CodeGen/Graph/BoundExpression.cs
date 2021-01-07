@@ -2857,21 +2857,24 @@ namespace Pchp.CodeAnalysis.Semantics
                 if (!argVal.IsConstant() && !(argVal is BoundVariableRef))
                 {
                     // Evaluate, store to a temporary local variable and replace it in the arguments
+                    // in order to shorten the generated code and prevent problems caused by emitting
+                    // the same expressions multiple times (e.g. call sites)
 
+                    // HACK: We first emit the expression to discover the exact type
+                    // (storing to a local variable does not in fact need  EmitStorePrepare)
+                    var argType = cg.Emit(argVal);
+
+                    // Create the temporal variable of the given type
                     var tempRef = new BoundTemporalVariableRef(cg.GetFreeTemporaryLocalName()).WithContext(argVal);
                     tempRef.TypeRefMask = argVal.TypeRefMask;
-                    tempRef.ConstantValue = argVal.ConstantValue;
-                    tempRef.Variable = cg.Routine.LocalsTable.BindTemporalVariable(tempRef.Name.NameValue);
+                    tempRef.Variable = cg.Routine.LocalsTable.BindTemporalVariable(tempRef.Name.NameValue, argType);
 
-                    // Set the variable to a proper type
-                    var flowCtx = cg.Routine.ControlFlowGraph.FlowContext;
-                    flowCtx.AddVarType(flowCtx.GetVarIndex(tempRef.Name.NameValue), argVal.TypeRefMask);
 
+                    // Store the value to the local variable
                     ((LocalVariableReference)tempRef.Variable).EmitInit(cg);
-                    tempRef.Place().EmitStorePrepare(cg.Builder);
-                    var argType = cg.Emit(argVal);
                     tempRef.Place().EmitStore(cg.Builder);
 
+                    // Replace the argument with the variable reference
                     argumentBuilder[i] = _arguments[i].Update(tempRef, _arguments[i].ArgumentKind);
                 }
 

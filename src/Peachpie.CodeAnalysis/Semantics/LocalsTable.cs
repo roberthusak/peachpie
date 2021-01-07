@@ -80,6 +80,12 @@ namespace Pchp.CodeAnalysis.Semantics
             return new LocalVariableReference(kind, Routine, new SourceLocalSymbol(Routine, name.Value, span), new BoundVariableName(name));
         }
 
+        LocalVariableReference CreateLocal(VariableName name, VariableKind kind, TypeSymbol type)
+        {
+            Debug.Assert(!name.IsAutoGlobal);
+            return new LocalVariableReference(kind, Routine, new SynthesizedLocalSymbol(Routine, name.Value, type), new BoundVariableName(name));
+        }
+
         #region Public methods
 
         IVariableReference BindVariable(VariableName varname, TextSpan span, Func<VariableName, TextSpan, LocalVariableReference> factory)
@@ -100,6 +106,8 @@ namespace Pchp.CodeAnalysis.Semantics
         public IVariableReference BindLocalVariable(VariableName varname, TextSpan span) => BindVariable(varname, span, (name, span) => CreateLocal(name, VariableKind.LocalVariable, span));
 
         public IVariableReference BindTemporalVariable(VariableName varname) => BindVariable(varname, default, (name, span) => CreateLocal(name, VariableKind.LocalTemporalVariable, span));
+
+        public IVariableReference BindTemporalVariable(VariableName varname, TypeSymbol type) => BindVariable(varname, default, (name, span) => CreateLocal(name, VariableKind.LocalTemporalVariable, type));
 
         public IVariableReference BindAutoGlobalVariable(VariableName varname) => BindVariable(varname, default, (name, span) => CreateAutoGlobal(name, span));
 
