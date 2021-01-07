@@ -63,6 +63,15 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
                 // TODO: emit parameters checks
             }
 
+            // Record routine call
+            OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkRoutineCall);
+
+            if (cg.Routine is SourceFunctionSymbol)
+            {
+                // Record global function call
+                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkGlobalFunctionCall);
+            }
+
             // In case of a routine with specialized overloads, emit counter increment for both the original method and the overload
             if (!cg.Routine.SpecializedOverloads.IsEmpty)
             {

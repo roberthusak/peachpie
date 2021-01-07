@@ -1034,12 +1034,16 @@ namespace Pchp.CodeAnalysis.Symbols
                 MarkBranchedCallOriginalSelect = ct.RuntimeCounters.Method(nameof(MarkBranchedCallOriginalSelect));
                 MarkBranchedCallSpecializedSelect = ct.RuntimeCounters.Method(nameof(MarkBranchedCallSpecializedSelect));
 
+                MarkRoutineCall = ct.RuntimeCounters.Method(nameof(MarkRoutineCall));
+                MarkGlobalFunctionCall = ct.RuntimeCounters.Method(nameof(MarkGlobalFunctionCall));
+
                 MarkOriginalOverloadCall = ct.RuntimeCounters.Method(nameof(MarkOriginalOverloadCall));
                 MarkSpecializedOverloadCall = ct.RuntimeCounters.Method(nameof(MarkSpecializedOverloadCall));
             }
 
             public readonly CoreMethod
                 MarkBranchedCallCheck, MarkBranchedCallOriginalSelect, MarkBranchedCallSpecializedSelect,
+                MarkRoutineCall, MarkGlobalFunctionCall,
                 MarkOriginalOverloadCall, MarkSpecializedOverloadCall;
         }
     }
