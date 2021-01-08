@@ -537,6 +537,7 @@ namespace Pchp.CodeAnalysis.Symbols
                 False = ct.PhpValue.Field("False");
 
                 IsStringNoAlias = ct.PhpValue.Method("IsStringNoAlias");
+                AsObjectNoAlias = ct.PhpValue.Method("AsObjectNoAlias");
             }
 
             public readonly CoreMethod
@@ -547,7 +548,7 @@ namespace Pchp.CodeAnalysis.Symbols
                 Ineq_PhpValue_PhpValue, Ineq_PhpValue_String, Ineq_String_PhpValue,
                 Create_Boolean, Create_Long, Create_Int, Create_Double, Create_String, Create_PhpString, Create_PhpNumber, Create_PhpAlias, Create_PhpArray, Create_IntStringKey,
                 FromClr_Object, FromClass_Object,
-                IsStringNoAlias;
+                IsStringNoAlias, AsObjectNoAlias;
 
             public readonly CoreField
                 Void, Null, True, False;

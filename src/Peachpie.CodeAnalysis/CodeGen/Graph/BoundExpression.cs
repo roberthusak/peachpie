@@ -2827,6 +2827,12 @@ namespace Pchp.CodeAnalysis.Semantics
 
         internal TypeSymbol EmitSpecializedBranchedCall(CodeGenerator cg, SourceRoutineSymbol origOverload, ImmutableArray<SourceRoutineSymbol> specializedOverloads)
         {
+            bool DoStoreToTempVar(BoundExpression argVal) => argVal switch
+            {
+                BoundVariableRef { Variable: LocalVariableReference localRef } => !localRef.IsOptimized,
+                _ => !argVal.IsConstant()
+            };
+
             Debug.Assert(!specializedOverloads.IsDefault);
             Debug.Assert(!specializedOverloads.IsEmpty);
 
@@ -2854,7 +2860,7 @@ namespace Pchp.CodeAnalysis.Semantics
             for (int i = 0; i < Math.Min(origOverload.SourceParameters.Length, _arguments.Length); i++)
             {
                 var argVal = _arguments[i].Value;
-                if (!argVal.IsConstant() && !(argVal is BoundVariableRef))
+                if (DoStoreToTempVar(argVal))
                 {
                     // Evaluate, store to a temporary local variable and replace it in the arguments
                     // in order to shorten the generated code and prevent problems caused by emitting
@@ -2868,7 +2874,6 @@ namespace Pchp.CodeAnalysis.Semantics
                     var tempRef = new BoundTemporalVariableRef(cg.GetFreeTemporaryLocalName()).WithContext(argVal);
                     tempRef.TypeRefMask = argVal.TypeRefMask;
                     tempRef.Variable = cg.Routine.LocalsTable.BindTemporalVariable(tempRef.Name.NameValue, argType);
-
 
                     // Store the value to the local variable
                     ((LocalVariableReference)tempRef.Variable).EmitInit(cg);
@@ -2911,7 +2916,7 @@ namespace Pchp.CodeAnalysis.Semantics
                 Debug.Assert(specInfo.Kind == SpecializationKind.RuntimeDependent);
 
                 var arg = (BoundReferenceExpression)arguments[i].Value;
-                var trgType = specializedOverload.Parameters[i].Type;
+                var trgType = specializedOverload.SourceParameters[i].Type;
 
                 var specializedMask = specInfo.Emitter(cg, arg, trgType);
                 cg.Builder.EmitBranch(ILOpCode.Brfalse, falseLbl);

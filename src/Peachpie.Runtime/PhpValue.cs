@@ -461,6 +461,12 @@ namespace Pchp.Core
             _ => null,
         };
 
+        public object AsObjectNoAlias() => TypeCode switch
+        {
+            PhpTypeCode.Object => Object,
+            _ => null,
+        };
+
         /// <summary>
         /// Explicit cast to object.
         /// Non-object values are wrapped to <see cref="stdClass"/>.
