@@ -530,4 +530,19 @@ namespace Pchp.Core
             ScriptType = scriptType;
         }
     }
+
+    [AttributeUsage(AttributeTargets.Assembly)]
+    public sealed class CompilationCountersAttribute : Attribute
+    {
+        public int Routines { get; }
+        public int GlobalFunctions { get; }
+        public int Specializations { get; }
+
+        public CompilationCountersAttribute(int routines, int globalFunctions, int specializations)
+        {
+            Routines = routines;
+            GlobalFunctions = globalFunctions;
+            Specializations = specializations;
+        }
+    }
 }

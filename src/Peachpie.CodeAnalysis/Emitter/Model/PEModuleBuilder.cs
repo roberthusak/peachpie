@@ -17,6 +17,8 @@ using Pchp.CodeAnalysis.Symbols;
 using Pchp.CodeAnalysis.Emitter;
 using Pchp.CodeAnalysis.Utilities;
 using Pchp.CodeAnalysis.CodeGen;
+using Peachpie.CodeAnalysis.Utilities;
+using ExceptionUtilities = Roslyn.Utilities.ExceptionUtilities;
 
 namespace Pchp.CodeAnalysis.Emit
 {
@@ -37,7 +39,7 @@ namespace Pchp.CodeAnalysis.Emit
         /// </summary>
         public SynthesizedManager SynthesizedManager { get; }
 
-        Cci.ICustomAttribute _debuggableAttribute, _targetFrameworkAttribute, _phpextensionAttribute, _targetphpversionAttribute, _assemblyinformationalversionAttribute;
+        Cci.ICustomAttribute _debuggableAttribute, _targetFrameworkAttribute, _phpextensionAttribute, _targetphpversionAttribute, _assemblyinformationalversionAttribute, _compilationCountersAttribute;
 
         protected readonly ConcurrentDictionary<Symbol, Cci.IModuleReference> AssemblyOrModuleSymbolToModuleRefMap = new ConcurrentDictionary<Symbol, Cci.IModuleReference>();
         readonly ConcurrentDictionary<Symbol, object> _genericInstanceMap = new ConcurrentDictionary<Symbol, object>();
@@ -212,6 +214,18 @@ namespace Pchp.CodeAnalysis.Emit
                     yield return _assemblyinformationalversionAttribute;
                 }
             }
+
+            if (_compilationCountersAttribute == null)
+            {
+                var counters = new CompilationCounters(Compilation);
+                _compilationCountersAttribute = new SynthesizedAttributeData(Compilation.CoreMethods.Ctors.CompilationCountersAttribute_int_int_int.Symbol,
+                    counters.GetAttributeCtorArgs()
+                        .Select(counter => new TypedConstant(Compilation.CoreTypes.Int32.Symbol, TypedConstantKind.Primitive, counter))
+                        .ToImmutableArray(),
+                    ImmutableArray<KeyValuePair<string, TypedConstant>>.Empty);
+            }
+
+            yield return _compilationCountersAttribute;
 
             //
             yield break;
