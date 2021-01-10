@@ -890,7 +890,7 @@ namespace Pchp.CodeAnalysis.Symbols
 
                 IndirectLocal_PhpArray_IntStringKey = ct.IndirectLocal.Ctor(ct.PhpArray, ct.IntStringKey);
 
-                CompilationCountersAttribute_int_int_int = ct.CompilationCountersAttribute.Ctor(ct.Int32, ct.Int32, ct.Int32);
+                CompilationCountersAttribute_int_int_int_int_int_int_int_int_int_int = ct.CompilationCountersAttribute.Ctor(Enumerable.Repeat(ct.Int32, 10).ToArray());
             }
 
             public readonly CoreConstructor
@@ -903,7 +903,7 @@ namespace Pchp.CodeAnalysis.Symbols
                 DefaultValueAttribute_string,
                 ScriptDiedException, ScriptDiedException_Long, ScriptDiedException_PhpValue,
                 IndirectLocal_PhpArray_IntStringKey,
-                CompilationCountersAttribute_int_int_int;
+                CompilationCountersAttribute_int_int_int_int_int_int_int_int_int_int;
         }
 
         public struct ContextHolder

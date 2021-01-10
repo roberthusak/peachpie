@@ -218,7 +218,7 @@ namespace Pchp.CodeAnalysis.Emit
             if (_compilationCountersAttribute == null)
             {
                 var counters = new CompilationCounters(Compilation);
-                _compilationCountersAttribute = new SynthesizedAttributeData(Compilation.CoreMethods.Ctors.CompilationCountersAttribute_int_int_int.Symbol,
+                _compilationCountersAttribute = new SynthesizedAttributeData(Compilation.CoreMethods.Ctors.CompilationCountersAttribute_int_int_int_int_int_int_int_int_int_int.Symbol,
                     counters.GetAttributeCtorArgs()
                         .Select(counter => new TypedConstant(Compilation.CoreTypes.Int32.Symbol, TypedConstantKind.Primitive, counter))
                         .ToImmutableArray(),

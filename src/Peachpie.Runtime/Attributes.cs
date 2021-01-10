@@ -538,11 +538,26 @@ namespace Pchp.Core
         public int GlobalFunctions { get; }
         public int Specializations { get; }
 
-        public CompilationCountersAttribute(int routines, int globalFunctions, int specializations)
+        public int RoutineCalls { get; }
+        public int FunctionCalls { get; }
+        public int LibraryFunctionCalls { get; }
+        public int AmbiguousSourceFunctionCalls { get; }
+        public int BranchedSourceFunctionCalls { get; }
+        public int OriginalSourceFunctionCalls { get; }
+        public int SpecializedSourceFunctionCalls { get; }
+
+        public CompilationCountersAttribute(int routines, int globalFunctions, int specializations, int routineCalls, int functionCalls, int libraryFunctionCalls, int ambiguousSourceFunctionCalls, int branchedSourceFunctionCalls, int originalSourceFunctionCalls, int specializedSourceFunctionCalls)
         {
             Routines = routines;
             GlobalFunctions = globalFunctions;
             Specializations = specializations;
+            RoutineCalls = routineCalls;
+            FunctionCalls = functionCalls;
+            LibraryFunctionCalls = libraryFunctionCalls;
+            AmbiguousSourceFunctionCalls = ambiguousSourceFunctionCalls;
+            BranchedSourceFunctionCalls = branchedSourceFunctionCalls;
+            OriginalSourceFunctionCalls = originalSourceFunctionCalls;
+            SpecializedSourceFunctionCalls = specializedSourceFunctionCalls;
         }
     }
 }
