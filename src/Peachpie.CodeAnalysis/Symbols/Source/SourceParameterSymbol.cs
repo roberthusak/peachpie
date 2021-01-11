@@ -112,7 +112,7 @@ namespace Pchp.CodeAnalysis.Symbols
         }
         FieldSymbol _lazyDefaultValueField;
 
-        public SourceParameterSymbol(SourceRoutineSymbol routine, FormalParam syntax, int relindex, PHPDocBlock.ParamTag ptagOpt)
+        public SourceParameterSymbol(SourceRoutineSymbol routine, FormalParam syntax, int relindex, PHPDocBlock.ParamTag ptagOpt, TypeSymbol specializedType = null)
         {
             Contract.ThrowIfNull(routine);
             Contract.ThrowIfNull(syntax);
@@ -127,6 +127,7 @@ namespace Pchp.CodeAnalysis.Symbols
                     .BindWholeExpression(syntax.InitValue, BoundAccess.Read)
                     .SingleBoundElement()
                 : null;
+            _lazyType = specializedType;
         }
 
         /// <summary>
@@ -237,7 +238,7 @@ namespace Pchp.CodeAnalysis.Symbols
 
             // 2. optionally type specified in PHPDoc
             if (result == null &&
-                ((DeclaringCompilation.Options.PhpDocTypes & PhpDocTypes.ParameterTypes) != 0 && Routine.CanUsePhpDocTypes() || Routine.IsSpecializedOverload))
+                (DeclaringCompilation.Options.PhpDocTypes & PhpDocTypes.ParameterTypes) != 0 && Routine.CanUsePhpDocTypes())
             {
                 this.TryGetTypeFromPhpDoc(out result);
             }

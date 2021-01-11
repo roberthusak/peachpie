@@ -16,6 +16,7 @@ using Microsoft.CodeAnalysis.PooledObjects;
 using Microsoft.CodeAnalysis.Symbols;
 using Pchp.CodeAnalysis.DocumentationComments;
 using Pchp.CodeAnalysis.Emit;
+using Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization;
 using Pchp.CodeAnalysis.Symbols;
 using Pchp.CodeAnalysis.Utilities;
 using Roslyn.Utilities;
@@ -53,6 +54,11 @@ namespace Pchp.CodeAnalysis
         /// We do so by creating a new reference manager for such compilation. 
         /// </summary>
         private ReferenceManager _referenceManager;
+
+        /// <summary>
+        /// Optional, selects the routine specializations to be created.
+        /// </summary>
+        internal IRoutineSpecializer RoutineSpecializer { get; }
 
         /// <summary>
         /// COR library containing base system types.
@@ -163,6 +169,12 @@ namespace Pchp.CodeAnalysis
                 : new ReferenceManager(MakeSourceAssemblySimpleName(), options.AssemblyIdentityComparer, referenceManager?.ObservedMetadata, options.SdkDirectory);
 
             _tables = new SourceSymbolCollection(this);
+
+            if (_options.ExperimentalOptimization.HasPhpDocOverloads() && (_options.PhpDocTypes & PhpDocTypes.ParameterTypes) == 0)
+            {
+                // Add the PhpDoc specialization unless the routines are already forced to use PhpDoc parameter types
+                RoutineSpecializer = new PhpDocSpecializer(this);
+            }
         }
 
         /// <summary>

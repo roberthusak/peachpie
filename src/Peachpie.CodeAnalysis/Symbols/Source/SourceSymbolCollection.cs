@@ -266,12 +266,6 @@ namespace Pchp.CodeAnalysis.Symbols
 
                 f.SetProperty(routine); // remember bound function symbol
                 fsymbol.AddFunction(routine);
-
-                if (Compilation.Options.ExperimentalOptimization.HasPhpDocOverloads()
-                    && (Compilation.Options.PhpDocTypes & PhpDocTypes.ParameterTypes) == 0)
-                {
-                    routine.TryCreatePhpDocOverload();
-                }
             }
 
             //

@@ -17,12 +17,14 @@ using Roslyn.Utilities;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Devsense.PHP.Syntax.Ast;
 
 namespace Pchp.CodeAnalysis
 {
@@ -198,27 +200,63 @@ namespace Pchp.CodeAnalysis
         /// <summary>
         /// Walks all expressions and resolves their access, operator method, and result CLR type.
         /// </summary>
-        void BindTypes()
+        void BindTypes(IEnumerable<SourceRoutineSymbol> specificRoutines = null)
         {
             var binder = new ResultTypeBinder(_compilation);
 
-            // method bodies
-            this.WalkMethods(routine =>
+            if (specificRoutines == null)
+            {
+                // method bodies
+                this.WalkMethods(BindRoutine, allowParallel: ConcurrentBuild);
+
+                // field initializers
+                WalkTypes(type =>
+                {
+                    type.GetDeclaredMembers().OfType<SourceFieldSymbol>().ForEach(binder.Bind);
+
+                }, allowParallel: ConcurrentBuild);
+            }
+            else
+            {
+                specificRoutines.ForEach(BindRoutine);
+            }
+
+            void BindRoutine(SourceRoutineSymbol routine)
             {
                 // body
                 binder.Bind(routine);
 
                 // parameter initializers
                 routine.SourceParameters.ForEach(binder.Bind);
+            }
+        }
 
-            }, allowParallel: ConcurrentBuild);
-
-            // field initializers
-            WalkTypes(type =>
+        private IEnumerable<SourceRoutineSymbol> SpecializeMethods()
+        {
+            var overloads = new ConcurrentBag<SourceRoutineSymbol>();
+            this.WalkMethods(routine =>
             {
-                type.GetDeclaredMembers().OfType<SourceFieldSymbol>().ForEach(binder.Bind);
+                // TODO: Enable to add more specializations to a method (currently it sticks only with the first one)
+                if (routine.SpecializedOverloads.IsEmpty)
+                {
+                    if (_compilation.RoutineSpecializer.TryGetRoutineSpecializedParameters(routine, out var specParams))
+                    {
+                        var overload = new SourceFunctionSymbol(routine.ContainingFile, (FunctionDecl) routine.Syntax)
+                        {
+                            SpecializedParameterTypes = specParams
+                        };
 
+                        routine.SpecializedOverloads = ImmutableArray.Create((SourceRoutineSymbol) overload);
+
+                        // Bind the overload and prepare for the next analysis
+                        _worklist.Enqueue(overload.ControlFlowGraph.Start);
+
+                        overloads.Add(overload);
+                    }
+                }
             }, allowParallel: ConcurrentBuild);
+
+            return overloads.ToArray();
         }
 
         #region Nested class: LateStaticCallsLookup
@@ -500,13 +538,37 @@ namespace Pchp.CodeAnalysis
                     compiler.BindTypes();
                 }
 
+                // 4. Optionally create and analyse routine specializations
+                if (compilation.RoutineSpecializer != null)
+                {
+
+                    IEnumerable<SourceRoutineSymbol> specializedRoutines;
+                    using (compilation.StartMetric("specialization"))
+                    {
+                        compilation.RoutineSpecializer.OnAfterAnalysis();
+                        specializedRoutines = compiler.SpecializeMethods();
+                    }
+
+                    using (compilation.StartMetric("specialization analysis"))
+                    {
+                        // Analyze only the newly specialized methods (they were put to the worklist)
+                        compiler.AnalyzeMethods();
+                    }
+
+                    using (compilation.StartMetric("bind types"))
+                    {
+                        // Bind only the recently specialized routines
+                        compiler.BindTypes(specializedRoutines);
+                    }
+                }
+
                 using (compilation.StartMetric(nameof(ForwardLateStaticBindings)))
                 {
-                    // 4. forward the late static type if needed
+                    // 5. forward the late static type if needed
                     compiler.ForwardLateStaticBindings();
                 }
 
-                // 5. Transform Semantic Trees for Runtime Optimization
+                // 6. Transform Semantic Trees for Runtime Optimization
             } while (
                 transformation++ < compiler.MaxTransformCount   // limit number of lowering cycles
                 && !cancellationToken.IsCancellationRequested   // user canceled ?
@@ -517,7 +579,7 @@ namespace Pchp.CodeAnalysis
 
             using (compilation.StartMetric("diagnostic"))
             {
-                // 6. Collect diagnostics
+                // 7. Collect diagnostics
                 compiler.DiagnoseMethods();
                 compiler.DiagnoseTypes();
                 compiler.DiagnoseFiles();

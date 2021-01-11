@@ -24,25 +24,6 @@ namespace Peachpie.CodeAnalysis.Utilities
             routine.DeclaringCompilation.Options.ExperimentalOptimization != ExperimentalOptimization.PhpDocForceOnlyFunctions
             || routine is SourceFunctionSymbol;
 
-        public static SourceFunctionSymbol? TryCreatePhpDocOverload(this SourceFunctionSymbol routine)
-        {
-            if (routine.SourceParameters.Any(CanBeParameterSpecialized))
-            {
-                var overload = new SourceFunctionSymbol(routine.ContainingFile, (FunctionDecl)routine.Syntax)
-                {
-                    IsSpecializedOverload = true
-                };
-
-                routine.SpecializedOverloads = new[] { (SourceRoutineSymbol)overload }.ToImmutableArray();
-
-                return overload;
-            }
-            else
-            {
-                return null;
-            }
-        }
-
         public static bool TryGetTypeFromPhpDoc(this SourceParameterSymbol parameter, out TypeSymbol? type)
         {
             if (parameter.PHPDocOpt != null && parameter.PHPDocOpt.TypeNamesArray.Length != 0)
@@ -164,16 +145,6 @@ namespace Peachpie.CodeAnalysis.Utilities
                 resultOverloadsBuilder.Add(origOverload!);
                 return new AmbiguousMethodSymbol(ImmutableArray<MethodSymbol>.CastUp(resultOverloadsBuilder.MoveToImmutable()), true);
             }
-        }
-
-        private static bool CanBeParameterSpecialized(SourceParameterSymbol parameter)
-        {
-            if (parameter.Type.Is_PhpValue() && parameter.TryGetTypeFromPhpDoc(out var type))
-            {
-                return !type.Is_PhpValue();
-            }
-
-            return false;
         }
 
         [Conditional("DEBUG")]

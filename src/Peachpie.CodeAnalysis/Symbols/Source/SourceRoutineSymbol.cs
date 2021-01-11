@@ -33,8 +33,10 @@ namespace Pchp.CodeAnalysis.Symbols
         /// <summary>Internal true/false values. Initially all false.</summary>
         protected CommonFlags _commonflags;
 
+        internal ImmutableArray<TypeSymbol> SpecializedParameterTypes { get; set; }
+
         // TODO: Put to CommonFlags
-        internal bool IsSpecializedOverload { get; set; }
+        internal bool IsSpecializedOverload => !SpecializedParameterTypes.IsDefault;
 
         public override bool IsPhpHidden => IsSpecializedOverload;
 
@@ -240,7 +242,8 @@ namespace Pchp.CodeAnalysis.Symbols
 
                 var ptag = (phpdocOpt != null) ? PHPDoc.GetParamTag(phpdocOpt, pindex, p.Name.Name.Value) : null;
 
-                yield return new SourceParameterSymbol(this, p, relindex: pindex++, ptagOpt: ptag);
+                var specializedType = IsSpecializedOverload ? SpecializedParameterTypes[pindex] : null;
+                yield return new SourceParameterSymbol(this, p, relindex: pindex++, ptagOpt: ptag, specializedType);
             }
         }
 
