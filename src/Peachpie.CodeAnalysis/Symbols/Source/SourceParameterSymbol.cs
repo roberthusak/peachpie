@@ -122,12 +122,18 @@ namespace Pchp.CodeAnalysis.Symbols
             _syntax = syntax;
             _relindex = relindex;
             _ptagOpt = ptagOpt;
-            _initializer = (syntax.InitValue != null)
+            _lazyType = specializedType;
+
+            var initializer = (syntax.InitValue != null)
                 ? new SemanticsBinder(DeclaringCompilation, routine.ContainingFile.SyntaxTree, locals: null, routine: null, self: routine.ContainingType as SourceTypeSymbol)
                     .BindWholeExpression(syntax.InitValue, BoundAccess.Read)
                     .SingleBoundElement()
                 : null;
-            _lazyType = specializedType;
+            _initializer =
+                (specializedType == null || initializer == null
+                 || SpecializationUtils.GetInfo(routine.DeclaringCompilation, routine.TypeRefContext, initializer, specializedType).Kind == SpecializationKind.Always)
+                    ? initializer
+                    : null;
         }
 
         /// <summary>

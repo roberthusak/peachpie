@@ -125,14 +125,14 @@ namespace Peachpie.CodeAnalysis.Utilities
 
         public static SpecializationInfo GetInfo(PhpCompilation compilation, TypeRefContext typeCtx, BoundExpression expr, TypeSymbol paramType)
         {
-            var exprMask = expr.TypeRefMask;
+            var exprMask = EstimateExpressionTypeRefMask(typeCtx, expr);
             var paramMask = TypeRefFactory.CreateMask(typeCtx, paramType);
 
             // Estimate the resulting type of the expression
-            var exprTypeEst = EstimateExpressionType(compilation, typeCtx, expr);
+            var exprTypeEst = EstimateExpressionType(compilation, typeCtx, expr, exprMask);
 
             // References are not supported, exclude also obviously different types
-            if (exprMask.IsRef || !typeCtx.CanBeSameType(expr.TypeRefMask, paramMask))
+            if (exprMask.IsRef || !typeCtx.CanBeSameType(exprMask, paramMask))
             {
                 return new SpecializationInfo(SpecializationKind.Never);
             }
@@ -204,7 +204,27 @@ namespace Peachpie.CodeAnalysis.Utilities
             return new SpecializationInfo(SpecializationKind.Never);
         }
 
-        public static TypeSymbol EstimateExpressionType(PhpCompilation compilation, TypeRefContext typeCtx, BoundExpression expr)
+        /// <summary>
+        /// Estimate <see cref="TypeRefMask"/> for simple expressions (e.g. default parameter values before proper analysis).
+        /// </summary>
+        public static TypeRefMask EstimateExpressionTypeRefMask(TypeRefContext typeCtx, BoundExpression expr)
+        {
+            if (!expr.TypeRefMask.IsDefault)
+            {
+                return expr.TypeRefMask;
+            }
+            else
+            {
+                return expr switch
+                {
+                    BoundLiteral literal => literal.ResolveTypeMask(typeCtx),
+                    BoundArrayEx _ => typeCtx.GetArrayTypeMask(),
+                    _ => TypeRefMask.AnyType
+                };
+            }
+        }
+
+        public static TypeSymbol EstimateExpressionType(PhpCompilation compilation, TypeRefContext typeCtx, BoundExpression expr, TypeRefMask exprTypeMask = default)
         {
             if (expr.Type is TypeSymbol resolvedType)
             {
@@ -213,12 +233,17 @@ namespace Peachpie.CodeAnalysis.Utilities
             }
             else
             {
+                if (exprTypeMask.IsDefault)
+                {
+                    exprTypeMask = expr.TypeRefMask;
+                }
+
                 // Estimate the type from the common cases
                 return expr switch
                 {
                     BoundVariableRef { Variable: LocalVariableReference { IsOptimized: true, Type: var type } } => type,
                     BoundRoutineCall { TargetMethod: { ReturnType: var type } method } => method.CastToFalse ? compilation.CoreTypes.PhpValue : type,
-                    _ => compilation.GetTypeFromTypeRef(typeCtx, expr.TypeRefMask)
+                    _ => compilation.GetTypeFromTypeRef(typeCtx, exprTypeMask)
                 };
             }
         }
