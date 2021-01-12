@@ -231,13 +231,13 @@ namespace Pchp.CodeAnalysis
             }
         }
 
-        private IEnumerable<SourceRoutineSymbol> SpecializeMethods()
+        private ImmutableArray<SourceRoutineSymbol> SpecializeMethods()
         {
             var overloads = new ConcurrentBag<SourceRoutineSymbol>();
             this.WalkMethods(routine =>
             {
                 // TODO: Enable to add more specializations to a method (currently it sticks only with the first one)
-                if (routine.SpecializedOverloads.IsEmpty)
+                if (routine.SpecializedOverloads.IsEmpty && !routine.IsSpecializedOverload)
                 {
                     if (_compilation.RoutineSpecializer.TryGetRoutineSpecializedParameters(routine, out var specParams))
                     {
@@ -256,7 +256,7 @@ namespace Pchp.CodeAnalysis
                 }
             }, allowParallel: ConcurrentBuild);
 
-            return overloads.ToArray();
+            return overloads.ToImmutableArray();
         }
 
         #region Nested class: LateStaticCallsLookup
@@ -472,11 +472,11 @@ namespace Pchp.CodeAnalysis
             }
         }
 
-        bool RewriteMethods()
+        bool RewriteMethods(bool forceAnalysisInvalidation)
         {
             using (_compilation.StartMetric("transform"))
             {
-                if (TransformMethods(ConcurrentBuild))
+                if (TransformMethods(ConcurrentBuild) || forceAnalysisInvalidation)
                 {
                     WalkMethods(m =>
                         {
@@ -522,6 +522,7 @@ namespace Pchp.CodeAnalysis
 
             // Repeat analysis and transformation until either the limit is met or there are no more changes
             int transformation = 0;
+            var specializedRoutines = ImmutableArray<SourceRoutineSymbol>.Empty;
             do
             {
                 using (compilation.StartMetric("analysis"))
@@ -541,8 +542,6 @@ namespace Pchp.CodeAnalysis
                 // 4. Optionally create and analyse routine specializations
                 if (compilation.RoutineSpecializer != null)
                 {
-
-                    IEnumerable<SourceRoutineSymbol> specializedRoutines;
                     using (compilation.StartMetric("specialization"))
                     {
                         compilation.RoutineSpecializer.OnAfterAnalysis(compiler._worklist.CallGraph);
@@ -555,7 +554,7 @@ namespace Pchp.CodeAnalysis
                         compiler.AnalyzeMethods();
                     }
 
-                    using (compilation.StartMetric("bind types"))
+                    using (compilation.StartMetric("specialization type binding"))
                     {
                         // Bind only the recently specialized routines
                         compiler.BindTypes(specializedRoutines);
@@ -570,9 +569,9 @@ namespace Pchp.CodeAnalysis
 
                 // 6. Transform Semantic Trees for Runtime Optimization
             } while (
-                transformation++ < compiler.MaxTransformCount   // limit number of lowering cycles
-                && !cancellationToken.IsCancellationRequested   // user canceled ?
-                && compiler.RewriteMethods());  // try lower the semantics
+                transformation++ < compiler.MaxTransformCount               // limit number of lowering cycles
+                && !cancellationToken.IsCancellationRequested               // user canceled ?
+                && compiler.RewriteMethods(!specializedRoutines.IsEmpty));  // try lower the semantics (repeat also when specialized overloads were produced)
 
             // Track the number of actually performed transformations
             compilation.TrackMetric("transformations", transformation - 1);
