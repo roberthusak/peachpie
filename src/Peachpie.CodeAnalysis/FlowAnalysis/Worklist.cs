@@ -49,6 +49,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
 
         readonly CallGraph _callGraph = new CallGraph();
 
+        internal CallGraph CallGraph => _callGraph;
+
         /// <summary>
         /// Set of blocks that need to be processed, but the methods they call haven't been processed yet.
         /// </summary>

@@ -175,6 +175,10 @@ namespace Pchp.CodeAnalysis
                 // Add the PhpDoc specialization unless the routines are already forced to use PhpDoc parameter types
                 RoutineSpecializer = new PhpDocSpecializer(this);
             }
+            else if (_options.ExperimentalOptimization == ExperimentalOptimization.CallSiteOverloadsBranch)
+            {
+                RoutineSpecializer = new CallSiteSpecializer(this);
+            }
         }
 
         /// <summary>

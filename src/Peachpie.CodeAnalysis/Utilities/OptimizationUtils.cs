@@ -83,7 +83,7 @@ namespace Peachpie.CodeAnalysis.Utilities
 
                 // If judging only by name or static resolution is not supported, return only the original overload if we want the conservative approach
                 return
-                    (optimization == ExperimentalOptimization.PhpDocOverloadsStatic || optimization == ExperimentalOptimization.PhpDocOverloadsBranch)
+                    (optimization == ExperimentalOptimization.PhpDocOverloadsStatic || optimization.HasBranchedCallSites())
                     ? (MethodSymbol)origOverload!
                     : ambiguousRoutine;
             }

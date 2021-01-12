@@ -545,7 +545,7 @@ namespace Pchp.CodeAnalysis
                     IEnumerable<SourceRoutineSymbol> specializedRoutines;
                     using (compilation.StartMetric("specialization"))
                     {
-                        compilation.RoutineSpecializer.OnAfterAnalysis();
+                        compilation.RoutineSpecializer.OnAfterAnalysis(compiler._worklist.CallGraph);
                         specializedRoutines = compiler.SpecializeMethods();
                     }
 

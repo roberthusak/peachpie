@@ -8,6 +8,7 @@ using Pchp.CodeAnalysis;
 using Pchp.CodeAnalysis.FlowAnalysis;
 using Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization;
 using Pchp.CodeAnalysis.Symbols;
+using Peachpie.CodeAnalysis.FlowAnalysis.Graph;
 using Peachpie.CodeAnalysis.Utilities;
 
 namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
@@ -23,7 +24,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
             _compilation = compilation;
         }
 
-        public void OnAfterAnalysis()
+        public void OnAfterAnalysis(CallGraph callGraph)
         {
             if (_specializations == null)
             {

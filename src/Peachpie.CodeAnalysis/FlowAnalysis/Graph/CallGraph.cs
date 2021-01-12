@@ -17,9 +17,9 @@ namespace Peachpie.CodeAnalysis.FlowAnalysis.Graph
             CallExpression = callExpression;
         }
 
-        BoundBlock Block { get; }
+        public BoundBlock Block { get; }
 
-        BoundRoutineCall CallExpression { get; }
+        public BoundRoutineCall CallExpression { get; }
     }
 
     /// <summary>

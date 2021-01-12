@@ -3022,7 +3022,7 @@ namespace Pchp.CodeAnalysis.Semantics
         {
             if (_name.IsDirect)
             {
-                if (cg.DeclaringCompilation.Options.ExperimentalOptimization == ExperimentalOptimization.PhpDocOverloadsBranch &&
+                if (cg.DeclaringCompilation.Options.ExperimentalOptimization.HasBranchedCallSites() &&
                     TargetMethod is AmbiguousMethodSymbol ambig &&
                     OptimizationUtils.TryExtractOriginalFromSpecializedOverloads(ambig.Ambiguities, out var origOverload))
                 {

@@ -204,7 +204,7 @@ namespace Peachpie.CodeAnalysis.Utilities
             return new SpecializationInfo(SpecializationKind.Never);
         }
 
-        private static TypeSymbol EstimateExpressionType(PhpCompilation compilation, TypeRefContext typeCtx, BoundExpression expr)
+        public static TypeSymbol EstimateExpressionType(PhpCompilation compilation, TypeRefContext typeCtx, BoundExpression expr)
         {
             if (expr.Type is TypeSymbol resolvedType)
             {

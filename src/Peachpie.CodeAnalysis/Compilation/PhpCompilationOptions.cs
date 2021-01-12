@@ -69,6 +69,12 @@ namespace Pchp.CodeAnalysis
         /// this switch cause them to be applied only on global functions, not on methods.
         /// </summary>
         PhpDocForceOnlyFunctions,
+
+        /// <summary>
+        /// Generates a type-specific overload for each routine where the parameter types are infered from the
+        /// types of the argument the routine is called with. 
+        /// </summary>
+        CallSiteOverloadsBranch,
     }
 
     public static class ExperimentalOptimizationExtensions
@@ -77,6 +83,10 @@ namespace Pchp.CodeAnalysis
             optimization == ExperimentalOptimization.PhpDocOverloadsStatic ||
             optimization == ExperimentalOptimization.PhpDocOverloadsDynamic ||
             optimization == ExperimentalOptimization.PhpDocOverloadsBranch;
+
+        public static bool HasBranchedCallSites(this ExperimentalOptimization optimization) =>
+            optimization == ExperimentalOptimization.PhpDocOverloadsBranch ||
+            optimization == ExperimentalOptimization.CallSiteOverloadsBranch;
     }
 
     /// <summary>
