@@ -2902,50 +2902,60 @@ namespace Pchp.CodeAnalysis.Semantics
 
             var arguments = argumentBuilder.MoveToImmutable();
 
-            // (arg1.Is... && arg3.Is...) ? SpecializedOverload(arg1, arg2, arg3) : OrigOverload(arg1, arg2, arg3)
-            
-            object falseLbl = new object();
-            object endLbl = new object();
-
-            Debug.Assert(diffParamInfo.Count > 0);
-
-            OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallCheck);
-
-            foreach ((int i, var specInfo, var _) in diffParamInfo)
+            if (diffParamInfo.Count > 0)
             {
-                Debug.Assert(specInfo.Kind == SpecializationKind.RuntimeDependent);
+                // (arg1.Is... && arg3.Is...) ? SpecializedOverload(arg1, arg2, arg3) : OrigOverload(arg1, arg2, arg3)
 
-                var arg = (BoundReferenceExpression)arguments[i].Value;
-                var trgType = specializedOverload.SourceParameters[i].Type;
+                object falseLbl = new object();
+                object endLbl = new object();
 
-                var specializedMask = specInfo.Emitter(cg, arg, trgType);
-                cg.Builder.EmitBranch(ILOpCode.Brfalse, falseLbl);
+                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallCheck);
 
-                // Temporarily specialize the expression type mask to ease casting
-                arg.TypeRefMask = specializedMask;
+                foreach ((int i, var specInfo, var _) in diffParamInfo)
+                {
+                    Debug.Assert(specInfo.Kind == SpecializationKind.RuntimeDependent);
+
+                    var arg = (BoundReferenceExpression)arguments[i].Value;
+                    var trgType = specializedOverload.SourceParameters[i].Type;
+
+                    var specializedMask = specInfo.Emitter(cg, arg, trgType);
+                    cg.Builder.EmitBranch(ILOpCode.Brfalse, falseLbl);
+
+                    // Temporarily specialize the expression type mask to ease casting
+                    arg.TypeRefMask = specializedMask;
+                }
+
+                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallSpecializedSelect);
+
+                var specReturnType = cg.EmitCall(opcode, specializedOverload, this.Instance, arguments, staticType);
+                cg.EmitConvert(specReturnType, default, returnType);
+                cg.Builder.EmitBranch(ILOpCode.Br, endLbl);
+
+                // Restore the original expression type masks
+                foreach ((int i, var _, var origMask) in diffParamInfo)
+                {
+                    arguments[i].Value.TypeRefMask = origMask;
+                }
+
+                cg.Builder.MarkLabel(falseLbl);
+
+                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallOriginalSelect);
+
+                var realReturnType = cg.EmitCall(opcode, origOverload, this.Instance, arguments, staticType);
+                Debug.Assert(realReturnType == returnType);
+
+                cg.Builder.MarkLabel(endLbl);
             }
-
-            OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallSpecializedSelect);
-
-            var specReturnType = cg.EmitCall(opcode, specializedOverload, this.Instance, arguments, staticType);
-            cg.EmitConvert(specReturnType, default, returnType);
-            cg.Builder.EmitBranch(ILOpCode.Br, endLbl);
-
-            // Restore the original expression type masks
-            foreach ((int i, var _, var origMask) in diffParamInfo)
+            else
             {
-                arguments[i].Value.TypeRefMask = origMask;
+                // This situation can happen when the argument types gathered by emitting are more precise
+                // than those estimated previously and fit the specialized overload without runtime checks.
+                // In that case, call the specialized overload with the temporary variables, JIT will
+                // hopefully optimize them away.
+
+                // Overwrite the return type
+                returnType = cg.EmitCall(opcode, specializedOverload, this.Instance, arguments, staticType);
             }
-
-            cg.Builder.MarkLabel(falseLbl);
-
-            OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallOriginalSelect);
-
-            var realReturnType = cg.EmitCall(opcode, origOverload, this.Instance, arguments, staticType);
-            Debug.Assert(realReturnType == returnType);
-
-            cg.Builder.MarkLabel(endLbl);
-
 
             //
             return (this.ResultType = cg.EmitMethodAccess(returnType, origOverload, Access));
