@@ -18,7 +18,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
     {
         private readonly PhpCompilation _compilation;
 
-        private Dictionary<SourceRoutineSymbol, ImmutableArray<TypeSymbol>> _specializations;
+        private readonly Dictionary<SourceRoutineSymbol, ImmutableArray<TypeSymbol>> _specializations =
+            new Dictionary<SourceRoutineSymbol, ImmutableArray<TypeSymbol>>();
 
         public CallSiteSpecializer(PhpCompilation compilation)
         {
@@ -27,40 +28,35 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
 
         public void OnAfterAnalysis(CallGraph callGraph)
         {
-            if (_specializations == null)
+            foreach (var function in _compilation.SourceSymbolCollection.GetFunctions())
             {
-                _specializations = new Dictionary<SourceRoutineSymbol, ImmutableArray<TypeSymbol>>();
-
-                foreach (var function in _compilation.SourceSymbolCollection.GetFunctions())
+                if (function.SourceParameters.Length > 0 && !_specializations.ContainsKey(function))
                 {
-                    if (function.SourceParameters.Length > 0)
+                    bool isSpecialized = false;
+                    var paramTypes =
+                        function.SourceParameters
+                            .Select(p => p.Type)
+                            .ToArray();
+
+                    foreach (var call in callGraph.GetCallerEdges(function))
                     {
-                        bool isSpecialized = false;
-                        var paramTypes =
-                            function.SourceParameters
-                                .Select(p => p.Type)
-                                .ToArray();
-
-                        foreach (var call in callGraph.GetCallerEdges(function))
+                        var args = call.CallSite.CallExpression.ArgumentsInSourceOrder;
+                        for (int i = 0; i < args.Length; i++)
                         {
-                            var args = call.CallSite.CallExpression.ArgumentsInSourceOrder;
-                            for (int i = 0; i < args.Length; i++)
+                            var argType = SpecializationUtils.EstimateExpressionType(_compilation, call.Caller.TypeRefContext, args[i].Value);
+                            if (i < paramTypes.Length && IsSpecialized(paramTypes[i], argType))
                             {
-                                var argType = SpecializationUtils.EstimateExpressionType(_compilation, call.Caller.TypeRefContext, args[i].Value);
-                                if (i < paramTypes.Length && IsSpecialized(paramTypes[i], argType))
-                                {
-                                    paramTypes[i] = argType;
-                                    isSpecialized = true;
+                                paramTypes[i] = argType;
+                                isSpecialized = true;
 
-                                    // TODO: Consider the most common specialization, not just the first one as now
-                                }
+                                // TODO: Consider the most common specialization, not just the first one as now
                             }
                         }
+                    }
 
-                        if (isSpecialized)
-                        {
-                            _specializations[function] = paramTypes.ToImmutableArray();
-                        }
+                    if (isSpecialized)
+                    {
+                        _specializations[function] = paramTypes.ToImmutableArray();
                     }
                 }
             }
