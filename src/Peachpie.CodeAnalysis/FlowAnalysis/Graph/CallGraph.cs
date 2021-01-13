@@ -9,7 +9,7 @@ using Pchp.CodeAnalysis.Symbols;
 
 namespace Peachpie.CodeAnalysis.FlowAnalysis.Graph
 {
-    struct CallSite
+    readonly struct CallSite : IEquatable<CallSite>
     {
         public CallSite(BoundBlock block, BoundRoutineCall callExpression)
         {
@@ -20,6 +20,24 @@ namespace Peachpie.CodeAnalysis.FlowAnalysis.Graph
         public BoundBlock Block { get; }
 
         public BoundRoutineCall CallExpression { get; }
+
+        public bool Equals(CallSite other)
+        {
+            return ReferenceEquals(Block, other.Block) && ReferenceEquals(CallExpression, other.CallExpression);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is CallSite other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                return ((Block != null ? Block.GetHashCode() : 0) * 397) ^ (CallExpression != null ? CallExpression.GetHashCode() : 0);
+            }
+        }
     }
 
     /// <summary>
@@ -31,11 +49,11 @@ namespace Peachpie.CodeAnalysis.FlowAnalysis.Graph
         /// Maps each node to its incident edges, their directions can be found by <see cref="Edge.Caller"/>
         /// and <see cref="Edge.Callee"/>.
         /// </summary>
-        private readonly ConcurrentDictionary<SourceRoutineSymbol, ConcurrentBag<Edge>> _incidentEdges;
+        private readonly ConcurrentDictionary<SourceRoutineSymbol, HashSet<Edge>> _incidentEdges;
 
         public CallGraph()
         {
-            _incidentEdges = new ConcurrentDictionary<SourceRoutineSymbol, ConcurrentBag<Edge>>();
+            _incidentEdges = new ConcurrentDictionary<SourceRoutineSymbol, HashSet<Edge>>();
         }
 
         public Edge AddEdge(SourceRoutineSymbol caller, SourceRoutineSymbol callee, CallSite callSite)
@@ -51,7 +69,10 @@ namespace Peachpie.CodeAnalysis.FlowAnalysis.Graph
         {
             if (_incidentEdges.TryGetValue(routine, out var edges))
             {
-                return edges;
+                lock (edges)
+                {
+                    return edges.ToArray();
+                }
             }
             else
             {
@@ -73,11 +94,18 @@ namespace Peachpie.CodeAnalysis.FlowAnalysis.Graph
         {
             _incidentEdges.AddOrUpdate(
                 routine,
-                _ => new ConcurrentBag<Edge>() { edge },
-                (_, edges) => { edges.Add(edge); return edges; });
+                _ => new HashSet<Edge>() { edge },
+                (_, edges) =>
+                {
+                    lock (edges)
+                    {
+                        edges.Add(edge);
+                        return edges;
+                    }
+                });
         }
 
-        public class Edge
+        public class Edge : IEquatable<Edge>
         {
             public Edge(SourceRoutineSymbol caller, SourceRoutineSymbol callee, CallSite callSite)
             {
@@ -91,6 +119,32 @@ namespace Peachpie.CodeAnalysis.FlowAnalysis.Graph
             public SourceRoutineSymbol Callee { get; }
 
             public CallSite CallSite { get; }
+
+            public bool Equals(Edge other)
+            {
+                if (ReferenceEquals(null, other)) return false;
+                if (ReferenceEquals(this, other)) return true;
+                return ReferenceEquals(Caller, other.Caller) && ReferenceEquals(Callee, other.Callee) && CallSite.Equals(other.CallSite);
+            }
+
+            public override bool Equals(object obj)
+            {
+                if (ReferenceEquals(null, obj)) return false;
+                if (ReferenceEquals(this, obj)) return true;
+                if (!(obj is Edge edge)) return false;
+                return Equals(edge);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    var hashCode = (Caller != null ? Caller.GetHashCode() : 0);
+                    hashCode = (hashCode * 397) ^ (Callee != null ? Callee.GetHashCode() : 0);
+                    hashCode = (hashCode * 397) ^ CallSite.GetHashCode();
+                    return hashCode;
+                }
+            }
         }
     }
 }

@@ -1731,6 +1731,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
         {
             if (MethodSymbolExtensions.IsValidMethod(x.TargetMethod))
             {
+                Worklist.NoteCall(x.TargetMethod, CurrentBlock, x);
+
                 x.TypeRefMask = BindValidRoutineCall(x, x.TargetMethod, x.ArgumentsInSourceOrder, maybeOverload);
             }
             else if (x.TargetMethod is MissingMethodSymbol || x.TargetMethod == null)
@@ -1768,6 +1770,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
                     var r = (TypeRefMask)0;
                     foreach (var m in ambiguity.Ambiguities)
                     {
+                        Worklist.NoteCall(m, CurrentBlock, x);
+
                         if (Worklist.EnqueueRoutine(m, CurrentBlock, x))
                         {
                             // The next blocks will be analysed after this routine is re-enqueued due to the dependency

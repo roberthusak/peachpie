@@ -87,26 +87,23 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
             }
         }
 
+        public void NoteCall(IPhpRoutineSymbol routine, T caller, BoundRoutineCall callExpression)
+        {
+            if (TryGetSourceRoutine(routine, out var sourceRoutine))
+            {
+                _callGraph.AddEdge(caller.FlowState.Routine, sourceRoutine, new CallSite(caller, callExpression)); 
+            }
+        }
+
         public bool EnqueueRoutine(IPhpRoutineSymbol routine, T caller, BoundRoutineCall callExpression)
         {
             Contract.ThrowIfNull(routine);
 
-            if (routine.ControlFlowGraph == null)
+            if (!TryGetSourceRoutine(routine, out var sourceRoutine) || sourceRoutine.ControlFlowGraph == null)
             {
-                var routine2 = routine is SynthesizedMethodSymbol sr
-                    ? sr.ForwardedCall
-                    : routine.OriginalDefinition as IPhpRoutineSymbol;
-
-                if (routine2 != null && !ReferenceEquals(routine, routine2))
-                {
-                    return EnqueueRoutine(routine2, caller, callExpression);
-                }
-
-                // library (sourceless) function
+                // We will not analyse library routines or abstract methods
                 return false;
             }
-
-            var sourceRoutine = (SourceRoutineSymbol)routine;
 
             if (sourceRoutine.SyntaxReturnType != null)
             {
@@ -114,9 +111,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
                 // nor reanalyse itself when routine analyses
                 return false;
             }
-
-            _callGraph.AddEdge(caller.FlowState.Routine, sourceRoutine, new CallSite(caller, callExpression));
-
+            
             // ensure caller is subscribed to routine's ExitBlock
             ((ExitBlock)routine.ControlFlowGraph.Exit).Subscribe(caller);
 
@@ -124,6 +119,30 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
 
             // Return whether the routine exit block will certainly be analysed in the future
             return !sourceRoutine.IsReturnAnalysed;
+        }
+
+        private static bool TryGetSourceRoutine(IPhpRoutineSymbol routine, out SourceRoutineSymbol sourceRoutine)
+        {
+            if (routine is SourceRoutineSymbol sourceRoutine2)
+            {
+                sourceRoutine = sourceRoutine2;
+                return true;
+            }
+            else
+            {
+                var routine2 = routine is SynthesizedMethodSymbol sr
+                    ? sr.ForwardedCall
+                    : routine.OriginalDefinition as IPhpRoutineSymbol;
+
+                if (routine2 != null && !ReferenceEquals(routine, routine2))
+                {
+                    return TryGetSourceRoutine(routine2, out sourceRoutine);
+                }
+
+                // library (sourceless) function
+                sourceRoutine = null;
+                return false;
+            }
         }
 
         public void PingReturnUpdate(ExitBlock updatedExit, T callingBlock)
