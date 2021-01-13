@@ -83,7 +83,7 @@ namespace Peachpie.CodeAnalysis.Utilities
 
                 // If judging only by name or static resolution is not supported, return only the original overload if we want the conservative approach
                 return
-                    (optimization == ExperimentalOptimization.PhpDocOverloadsStatic || optimization.HasBranchedCallSites())
+                    (optimization.HasStaticCallSites() || optimization.HasBranchedCallSites())
                     ? (MethodSymbol)origOverload!
                     : ambiguousRoutine;
             }
@@ -129,7 +129,7 @@ namespace Peachpie.CodeAnalysis.Utilities
                 }
             }
 
-            if (resultOverloadsBuilder.Count == 0 || optimization == ExperimentalOptimization.PhpDocOverloadsStatic)
+            if (resultOverloadsBuilder.Count == 0 || optimization.HasStaticCallSites())
             {
                 // We removed all the specialized overloads out of the options or we are not allowed to allow more than one overload
                 return origOverload!;

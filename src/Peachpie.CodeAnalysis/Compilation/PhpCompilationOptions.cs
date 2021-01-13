@@ -72,17 +72,34 @@ namespace Pchp.CodeAnalysis
 
         /// <summary>
         /// Generates a type-specific overload for each routine where the parameter types are infered from the
-        /// types of the argument the routine is called with. 
+        /// types of the argument the routine is called with. Calls them only in situations when we know the
+        /// types match.
+        /// </summary>
+        CallSiteOverloadsStatic,
+
+        /// <summary>
+        /// Generates a type-specific overload for each routine where the parameter types are infered from the
+        /// types of the argument the routine is called with. Attempts to call them as much as possible by
+        /// explicit type checking at call sites.
         /// </summary>
         CallSiteOverloadsBranch,
     }
 
+    // TODO: Turn the enum to flags instead
     public static class ExperimentalOptimizationExtensions
     {
         public static bool HasPhpDocOverloads(this ExperimentalOptimization optimization) =>
             optimization == ExperimentalOptimization.PhpDocOverloadsStatic ||
             optimization == ExperimentalOptimization.PhpDocOverloadsDynamic ||
             optimization == ExperimentalOptimization.PhpDocOverloadsBranch;
+
+        public static bool HasCallSiteOverloads(this ExperimentalOptimization optimization) =>
+            optimization == ExperimentalOptimization.CallSiteOverloadsStatic ||
+            optimization == ExperimentalOptimization.CallSiteOverloadsBranch;
+
+        public static bool HasStaticCallSites(this ExperimentalOptimization optimization) =>
+            optimization == ExperimentalOptimization.PhpDocOverloadsStatic ||
+            optimization == ExperimentalOptimization.CallSiteOverloadsStatic;
 
         public static bool HasBranchedCallSites(this ExperimentalOptimization optimization) =>
             optimization == ExperimentalOptimization.PhpDocOverloadsBranch ||
