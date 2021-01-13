@@ -43,7 +43,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                         var args = call.CallSite.CallExpression.ArgumentsInSourceOrder;
                         for (int i = 0; i < args.Length; i++)
                         {
-                            var argType = SpecializationUtils.EstimateExpressionType(_compilation, call.Caller.TypeRefContext, args[i].Value);
+                            var argType = GeneralizeParameterType(
+                                SpecializationUtils.EstimateExpressionType(_compilation, call.Caller.TypeRefContext, args[i].Value));
                             if (i < paramTypes.Length && IsSpecialized(paramTypes[i], argType))
                             {
                                 paramTypes[i] = argType;
@@ -62,8 +63,21 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
             }
         }
 
-        private bool IsSpecialized(TypeSymbol paramType, TypeSymbol argType) =>
+        private static bool IsSpecialized(TypeSymbol paramType, TypeSymbol argType) =>
             paramType.Is_PhpValue() && !argType.Is_PhpAlias() && argType.SpecialType != SpecialType.System_Void && !argType.IsErrorType();
+
+        private TypeSymbol GeneralizeParameterType(TypeSymbol type)
+        {
+            // TODO: Handle other types as well if useful (e.g. PhpNumber)
+            if (type.SpecialType == SpecialType.System_String)
+            {
+                return _compilation.CoreTypes.PhpString;
+            }
+            else
+            {
+                return type;
+            }
+        }
 
         public bool TryGetRoutineSpecializedParameters(SourceRoutineSymbol routine, out ImmutableArray<TypeSymbol> parameterTypes) =>
             _specializations.TryGetValue(routine, out parameterTypes);
