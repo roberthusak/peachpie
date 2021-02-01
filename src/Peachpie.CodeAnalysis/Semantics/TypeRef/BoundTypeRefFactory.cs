@@ -9,6 +9,7 @@ using Pchp.CodeAnalysis.CodeGen;
 using Pchp.CodeAnalysis.FlowAnalysis;
 using Pchp.CodeAnalysis.Semantics.TypeRef;
 using Pchp.CodeAnalysis.Symbols;
+using Peachpie.CodeAnalysis.Semantics;
 using Roslyn.Utilities;
 using Ast = Devsense.PHP.Syntax.Ast;
 
@@ -38,6 +39,7 @@ namespace Pchp.CodeAnalysis.Semantics
 
         internal readonly BoundClassTypeRef/*!*/TraversableTypeRef = new BoundClassTypeRef(NameUtils.SpecialNames.Traversable, null, null);
         internal readonly BoundClassTypeRef/*!*/ClosureTypeRef = new BoundClassTypeRef(NameUtils.SpecialNames.Closure, null, null);
+        internal readonly BoundClassTypeRef/*!*/stdClassTypeRef = new BoundClassTypeRef(NameUtils.SpecialNames.stdClass, null, null);
 
         #endregion
 
@@ -134,7 +136,7 @@ namespace Pchp.CodeAnalysis.Semantics
             else if (tref is Ast.AnonymousTypeRef at) return new BoundTypeRefFromSymbol(at.TypeDeclaration.GetProperty<SourceTypeSymbol>());
             else if (tref is Ast.MultipleTypeRef mt)
             {
-                return new BoundMultipleTypeRef(Create(mt.MultipleTypes, binder, self));
+                return new BoundMultipleTypeRef(Create(mt.MultipleTypes, binder, self, nullClassSemantic: true));
             }
             else if (tref is Ast.NullableTypeRef nullable)
             {
@@ -169,9 +171,17 @@ namespace Pchp.CodeAnalysis.Semantics
             }
         }
 
-        ImmutableArray<BoundTypeRef> Create(IList<Ast.TypeRef> trefs, SemanticsBinder binder, SourceTypeSymbol self)
+        ImmutableArray<BoundTypeRef> Create(IList<Ast.TypeRef> trefs, SemanticsBinder binder, SourceTypeSymbol self, bool nullClassSemantic = false)
         {
-            return trefs.SelectAsArray(t => CreateFromTypeRef(t, binder, self, objectTypeInfoSemantic: false).WithSyntax(t));
+            return trefs.SelectAsArray(t =>
+            {
+                if (nullClassSemantic && t.IsNullClass())
+                {
+                    return NullTypeRef;
+                }
+
+                return CreateFromTypeRef(t, binder, self, objectTypeInfoSemantic: false).WithSyntax(t);
+            });
         }
 
         public static IBoundTypeRef Create(QualifiedName qname, SourceTypeSymbol self) => new BoundClassTypeRef(qname, null, self);

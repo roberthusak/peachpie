@@ -70,6 +70,15 @@ namespace Peachpie.CodeAnalysis.Errors {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Argument {0} passed to {1}() must be of the type {2}, {3} given.
+        /// </summary>
+        internal static string ERR_ArgumentTypeMismatch {
+            get {
+                return ResourceManager.GetString("ERR_ArgumentTypeMismatch", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Invalid assembly name: {0}.
         /// </summary>
         internal static string ERR_BadAssemblyName {
@@ -376,6 +385,15 @@ namespace Peachpie.CodeAnalysis.Errors {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Multiple analyzer config files cannot be in the same directory (&apos;{0}&apos;)..
+        /// </summary>
+        internal static string ERR_MultipleAnalyzerConfigsInSameDir {
+            get {
+                return ResourceManager.GetString("ERR_MultipleAnalyzerConfigsInSameDir", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to {0} {1}() must take exactly {2} arguments.
         /// </summary>
         internal static string ERR_MustTakeArgs {
@@ -556,6 +574,15 @@ namespace Peachpie.CodeAnalysis.Errors {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Cannot convert {0} to {1}.
+        /// </summary>
+        internal static string ERR_TypeMismatch {
+            get {
+                return ResourceManager.GetString("ERR_TypeMismatch", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Type name &apos;{0}&apos; could not be resolved..
         /// </summary>
         internal static string ERR_TypeNameCannotBeResolved {
@@ -615,6 +642,15 @@ namespace Peachpie.CodeAnalysis.Errors {
         internal static string FTL_InvalidInputFileName {
             get {
                 return ResourceManager.GetString("FTL_InvalidInputFileName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Constant &apos;{0}&apos; with the same name is already defined.
+        /// </summary>
+        internal static string INF_ConstantAlreadyDefined {
+            get {
+                return ResourceManager.GetString("INF_ConstantAlreadyDefined", resourceCulture);
             }
         }
         
@@ -768,6 +804,24 @@ namespace Peachpie.CodeAnalysis.Errors {
         internal static string WRN_FormatStringWrongArgCount {
             get {
                 return ResourceManager.GetString("WRN_FormatStringWrongArgCount", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Generator &apos;{0}&apos; failed to generate source. It will not contribute to the output and compilation errors may occur as a result. Exception was of type &apos;{1}&apos; with message &apos;{2}&apos;.
+        /// </summary>
+        internal static string WRN_GeneratorFailedDuringGeneration {
+            get {
+                return ResourceManager.GetString("WRN_GeneratorFailedDuringGeneration", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Generator &apos;{0}&apos; failed to initialize. It will not contribute to the output and compilation errors may occur as a result. Exception was of type &apos;{1}&apos; with message &apos;{2}&apos;.
+        /// </summary>
+        internal static string WRN_GeneratorFailedDuringInitialization {
+            get {
+                return ResourceManager.GetString("WRN_GeneratorFailedDuringInitialization", resourceCulture);
             }
         }
         

@@ -45,7 +45,7 @@ namespace Pchp.Library.Reflection
 
             type = m.ReturnType;
             notNullFlag =
-                m.ReturnTypeCustomAttributes.IsDefined(typeof(NotNullAttribute), false) ||
+                !m.ReturnParameter.IsNullable() ||
                 m.ReturnTypeCustomAttributes.IsDefined(typeof(CastToFalse), false); // [return: CastToFalse] => NULL cannot be returned
 
             //
@@ -163,7 +163,6 @@ namespace Pchp.Library.Reflection
             return (sep < 0) ? name : name.Substring(sep + 1);
         }
 
-        [return: NotNull]
         public PhpArray getStaticVariables(Context ctx)
         {
             var arr = new PhpArray();
@@ -188,6 +187,9 @@ namespace Pchp.Library.Reflection
         public bool isUserDefined() => _routine.IsUserFunction;
         public bool isVariadic() => _routine.Methods.Any(m => m.GetParameters().Any(p => p.GetCustomAttribute<ParamArrayAttribute>() != null));
         public bool returnsReference() => _routine.Methods.Any(m => m.ReturnType == typeof(PhpAlias));
+
+        public virtual PhpArray getAttributes(string class_name = null, int flags = 0)
+            => ReflectionUtils.getAttributes(_routine, class_name, flags);
 
         public virtual string __toString() { throw new NotImplementedException(); }
 

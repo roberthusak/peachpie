@@ -202,6 +202,11 @@ namespace Pchp.CodeAnalysis
         /// </summary>
         public IReadOnlyCollection<(string prefix, string path)> Autoload_PSR4 { get; internal set; }
 
+        /// <summary>
+        /// Global Nullable context options.
+        /// </summary>
+        public override NullableContextOptions NullableContextOptions { get; protected set; }
+
         ///// <summary>
         ///// Flags applied to the top-level binder created for each syntax tree in the compilation 
         ///// as well as for the binder of global imports.
@@ -256,6 +261,7 @@ namespace Pchp.CodeAnalysis
             PhpParseOptions parseOptions = null,
             ImmutableDictionary<string, string> defines = default,
             bool referencesSupersedeLowerVersions = false,
+            NullableContextOptions nullableContextOptions = NullableContextOptions.Disable,
             bool exportSouffleRelations = false,
             ExperimentalOptimization experimentalOptimization = ExperimentalOptimization.None)
             : this(outputKind, baseDirectory, sdkDirectory, subDirectory, targetFramework,
@@ -280,6 +286,7 @@ namespace Pchp.CodeAnalysis
                    defines: defines,
                    parseOptions: parseOptions,
                    referencesSupersedeLowerVersions: referencesSupersedeLowerVersions,
+                   nullableContextOptions: nullableContextOptions,
                    exportSouffleRelations: exportSouffleRelations,
                    experimentalOptimization: experimentalOptimization)
         {
@@ -324,6 +331,7 @@ namespace Pchp.CodeAnalysis
             PhpParseOptions parseOptions,
             ImmutableDictionary<string, string> defines,
             bool referencesSupersedeLowerVersions,
+            NullableContextOptions nullableContextOptions,
             bool exportSouffleRelations,
             ExperimentalOptimization experimentalOptimization)
             : base(outputKind, reportSuppressedDiagnostics, moduleName, mainTypeName, scriptClassName,
@@ -344,6 +352,7 @@ namespace Pchp.CodeAnalysis
             this.VersionString = versionString;
             this.OptimizationLevel = optimizationLevel;
             this.Defines = defines;
+            this.NullableContextOptions = nullableContextOptions;
             this.ExportSouffleRelations = exportSouffleRelations;
             this.ExperimentalOptimization = experimentalOptimization;
         }
@@ -386,6 +395,7 @@ namespace Pchp.CodeAnalysis
             parseOptions: other.ParseOptions,
             defines: other.Defines,
             referencesSupersedeLowerVersions: other.ReferencesSupersedeLowerVersions,
+            nullableContextOptions: other.NullableContextOptions,
             exportSouffleRelations: other.ExportSouffleRelations,
             experimentalOptimization: other.ExperimentalOptimization)
         {

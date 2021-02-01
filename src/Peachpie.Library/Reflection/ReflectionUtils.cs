@@ -17,6 +17,9 @@ namespace Pchp.Library.Reflection
     {
         public const char NameSeparator = '\\';
 
+        /// <summary>Name of attribute annotating a PHP attribute class.</summary>
+        public static string AttributeClassName => "Attribute";
+
         public const string ExtensionName = PhpExtensionAttribute.KnownExtensionNames.Reflection;
 
         /// <summary>
@@ -182,13 +185,13 @@ namespace Pchp.Library.Reflection
                             }
                         }
 
-                        parameters.Add(new ReflectionParameter(function, index, p.ParameterType, allowsNull, isVariadic, p.Name, defaultValue));
+                        parameters.Add(new ReflectionParameter(function, index, p, allowsNull, isVariadic, defaultValue));
                     }
                     else
                     {
                         // update existing
                         Debug.Assert(index < parameters.Count);
-                        parameters[index].AddOverload(p.ParameterType, allowsNull, isVariadic, p.Name, defaultValue);
+                        parameters[index].AddOverload(p, allowsNull, isVariadic, defaultValue);
                     }
                 }
 
@@ -225,6 +228,59 @@ namespace Pchp.Library.Reflection
             }
 
             return null;
+        }
+
+        public static PhpArray getAttributes(RoutineInfo routine, string class_name = null, int flags = 0)
+        {
+            var result = new PhpArray();
+            foreach (var method in routine.Methods)
+            {
+                CollectAttributes(result, method, class_name, flags);
+            }
+            return result;
+        }
+
+        public static PhpArray getAttributes(ICustomAttributeProvider symbol, string class_name = null, int flags = 0)
+        {
+            return CollectAttributes(new PhpArray(), symbol, class_name, flags);
+        }
+
+        static PhpArray CollectAttributes(PhpArray result, ICustomAttributeProvider symbol, string class_name = null, int flags = 0)
+        {
+            if (symbol == null)
+            {
+                return result;
+            }
+
+            //var attrs = MemberInfo.CustomAttributes // CONSIDER: use just the metadata as it is in PHP
+
+            foreach (Attribute attr in symbol.GetCustomAttributes(false))
+            {
+                if (class_name != null)
+                {
+                    // TODO: filter
+                }
+
+                result.Add(PhpValue.FromClass(new ReflectionAttribute(attr)));
+            }
+
+            return result;
+        }
+
+        /// <summary>Gets value indicating whether given type is annotated with #[Attribute] attribute.</summary>
+        public static bool IsPhpAttributeClass(this PhpTypeInfo tinfo)
+        {
+            if (tinfo != null)
+            {
+                foreach (var attr in tinfo.Type.GetCustomAttributes<PhpCustomAtribute>())
+                {
+                    if (attr.TypeName.EqualsOrdinalIgnoreCase(AttributeClassName))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
     }
 }

@@ -259,6 +259,15 @@ namespace Pchp.Library.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to bcmath function argument is not well-formed.
+        /// </summary>
+        public static string bcmath_wrong_argument {
+            get {
+                return ResourceManager.GetString("bcmath_wrong_argument", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Invalid bcrypt cost parameter specified: {0}).
         /// </summary>
         public static string bcrypt_invalid_cost {
@@ -1168,6 +1177,15 @@ namespace Pchp.Library.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Attempting to use non-attribute class &quot;{0}&quot; as attribute.
+        /// </summary>
+        public static string non_attribute_class_used {
+            get {
+                return ResourceManager.GetString("non_attribute_class_used", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Type &apos;{0}&apos;: not enough arguments.
         /// </summary>
         public static string not_enought_arguments {
@@ -1470,6 +1488,24 @@ namespace Pchp.Library.Resources {
         public static string serialization_failed {
             get {
                 return ResourceManager.GetString("serialization_failed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Inf and NaN cannot be JSON encoded.
+        /// </summary>
+        public static string serialization_json_inf_nan_error {
+            get {
+                return ResourceManager.GetString("serialization_json_inf_nan_error", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Maximum stack depth exceeded.
+        /// </summary>
+        public static string serialization_max_depth {
+            get {
+                return ResourceManager.GetString("serialization_max_depth", resourceCulture);
             }
         }
         

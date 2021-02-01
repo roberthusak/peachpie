@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -36,7 +37,7 @@ namespace Pchp.Core.Dynamic
             public static MethodInfo SetValue_PhpValueRef_PhpValue = typeof(Core.Operators).GetMethod("SetValue", Types.PhpValue.MakeByRefType(), Types.PhpValue);
             public static MethodInfo IsSet_PhpValue = new Func<PhpValue, bool>(Core.Operators.IsSet).Method;
 
-            public static MethodInfo ToString_Double_Context = new Func<double, Context, string>(Core.Convert.ToString).Method;
+            public static MethodInfo ToString_Double = new Func<double, string>(Core.Convert.ToString).Method;
             public static MethodInfo ToLongOrThrow_String = new Func<string, long>(Core.StrictConvert.ToLong).Method;
             public static MethodInfo ToDouble_String = new Func<string, double>(Core.Convert.StringToDouble).Method;
             public static MethodInfo ToPhpString_PhpValue_Context = new Func<PhpValue, Context, Core.PhpString>(Core.Convert.ToPhpString).Method;
@@ -64,7 +65,7 @@ namespace Pchp.Core.Dynamic
             public static MethodInfo PhpValue_GetValue = Types.PhpValue.GetMethod("GetValue");
             public static MethodInfo PhpValue_DeepCopy = Types.PhpValue.GetMethod("DeepCopy");
 
-            public static MethodInfo PhpNumber_ToString_Context = Types.PhpNumber[0].GetMethod("ToString", typeof(Context));
+            public static MethodInfo PhpNumber_ToString = Types.PhpNumber[0].GetMethod("ToString");
             public static MethodInfo PhpNumber_ToClass = Types.PhpNumber[0].GetMethod("ToObject", Types.Empty);
 
             public static MethodInfo PhpArray_ToClass = typeof(PhpArray).GetMethod("ToObject", Types.Empty);
@@ -79,7 +80,7 @@ namespace Pchp.Core.Dynamic
             public static MethodInfo PhpArray_ContainsKey = typeof(PhpArray).GetMethod("ContainsKey", typeof(Core.IntStringKey));
 
             public static MethodInfo ToBoolean_PhpArray = typeof(PhpArray).GetOpExplicit(typeof(bool));
-            public static MethodInfo ToBoolean_PhpValue = typeof(PhpValue).GetOpImplicit(typeof(bool));
+            public static MethodInfo ToBoolean_PhpValue = typeof(PhpValue).GetOpExplicit(typeof(bool));
             public static MethodInfo ToBoolean_PhpNumber = typeof(PhpNumber).GetOpImplicit(typeof(bool));
             public static MethodInfo ToBoolean_String = typeof(Convert).GetMethod("ToBoolean", Types.String);
 
@@ -92,11 +93,13 @@ namespace Pchp.Core.Dynamic
 
             public static MethodInfo RuntimeTypeHandle_Equals_RuntimeTypeHandle = typeof(RuntimeTypeHandle).GetMethod("Equals", typeof(RuntimeTypeHandle));
 
-            public static readonly MethodInfo RuntimePropertyGetValue = new Func<Context, PhpTypeInfo, object, string, PhpValue>(Core.Operators.RuntimePropertyGetValue).Method;
+            public static readonly MethodInfo RuntimePropertyGetValue = new Func<Context, PhpTypeInfo, object, string, bool, PhpValue>(Core.Operators.RuntimePropertyGetValue).Method;
 
             public static MethodInfo Or_ConversionCost_ConversionCost = typeof(CostOf).GetMethod("Or", typeof(ConversionCost), typeof(ConversionCost));
 
             public static MethodInfo CheckFunctionDeclared_Context_Int_Int = new Func<Context, int, int, bool>(Context.CheckFunctionDeclared).Method;
+
+            public static MethodInfo GetDeclaredFunction_Context_String = typeof(Context).GetMethod("GetDeclaredFunction");
         }
 
         public static class Exceptions
@@ -163,7 +166,23 @@ namespace Pchp.Core.Dynamic
             /// <summary><see cref="System.Object"/>.</summary>
             public static new MethodInfo ToString = typeof(object).GetMethod("ToString", Types.Empty);
             public static readonly MethodInfo ToString_Bool = typeof(Core.Convert).GetMethod("ToString", Types.Bool);
-            public static readonly MethodInfo ToString_Double_Context = typeof(Core.Convert).GetMethod("ToString", Types.Double[0], typeof(Context));
+        }
+
+        public static class Expressions
+        {
+            public static ConstantExpression True => s_true ??= Expression.Constant(true);
+            public static ConstantExpression False => s_false ??= Expression.Constant(false);
+            public static ConstantExpression Null => s_null ??= Expression.Constant(null/*, typeof(object)*/);
+
+            public static ConstantExpression Create(bool value) => value ? True : False;
+            public static ConstantExpression Create(int value) => value switch
+            {
+                0 => s_int32_0 ??= Expression.Constant(0),
+                1 => s_int32_1 ??= Expression.Constant(1),
+                _ => Expression.Constant(value),
+            };
+
+            static ConstantExpression s_true, s_false, s_null, s_int32_0, s_int32_1;
         }
 
         /// <summary>

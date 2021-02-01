@@ -177,21 +177,6 @@ namespace Pchp.Core
     }
 
     /// <summary>
-    /// Indicates to compiler that a symbol should be ignored unless a specified conditional compilation scope is valid.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Property | AttributeTargets.Method | AttributeTargets.Field, AllowMultiple = true)]
-    public sealed class PhpConditionalAttribute : Attribute
-    {
-        public string ConditionString => _scope;
-        readonly string _scope;
-
-        public PhpConditionalAttribute(string scope)
-        {
-            _scope = scope;
-        }
-    }
-
-    /// <summary>
     /// Marks public class or interface declaration as a PHP type visible to the scripts from extension libraries.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
@@ -415,20 +400,33 @@ namespace Pchp.Core
     }
 
     /// <summary>
+    /// Annotates a compile time constant value.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false)]
+    public sealed class PhpConstantAttribute : Attribute
+    {
+        /// <summary>
+        /// The constant value expression.
+        /// </summary>
+        public string? Expression { get; }
+
+        public PhpConstantAttribute()
+        {
+            Expression = null;
+        }
+
+        public PhpConstantAttribute(string expression)
+        {
+            Expression = expression;
+        }
+    }
+
+    /// <summary>
     /// Compiler generated attribute denoting constructor that initializes only fields and calls minimal base .ctor.
     /// Such constructor is used for emitting derived class constructor that calls PHP constructor function by itself.
     /// </summary>
     [AttributeUsage(AttributeTargets.Constructor)]
     public sealed class PhpFieldsOnlyCtorAttribute : Attribute
-    {
-
-    }
-
-    /// <summary>
-    /// Attribute denoting that associated value cannot be <c>null</c>.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.ReturnValue | AttributeTargets.Field | AttributeTargets.Property)]
-    public sealed class NotNullAttribute : Attribute
     {
 
     }
@@ -531,6 +529,35 @@ namespace Pchp.Core
         }
     }
 
+    /// <summary>
+    /// PHP attribute annotation.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = true)]
+    public sealed class PhpCustomAtribute : Attribute
+    {
+        /// <summary>
+        /// The attribute full type name.
+        /// </summary>
+        public string TypeName { get; }
+
+        /// <summary>
+        /// The attribute arguments encoded as JSON string.
+        /// Cannot be <c>null</c>.
+        /// </summary>
+        public byte[] Arguments { get; }
+
+        /// <summary>
+        /// Initializes the custom attribute data.
+        /// </summary>
+        /// <param name="typename">The type attribute name.</param>
+        /// <param name="utf8value">Arguments in form of associative JSON object or JSON array.</param>
+        public PhpCustomAtribute(string typename, byte[] utf8value)
+        {
+            TypeName = typename ?? throw new ArgumentNullException(nameof(typename));
+            Arguments = utf8value ?? Array.Empty<byte>();
+        }
+    }
+
     [AttributeUsage(AttributeTargets.Assembly)]
     public sealed class CompilationCountersAttribute : Attribute
     {
@@ -558,6 +585,48 @@ namespace Pchp.Core
             BranchedSourceFunctionCalls = branchedSourceFunctionCalls;
             OriginalSourceFunctionCalls = originalSourceFunctionCalls;
             SpecializedSourceFunctionCalls = specializedSourceFunctionCalls;
+        }
+    }
+}
+
+namespace System.Runtime.CompilerServices
+{
+    /// <summary>
+    /// Attribute for compiler use only, used to indicate the nullability of contained type references without a <see cref="NullableAttribute"/> annotation.
+    /// </summary>
+    /// <remarks>
+    /// Whereas the C# compiler embeds the definition in the compiled assembly, the assemblies produced by Peachpie refer to this definition.
+    /// </remarks>
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Method | AttributeTargets.Interface | AttributeTargets.Delegate, AllowMultiple = false, Inherited = false)]
+    public sealed class NullableContextAttribute : Attribute
+    {
+        public readonly byte Flag;
+
+        public NullableContextAttribute(byte flag)
+        {
+            Flag = flag;
+        }
+    }
+
+    /// <summary>
+    /// Attribute for compiler use only, used to indicate the nullability of type references.
+    /// </summary>
+    /// <remarks>
+    /// Whereas the C# compiler embeds the definition in the compiled assembly, the assemblies produced by Peachpie refer to this definition.
+    /// </remarks>
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Event | AttributeTargets.Parameter | AttributeTargets.ReturnValue | AttributeTargets.GenericParameter, AllowMultiple = false, Inherited = false)]
+    public sealed class NullableAttribute : Attribute
+    {
+        public readonly byte[] NullableFlags;
+
+        public NullableAttribute(byte nullableFlag)
+        {
+            NullableFlags = new byte[1] { nullableFlag };
+        }
+
+        public NullableAttribute(byte[] nullableFlags)
+        {
+            NullableFlags = nullableFlags;
         }
     }
 }

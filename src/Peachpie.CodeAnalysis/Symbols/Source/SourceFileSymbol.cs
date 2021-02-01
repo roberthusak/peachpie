@@ -257,8 +257,11 @@ namespace Pchp.CodeAnalysis.Symbols
                 Interlocked.CompareExchange(ref _lazyScriptAttribute, scriptAttribute, null);
             }
 
+            // [NullableContext(2)] - everything nullable can return/receive null by default
+            var nullableContext = DeclaringCompilation.CreateNullableContextAttribute(NullableContextUtils.AnnotatedAttributeValue);
+
             //
-            return ImmutableArray.Create<AttributeData>(_lazyScriptAttribute);
+            return ImmutableArray.Create<AttributeData>(_lazyScriptAttribute, nullableContext);
         }
 
         public override NamedTypeSymbol BaseType
@@ -277,7 +280,7 @@ namespace Pchp.CodeAnalysis.Symbols
 
         public override Symbol ContainingSymbol => _compilation.SourceModule;
 
-        internal override IModuleSymbol ContainingModule => _compilation.SourceModule;
+        internal override ModuleSymbol ContainingModule => _compilation.SourceModule;
 
         internal override PhpCompilation DeclaringCompilation => _compilation;
 

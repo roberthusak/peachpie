@@ -258,10 +258,7 @@ namespace Peachpie.NET.Sdk.Tools
             // sources at the end:
             if (Compile != null)
             {
-                foreach (var s in Compile)
-                {
-                    args.Add(s);
-                }
+                args.AddRange(Compile.Distinct(StringComparer.InvariantCulture));
             }
 
             if (ExportSouffleRelations)

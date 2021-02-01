@@ -7,13 +7,13 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net;
-using System.Net.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Pchp.Core;
 using Pchp.Core.Utilities;
+using Pchp.Library.Streams;
 
 namespace Peachpie.Library.Network
 {
@@ -23,10 +23,8 @@ namespace Peachpie.Library.Network
         /// <summary>
         /// Create a CURLFile object.
         /// </summary>
-        [return: NotNull]
         public static CURLFile/*!*/curl_file_create(string filename, string? mimetype = null, string? postname = null) => new CURLFile(filename, mimetype, postname);
 
-        [return: NotNull]
         public static CURLResource/*!*/curl_init(string? url = null) => new CURLResource() { Url = url };
 
         /// <summary>
@@ -68,7 +66,7 @@ namespace Peachpie.Library.Network
         /// Sets an option on the given cURL session handle.
         /// </summary>
         public static bool curl_setopt(
-            [ImportValue(ImportValueAttribute.ValueSpec.CallerClass)]RuntimeTypeHandle callerCtx,
+            [ImportValue(ImportValueAttribute.ValueSpec.CallerClass)] RuntimeTypeHandle callerCtx,
             CURLResource ch, int option, PhpValue value)
         {
             return ch.TrySetOption(option, value, callerCtx);
@@ -93,7 +91,6 @@ namespace Peachpie.Library.Network
         /// in the future might get a different struct.
         /// <c>CURLVERSION_NOW</c> will be the most recent one for the library you have installed.</param>
         /// <returns>Array with version information.</returns>
-        [return: NotNull]
         public static PhpArray curl_version(int version = CURLConstants.CURLVERSION_NOW)
         {
             // version_number       cURL 24 bit version number
@@ -126,7 +123,7 @@ namespace Peachpie.Library.Network
         /// Set multiple options for a cURL transfer.
         /// </summary>
         public static bool curl_setopt_array(
-            [ImportValue(ImportValueAttribute.ValueSpec.CallerClass)]RuntimeTypeHandle callerCtx,
+            [ImportValue(ImportValueAttribute.ValueSpec.CallerClass)] RuntimeTypeHandle callerCtx,
             CURLResource ch, PhpArray options)
         {
             if (ch == null || !ch.IsValid)
@@ -402,10 +399,13 @@ namespace Peachpie.Library.Network
             // make request:
 
             // GET, HEAD
-            if (string.Equals(ch.Method, WebRequestMethods.Http.Get, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(ch.Method, WebRequestMethods.Http.Head, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(ch.Method, WebRequestMethods.Http.Get, StringComparison.OrdinalIgnoreCase))
             {
-                // nothing to do
+                WriteRequestStream(ctx, req, ch, ch.ProcessingRequest.Stream);
+            }
+            else if (string.Equals(ch.Method, WebRequestMethods.Http.Head, StringComparison.OrdinalIgnoreCase))
+            {
+                //
             }
             // POST
             else if (string.Equals(ch.Method, WebRequestMethods.Http.Post, StringComparison.OrdinalIgnoreCase))
@@ -415,7 +415,7 @@ namespace Peachpie.Library.Network
             // PUT
             else if (string.Equals(ch.Method, WebRequestMethods.Http.Put, StringComparison.OrdinalIgnoreCase))
             {
-                ProcessPut(req, ch);
+                ProcessPut(ctx, req, ch);
             }
             // DELETE, or custom method
             else
@@ -433,18 +433,9 @@ namespace Peachpie.Library.Network
             return req.GetResponseAsync();
         }
 
-        static void ProcessPut(HttpWebRequest req, CURLResource ch)
+        static void ProcessPut(Context ctx, HttpWebRequest req, CURLResource ch)
         {
-            var fs = ch.ProcessingRequest.Stream;
-            if (fs != null)
-            {
-                // req.ContentLength = bytes.Length;
-
-                using (var stream = req.GetRequestStream())
-                {
-                    fs.RawStream.CopyTo(stream);
-                }
-            }
+            WriteRequestStream(ctx, req, ch, ch.ProcessingRequest.Stream);
         }
 
         static void ProcessPost(Context ctx, HttpWebRequest req, CURLResource ch)
@@ -476,6 +467,44 @@ namespace Peachpie.Library.Network
             {
                 stream.Write(bytes);
             }
+        }
+
+        static bool WriteRequestStream(Context ctx, HttpWebRequest req, CURLResource ch, PhpStream infile)
+        {
+            if (infile != null)
+            {
+                using (var stream = req.GetRequestStream())
+                {
+                    if (ch.ReadFunction == null)
+                    {
+                        // req.ContentLength = bytes.Length;
+                        infile.RawStream.CopyTo(stream);
+                        return true;
+                    }
+                    else
+                    {
+                        for (; ; )
+                        {
+                            var result = ch.ReadFunction.Invoke(ctx, ch, infile, ch.BufferSize);
+                            if (result.IsString() || !result.IsEmpty)
+                            {
+                                var bytes = result.ToBytes(ctx);
+                                if (bytes.Length != 0)
+                                {
+                                    stream.Write(bytes);
+                                    continue;
+                                }
+                            }
+
+                            break;
+                        }
+
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         static byte[] GetMultipartFormData(Context ctx, PhpArray postParameters, string boundary)
@@ -735,7 +764,6 @@ namespace Peachpie.Library.Network
         /// <summary>
         /// Return a new cURL multi handle.
         /// </summary>
-        [return: NotNull]
         public static CURLMultiResource/*!*/curl_multi_init() => new CURLMultiResource();
 
         /// <summary>

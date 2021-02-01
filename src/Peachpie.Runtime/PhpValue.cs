@@ -112,12 +112,6 @@ namespace Pchp.Core
         [Obsolete]
         public bool IsDefault => TypeCode == 0; // NULL
 
-        /// <summary>INTERNAL. Checks if the value has been marked as invalid.</summary>
-        internal bool IsInvalid => TypeCode == InvalidTypeCode; // CONSIDER: (TypeCode >= PhpTypeCode.Count)
-
-        /// <summary>INTERNAL. Type code of an invalid value.</summary>
-        internal static PhpTypeCode InvalidTypeCode => ~(PhpTypeCode)0;
-
         /// <summary>
         /// Gets value indicating the value is <c>FALSE</c> or <c>&amp;FALSE</c>.
         /// </summary>
@@ -369,11 +363,11 @@ namespace Pchp.Core
             PhpTypeCode.Null => string.Empty,
             PhpTypeCode.Boolean => Convert.ToString(Boolean),
             PhpTypeCode.Long => Long.ToString(),
-            PhpTypeCode.Double => Convert.ToString(Double, ctx),
+            PhpTypeCode.Double => Convert.ToString(Double),
             PhpTypeCode.PhpArray => (string)Array,
             PhpTypeCode.String => String,
             PhpTypeCode.MutableString => MutableStringBlob.ToString(ctx.StringEncoding),
-            PhpTypeCode.Object => Convert.ToString(Object, ctx),
+            PhpTypeCode.Object => Convert.ToString(Object),
             PhpTypeCode.Alias => Alias.Value.ToString(ctx),
             _ => throw InvalidTypeCodeException(),
         };
@@ -411,7 +405,7 @@ namespace Pchp.Core
         public static implicit operator PhpValue(PhpArray value) => Create(value);
         public static implicit operator PhpValue(Delegate value) => FromClass(value);
 
-        public static implicit operator bool(PhpValue value) => value.ToBoolean();
+        public static explicit operator bool(PhpValue value) => value.ToBoolean();
 
         public static explicit operator long(PhpValue value) => value.ToLong();
 
@@ -545,8 +539,7 @@ namespace Pchp.Core
 
         public static PhpNumber operator /(long lx, PhpValue y)
         {
-            PhpNumber ny;
-            if ((y.ToNumber(out ny) & Convert.NumberInfo.IsPhpArray) != 0)
+            if ((y.ToNumber(out var ny) & Convert.NumberInfo.IsPhpArray) != 0)
             {
                 //PhpException.UnsupportedOperandTypes();
                 //return PhpNumber.Create(0.0);
@@ -558,8 +551,7 @@ namespace Pchp.Core
 
         public static double operator /(double dx, PhpValue y)
         {
-            PhpNumber ny;
-            if ((y.ToNumber(out ny) & Convert.NumberInfo.IsPhpArray) != 0)
+            if ((y.ToNumber(out var ny) & Convert.NumberInfo.IsPhpArray) != 0)
             {
                 //PhpException.UnsupportedOperandTypes();
                 //return PhpNumber.Create(0.0);
@@ -608,7 +600,7 @@ namespace Pchp.Core
                     return true;
 
                 case PhpTypeCode.MutableString:
-                    key = Convert.StringToArrayKey(MutableStringBlob.ToString());
+                    key = Convert.StringToArrayKey(MutableStringBlob.ToString()); // TODO: corrupts non-Unicode strings https://github.com/peachpiecompiler/peachpie/issues/802
                     return true;
 
                 case PhpTypeCode.PhpArray:
@@ -924,7 +916,7 @@ namespace Pchp.Core
                 case PhpTypeCode.PhpArray: ctx.Echo((string)Array); break;
                 case PhpTypeCode.String: ctx.Echo(String); break;
                 case PhpTypeCode.MutableString: MutableStringBlob.Output(ctx); break;
-                case PhpTypeCode.Object: ctx.Echo(Convert.ToString(Object, ctx)); break;
+                case PhpTypeCode.Object: ctx.Echo(Convert.ToString(Object)); break;
                 case PhpTypeCode.Alias: Alias.Value.Output(ctx); break;
             }
         }
@@ -1188,12 +1180,6 @@ namespace Pchp.Core
             _value = default;
             _obj = default;
         }
-
-        /// <summary>
-        /// INTERNAL.
-        /// Creates an invalid value with the type code of <c>-1</c>.
-        /// </summary>
-        internal static PhpValue CreateInvalid() => new PhpValue(InvalidTypeCode);
 
         public static PhpValue Create(PhpNumber number) => number.ToPhpValue();
 

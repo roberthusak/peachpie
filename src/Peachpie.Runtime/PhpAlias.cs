@@ -105,8 +105,6 @@ namespace Pchp.Core
 
         public Convert.NumberInfo ToNumber(out PhpNumber number) => Value.ToNumber(out number);
 
-        public string ToString(Context ctx) => Value.ToString(ctx);
-
         public object ToClass() => Value.ToClass();
 
         public PhpArray ToArray() => Value.ToArray();
@@ -119,9 +117,9 @@ namespace Pchp.Core
 
         public static implicit operator PhpValue(PhpAlias alias) => PhpValue.Create(alias);
 
-        public static implicit operator bool(PhpAlias value) => value.Value;
+        public static explicit operator bool(PhpAlias value) => value.ToBoolean();
 
-        public static implicit operator IntStringKey(PhpAlias value) => value.Value;
+        public static explicit operator IntStringKey(PhpAlias value) => value.Value;
 
         /// <summary>
         /// Casts the value to object instance.
@@ -134,6 +132,10 @@ namespace Pchp.Core
         public PhpNumber ToNumber() => Convert.ToNumber(Value);
 
         public PhpString ToPhpString(Context ctx) => Value.ToPhpString(ctx);
+
+        public override string ToString() => Value.ToString();
+
+        public string ToString(Context ctx) => Value.ToString(ctx);
 
         public bool IsEmpty() => Value.IsEmpty;
 

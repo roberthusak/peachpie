@@ -380,11 +380,14 @@ namespace Pchp.Library
         /// </summary>
         /// <param name="variable">The variable.</param>
         /// <returns>The string type identifier. See PHP manual for details.</returns>
-        public static string gettype(PhpValue variable)
-        {
-            // works well on references:
-            return PhpVariable.GetTypeName(variable);
-        }
+        public static string gettype(PhpValue variable) => PhpVariable.GetTypeName(variable);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="variable"></param>
+        /// <remarks>https://wiki.php.net/rfc/get_debug_type</remarks>
+        public static string get_debug_type(PhpValue variable) => PhpVariable.GetDebugType(variable);
 
         #endregion
 
@@ -621,12 +624,6 @@ namespace Pchp.Library
             return false;
         }
 
-        /// <summary>
-        /// Get the resource ID for a given resource.
-        /// </summary>
-        /// <exception cref="Spl.TypeError">Argument is not a resource or <c>null</c>.</exception>
-        public static int get_resource_id(PhpResource res) => res != null ? res.Id : throw new Spl.TypeError();
-
         #endregion
 
         #region compact, extract
@@ -858,7 +855,6 @@ namespace Pchp.Library
 
         abstract class FormatterVisitor : PhpVariableVisitor, IPhpVariableFormatter
         {
-            readonly protected Context _ctx;
             readonly protected string _nl;
 
             protected PhpString.Blob _output;
@@ -866,10 +862,8 @@ namespace Pchp.Library
 
             protected const string RECURSION = "*RECURSION*";
 
-            protected FormatterVisitor(Context ctx, string newline = "\n")
+            protected FormatterVisitor(string newline = "\n")
             {
-                Debug.Assert(ctx != null);
-                _ctx = ctx;
                 _nl = newline;
             }
 
@@ -928,8 +922,8 @@ namespace Pchp.Library
                 }
             }
 
-            public PrintFormatter(Context ctx, string newline = "\n")
-                : base(ctx, newline)
+            public PrintFormatter(string newline = "\n")
+                : base(newline)
             {
             }
 
@@ -937,7 +931,7 @@ namespace Pchp.Library
 
             public override void Accept(long obj) => _output.Append(obj.ToString());
 
-            public override void Accept(double obj) => _output.Append(Core.Convert.ToString(obj, _ctx));
+            public override void Accept(double obj) => _output.Append(Core.Convert.ToString(obj));
 
             public override void Accept(string obj) => _output.Append(obj);
 
@@ -1064,8 +1058,8 @@ namespace Pchp.Library
                 }
             }
 
-            public ExportFormatter(Context ctx, string newline = "\n")
-                : base(ctx, newline)
+            public ExportFormatter(string newline = "\n")
+                : base(newline)
             {
             }
 
@@ -1073,7 +1067,7 @@ namespace Pchp.Library
 
             public override void Accept(long obj) => _output.Append(obj.ToString());
 
-            public override void Accept(double obj) => _output.Append(Core.Convert.ToString(obj, _ctx));
+            public override void Accept(double obj) => _output.Append(Core.Convert.ToString(obj));
 
             public override void Accept(string obj)
             {
@@ -1263,8 +1257,8 @@ namespace Pchp.Library
                 }
             }
 
-            public DumpFormatter(Context ctx, string newline = "\n", bool verbose = false)
-                : base(ctx, newline)
+            public DumpFormatter(string newline = "\n", bool verbose = false)
+                : base(newline)
             {
                 this.Verbose = verbose;
             }
@@ -1296,7 +1290,7 @@ namespace Pchp.Library
             {
                 _output.Append(PhpVariable.TypeNameDouble);
                 _output.Append("(");
-                _output.Append(Core.Convert.ToString(obj, _ctx));
+                _output.Append(Core.Convert.ToString(obj));
                 _output.Append(")");
             }
 
@@ -1444,7 +1438,7 @@ namespace Pchp.Library
         /// <returns>A string representation or <c>true</c> if <paramref name="returnString"/> is <c>false</c>.</returns>
         public static PhpValue print_r(Context ctx, PhpValue value, bool returnString = false)
         {
-            var output = (new PrintFormatter(ctx)).Serialize(value);
+            var output = new PrintFormatter().Serialize(value);
 
             if (returnString)
             {
@@ -1466,7 +1460,7 @@ namespace Pchp.Library
         /// <param name="variables">Variables to be dumped.</param>
         public static void var_dump(Context ctx, params PhpValue[] variables)
         {
-            var formatter = new DumpFormatter(ctx); // TODO: HtmlDumpFormatter
+            var formatter = new DumpFormatter(); // TODO: HtmlDumpFormatter
             for (int i = 0; i < variables.Length; i++)
             {
                 ctx.Echo(formatter.Serialize(variables[i].GetValue()));
@@ -1480,7 +1474,7 @@ namespace Pchp.Library
         /// <param name="variables">Variables to be dumped.</param>
         public static void debug_zval_dump(Context ctx, params PhpValue[] variables)
         {
-            var formatter = new DumpFormatter(ctx, verbose: true);
+            var formatter = new DumpFormatter(verbose: true);
 
             for (int i = 0; i < variables.Length; i++)
             {
@@ -1497,7 +1491,7 @@ namespace Pchp.Library
         /// <returns>A string representation or a <c>null</c> reference if <paramref name="returnString"/> is <c>false</c>.</returns>
         public static string var_export(Context ctx, PhpValue variable, bool returnString = false)
         {
-            var output = (new ExportFormatter(ctx)).Serialize(variable);
+            var output = new ExportFormatter().Serialize(variable);
 
             if (returnString)
             {
@@ -1541,5 +1535,11 @@ namespace Pchp.Library
         public static string get_resource_type(PhpValue res) => res.AsResource()?.TypeName;
 
         #endregion
+
+        /// <summary>
+        /// Get the resource ID for a given resource.
+        /// </summary>
+        /// <exception cref="Spl.TypeError">Argument is not a resource or <c>null</c>.</exception>
+        public static int get_resource_id(PhpResource res) => res != null ? res.Id : throw new Spl.TypeError();
     }
 }

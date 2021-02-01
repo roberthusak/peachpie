@@ -26,9 +26,10 @@ namespace Pchp.CodeAnalysis.Symbols
         /// Index of the source parameter, relative to the first source parameter.
         /// </summary>
         readonly int _relindex;
-        readonly PHPDocBlock.ParamTag _ptagOpt;
+        
+        internal PHPDocBlock.ParamTag PHPDoc { get; }
 
-        internal PHPDocBlock.ParamTag PHPDocOpt => _ptagOpt;
+        ImmutableArray<AttributeData> _attributes;
 
         TypeSymbol _lazyType;
 
@@ -37,6 +38,11 @@ namespace Pchp.CodeAnalysis.Symbols
         /// </summary>
         public override BoundExpression Initializer => _initializer;
         readonly BoundExpression _initializer;
+
+        /// <summary>
+        /// Gets enumeration of parameter source attributes.
+        /// </summary>
+        public IEnumerable<SourceCustomAttribute> SourceAttributes => _attributes.OfType<SourceCustomAttribute>();
 
         /// <summary>
         /// Whether the parameter needs to be copied when passed by value.
@@ -118,10 +124,10 @@ namespace Pchp.CodeAnalysis.Symbols
             Contract.ThrowIfNull(syntax);
             Debug.Assert(relindex >= 0);
 
+
             _routine = routine;
             _syntax = syntax;
             _relindex = relindex;
-            _ptagOpt = ptagOpt;
             _lazyType = specializedType;
 
             var initializer = (syntax.InitValue != null)
@@ -134,6 +140,14 @@ namespace Pchp.CodeAnalysis.Symbols
                  || SpecializationUtils.GetInfo(routine.DeclaringCompilation, routine.TypeRefContext, initializer, specializedType).Kind == SpecializationKind.Always)
                     ? initializer
                     : null;
+
+            var phpattrs = _syntax.GetAttributes();
+            _attributes = phpattrs.Count != 0
+                ? new SemanticsBinder(DeclaringCompilation, routine.ContainingFile.SyntaxTree, locals: null, routine: routine, self: routine.ContainingType as SourceTypeSymbol)
+                    .BindAttributes(phpattrs)
+                : ImmutableArray<AttributeData>.Empty;
+
+            PHPDoc = ptagOpt;
         }
 
         /// <summary>
@@ -145,7 +159,7 @@ namespace Pchp.CodeAnalysis.Symbols
 
         internal override PhpCompilation DeclaringCompilation => _routine.DeclaringCompilation;
 
-        internal override IModuleSymbol ContainingModule => _routine.ContainingModule;
+        internal override ModuleSymbol ContainingModule => _routine.ContainingModule;
 
         public override NamedTypeSymbol ContainingType => _routine.ContainingType;
 
@@ -303,6 +317,8 @@ namespace Pchp.CodeAnalysis.Symbols
             }
         }
 
+        public override ImmutableArray<AttributeData> GetAttributes() => _attributes;
+        
         internal override IEnumerable<AttributeData> GetCustomAttributesToEmit(CommonModuleCompilationState compilationState)
         {
             // [param]   
@@ -311,10 +327,10 @@ namespace Pchp.CodeAnalysis.Symbols
                 yield return DeclaringCompilation.CreateParamsAttribute();
             }
 
-            // [NotNull]
+            // [Nullable(1)] - does not return null
             if (HasNotNull && Type.IsReferenceType)
             {
-                yield return DeclaringCompilation.CreateNotNullAttribute();
+                yield return DeclaringCompilation.CreateNullableAttribute(NullableContextUtils.NotAnnotatedAttributeValue);
             }
 
             // [DefaultValue]
@@ -324,7 +340,10 @@ namespace Pchp.CodeAnalysis.Symbols
             }
 
             //
-            yield break;
+            foreach (var attr in GetAttributes())
+            {
+                yield return attr;
+            }
         }
 
         public override bool IsOptional => this.HasExplicitDefaultValue;

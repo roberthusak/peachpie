@@ -807,8 +807,11 @@ namespace Pchp.Core
         {
             switch (value.TypeCode)
             {
+                case PhpTypeCode.PhpArray:
+                    return value.Array.GetItemValue(index); // , quiet);
+
                 case PhpTypeCode.String:
-                    var item = Operators.GetItemValue(value.String, index, quiet);
+                    var item = GetItemValue(value.String, index, quiet);
                     if (quiet && string.IsNullOrEmpty(item))
                     {
                         return PhpValue.Null;
@@ -816,10 +819,7 @@ namespace Pchp.Core
                     return item;
 
                 case PhpTypeCode.MutableString:
-                    return ((IPhpArray)value.MutableStringBlob).GetItemValue(index); // quiet);
-
-                case PhpTypeCode.PhpArray:
-                    return value.Array.GetItemValue(index); // , quiet);
+                    return value.MutableStringBlob.GetItemValue(index); // quiet);
 
                 case PhpTypeCode.Object:
                     return Operators.GetItemValue(value.Object, index, quiet);
@@ -828,6 +828,7 @@ namespace Pchp.Core
                     return value.Alias.Value.GetArrayItem(index, quiet);
 
                 default:
+                    // TODO: warning
                     return PhpValue.Null;
             }
         }
@@ -1166,15 +1167,15 @@ namespace Pchp.Core
         /// <summary>
         /// Resolves the runtime property by looking into runtime properties and eventually invoking the <c>__get</c> magic method.
         /// </summary>
-        public static PhpValue RuntimePropertyGetValue(Context/*!*/ctx, object/*!*/instance, string propertyName)
+        public static PhpValue RuntimePropertyGetValue(Context/*!*/ctx, object/*!*/instance, string propertyName, bool quiet)
         {
-            return RuntimePropertyGetValue(ctx, instance.GetPhpTypeInfo(), instance, propertyName);
+            return RuntimePropertyGetValue(ctx, instance.GetPhpTypeInfo(), instance, propertyName, quiet);
         }
 
         /// <summary>
         /// Resolves the runtime property by looking into runtime properties and eventually invoking the <c>__get</c> magic method.
         /// </summary>
-        public static PhpValue RuntimePropertyGetValue(Context/*!*/ctx, PhpTypeInfo/*!*/type, object/*!*/instance, string propertyName)
+        public static PhpValue RuntimePropertyGetValue(Context/*!*/ctx, PhpTypeInfo/*!*/type, object/*!*/instance, string propertyName, bool quiet)
         {
             var runtimeFields = type.GetRuntimeFields(instance);
             if (runtimeFields != null && runtimeFields.TryGetValue(propertyName, out var value))
@@ -1200,7 +1201,12 @@ namespace Pchp.Core
             }
 
             //
-            PhpException.UndefinedProperty(type.Name, propertyName);
+            if (!quiet)
+            {
+                PhpException.UndefinedProperty(type.Name, propertyName);
+            }
+
+            // empty
             return PhpValue.Null;
         }
 
@@ -1741,6 +1747,33 @@ namespace Pchp.Core
         /// Gets enumerator object for given value.
         /// </summary>
         public static IPhpEnumerator GetForeachEnumerator(PhpValue value, bool aliasedValues, RuntimeTypeHandle caller) => value.GetForeachEnumerator(aliasedValues, caller);
+
+        /// <summary>
+        /// Gets enumerator of array entries.
+        /// This is internal implementation that avoids allocations in common cases.
+        /// </summary>
+        public static OrderedDictionary.FastEnumerator GetFastEnumerator(PhpArray array, bool aliasedValue)
+        {
+            Debug.Assert(array != null);
+
+            if (array.Count == 0)
+            {
+                // follows call to MoveNext() which ends the enumeration
+                // keep array as it is, it won't be accessed anyways
+            }
+            else if (aliasedValue)
+            {
+                // ensure array is not shared with another variable
+                array.EnsureWritable();
+            }
+            else
+            {
+                // create lazy copy
+                array.table.AddRef();
+            }
+
+            return array.GetFastEnumerator();
+        }
 
         #endregion
 

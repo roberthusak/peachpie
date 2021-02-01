@@ -297,10 +297,13 @@ namespace Pchp.CodeAnalysis.Symbols
                 IsNullOrEmpty_String = ct.String.Method("IsNullOrEmpty", ct.String);
                 Concat_String_String = ct.String.Method("Concat", ct.String, ct.String);
 
+                ToBoolean_String = ct.Convert.Method("ToBoolean", ct.String);
+                ToBoolean_PhpString = ct.Convert.Method("ToBoolean", ct.PhpString);
+
                 ToString_Bool = ct.Convert.Method("ToString", ct.Boolean);
                 ToString_Int32 = ct.Convert.Method("ToString", ct.Int32);
                 ToString_Long = ct.Convert.Method("ToString", ct.Long);
-                ToString_Double_Context = ct.Convert.Method("ToString", ct.Double, ct.Context);
+                ToString_Double = ct.Convert.Method("ToString", ct.Double);
                 Long_ToString = ct.Long.Method("ToString");
                 ToChar_String = ct.Convert.Method("ToChar", ct.String);
                 ToNumber_PhpValue = ct.Convert.Method("ToNumber", ct.PhpValue);
@@ -335,6 +338,7 @@ namespace Pchp.CodeAnalysis.Symbols
 
                 GetForeachEnumerator_PhpValue_Bool_RuntimeTypeHandle = ct.Operators.Method("GetForeachEnumerator", ct.PhpValue, ct.Boolean, ct.RuntimeTypeHandle);
                 GetForeachEnumerator_Iterator = ct.Operators.Method("GetForeachEnumerator", ct.Iterator);
+                GetFastEnumerator_PhpArray_Boolean = ct.Operators.Method("GetFastEnumerator", ct.PhpArray, ct.Boolean);
 
                 GetSelf_RuntimeTypeHandle = ct.Operators.Method("GetSelf", ct.RuntimeTypeHandle);
                 GetSelfOrNull_RuntimeTypeHandle = ct.Operators.Method("GetSelfOrNull", ct.RuntimeTypeHandle);
@@ -433,7 +437,8 @@ namespace Pchp.CodeAnalysis.Symbols
                 EnsureItemArray_IPhpArray_PhpValue,
                 EnsureItemObject_IPhpArray_PhpValue,
                 IsSet_PhpValue, IsEmpty_PhpValue, IsNullOrEmpty_String, Concat_String_String,
-                ToString_Bool, ToString_Long, ToString_Int32, ToString_Double_Context, Long_ToString,
+                ToBoolean_String, ToBoolean_PhpString,
+                ToString_Bool, ToString_Long, ToString_Int32, ToString_Double, Long_ToString,
                 ToChar_String,
                 ToNumber_PhpValue, ToNumber_String, ToArrayOrThrow_PhpValue,
                 AsObject_PhpValue, AsArray_PhpValue, ToArray_PhpValue, GetArrayAccess_PhpValueRef, ToPhpString_PhpValue_Context, ToClass_PhpValue, ToClass_IPhpArray, AsCallable_PhpValue_RuntimeTypeHandle_Object, AsCallable_String_RuntimeTypeHandle_Object,
@@ -447,6 +452,7 @@ namespace Pchp.CodeAnalysis.Symbols
 
                 GetForeachEnumerator_PhpValue_Bool_RuntimeTypeHandle,
                 GetForeachEnumerator_Iterator,
+                GetFastEnumerator_PhpArray_Boolean,
 
                 GetSelf_RuntimeTypeHandle, GetSelfOrNull_RuntimeTypeHandle, GetParent_RuntimeTypeHandle, GetParent_PhpTypeInfo,
                 TypeNameOrObjectToType_Context_PhpValue,
@@ -881,8 +887,9 @@ namespace Pchp.CodeAnalysis.Symbols
                 PhpTypeAttribute_string_string_byte = ct.PhpTypeAttribute.Ctor(ct.String, ct.String, ct.Byte);
                 PhpFieldsOnlyCtorAttribute = ct.PhpFieldsOnlyCtorAttribute.Ctor();
                 PhpHiddenAttribute = ct.PhpHiddenAttribute.Ctor();
-                NotNullAttribute = ct.NotNullAttribute.Ctor();
                 DefaultValueAttribute_string = ct.DefaultValueAttribute.Ctor(ct.String);
+                NullableAttribute_byte = ct.NullableAttribute.Ctor(ct.Byte);
+                NullableContextAttribute_byte = ct.NullableContextAttribute.Ctor(ct.Byte);
 
                 ScriptDiedException = ct.ScriptDiedException.Ctor();
                 ScriptDiedException_Long = ct.ScriptDiedException.Ctor(ct.Long);
@@ -899,8 +906,9 @@ namespace Pchp.CodeAnalysis.Symbols
                 PhpString_Blob, PhpString_PhpString, PhpString_string_string, PhpString_PhpValue_Context,
                 Blob,
                 IntStringKey_long, IntStringKey_string,
-                ScriptAttribute_string_long, PhpTraitAttribute, PharAttribute_string, PhpTypeAttribute_string_string, PhpTypeAttribute_string_string_byte, PhpFieldsOnlyCtorAttribute, PhpHiddenAttribute, NotNullAttribute,
+                ScriptAttribute_string_long, PhpTraitAttribute, PharAttribute_string, PhpTypeAttribute_string_string, PhpTypeAttribute_string_string_byte, PhpFieldsOnlyCtorAttribute, PhpHiddenAttribute,
                 DefaultValueAttribute_string,
+                NullableAttribute_byte, NullableContextAttribute_byte,
                 ScriptDiedException, ScriptDiedException_Long, ScriptDiedException_PhpValue,
                 IndirectLocal_PhpArray_IntStringKey,
                 CompilationCountersAttribute_int_int_int_int_int_int_int_int_int_int;

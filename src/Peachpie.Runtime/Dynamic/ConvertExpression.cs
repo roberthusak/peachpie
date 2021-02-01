@@ -55,7 +55,7 @@ namespace Pchp.Core.Dynamic
                 if (target == typeof(PhpAlias))
                 {
                     // new PhppAlias(PhpValue.Null, 1)
-                    return Expression.New(Cache.PhpAlias.ctor_PhpValue_int, BindToValue(arg), Expression.Constant(1));
+                    return Expression.New(Cache.PhpAlias.ctor_PhpValue_int, BindToValue(arg), Cache.Expressions.Create(1));
                 }
 
                 // (T)null
@@ -107,7 +107,7 @@ namespace Pchp.Core.Dynamic
             {
                 //Debug.Assert(arg.Type.IsByRef && arg.Type == typeof(PhpValue), "Variable should be PhpValue and passed by ref so things will work out!");
                 if (arg.Type == typeof(PhpValue)) return Expression.Call(Cache.Operators.EnsureAlias_PhpValueRef, arg);
-                return Expression.New(Cache.PhpAlias.ctor_PhpValue_int, BindToValue(arg), Expression.Constant(1));
+                return Expression.New(Cache.PhpAlias.ctor_PhpValue_int, BindToValue(arg), Cache.Expressions.Create(1));
             }
 
             if (target.IsByRef)
@@ -220,7 +220,7 @@ namespace Pchp.Core.Dynamic
             }
 
             // Template: new Nullable<T>( (T)arg )
-            Expression new_nullable = null;
+            Expression new_nullable;
 
             try
             {
@@ -348,10 +348,10 @@ namespace Pchp.Core.Dynamic
                 return Expression.Call(expr, Cache.Object.ToString);
 
             if (source == typeof(double))
-                return Expression.Call(Cache.Object.ToString_Double_Context, expr, ctx);
+                return Expression.Call(Cache.Operators.ToString_Double, expr);
 
             if (source == typeof(float))
-                return Expression.Call(Cache.Object.ToString_Double_Context, Expression.Convert(expr, typeof(double)), ctx);    // ToString((double)expr, ctx)
+                return Expression.Call(Cache.Operators.ToString_Double, Expression.Convert(expr, typeof(double)));    // ToString((double)expr)
 
             if (source == typeof(bool))
                 return Expression.Call(Cache.Object.ToString_Bool, expr);
@@ -369,7 +369,7 @@ namespace Pchp.Core.Dynamic
                 return VoidAsConstant(expr, null, typeof(string));
 
             if (source == typeof(PhpNumber))
-                return Expression.Call(expr, Cache.Operators.PhpNumber_ToString_Context, ctx);
+                return Expression.Call(expr, Cache.Operators.PhpNumber_ToString);
 
             if (source == typeof(object))
             {
@@ -523,6 +523,7 @@ namespace Pchp.Core.Dynamic
                 if (source == typeof(void)) return VoidAsConstant(expr, PhpValue.Null, Cache.Types.PhpValue);
                 if (source == typeof(uint)) return Expression.Call(typeof(PhpValue).GetMethod("Create", Cache.Types.Long), Expression.Convert(expr, typeof(long)));
                 if (source == typeof(ulong)) return Expression.Call(typeof(PhpValue).GetMethod("Create", Cache.Types.UInt64), expr);
+                if (source == typeof(byte)) return BindToValue(Expression.Convert(expr, typeof(int)));
 
                 if (source.IsEnum)
                 {

@@ -82,7 +82,7 @@ namespace Pchp.CodeAnalysis.CommandLine
             var gindex = path.IndexOf('*');
             if (gindex < 0)
             {
-                return ParseFileArgument(path, baseDirectory, diagnostics);
+                return ParseFileArgument(path, baseDirectory, diagnostics).Select(file => ToCommandLineSourceFile(file));
             }
 
             var dir = baseDirectory;
@@ -146,7 +146,9 @@ namespace Pchp.CodeAnalysis.CommandLine
             // we don't care about empty folders reported as file not found,
             // this error is ment for cases where no files are enumerated at all
 
-            return ParseFileArgument(path, dir, new ConditionalList<Diagnostic>(errors, (err) => err.Code != MessageProvider.ERR_FileNotFound));
+            return
+                ParseFileArgument(path, dir, new ConditionalList<Diagnostic>(errors, (err) => err.Code != MessageProvider.ERR_FileNotFound))
+                    .Select(file => ToCommandLineSourceFile(file));
         }
 
         internal override CommandLineArguments CommonParse(IEnumerable<string> args, string baseDirectory, string sdkDirectoryOpt, string additionalReferenceDirectories)
@@ -159,6 +161,7 @@ namespace Pchp.CodeAnalysis.CommandLine
             var sourceFiles = new List<CommandLineSourceFile>();
             var metadataReferences = new List<CommandLineReference>();
             var analyzers = new List<CommandLineAnalyzerReference>();
+            var analyzerConfigPaths = new List<string>();
             var additionalFiles = new List<CommandLineSourceFile>();
             var embeddedFiles = new List<CommandLineSourceFile>();
             var managedResources = new List<ResourceDescription>();
@@ -379,9 +382,13 @@ namespace Pchp.CodeAnalysis.CommandLine
                         {
                             diagnostics.Add(Errors.MessageProvider.Instance.CreateDiagnostic(Errors.ErrorCode.ERR_SwitchNeedsValue, Location.None, name));
                         }
-                        else if (string.Equals(value, "default", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "latest", StringComparison.OrdinalIgnoreCase))
+                        else if (string.Equals(value, "default", StringComparison.OrdinalIgnoreCase))
                         {
-                            languageVersion = null; // default
+                            languageVersion = PhpSyntaxTree.DefaultLanguageVersion;
+                        }
+                        else if (string.Equals(value, "latest", StringComparison.OrdinalIgnoreCase))
+                        {
+                            languageVersion = PhpSyntaxTree.LatestLanguageVersion;
                         }
                         else if (!Version.TryParse(value, out languageVersion))
                         {
@@ -674,7 +681,10 @@ namespace Pchp.CodeAnalysis.CommandLine
                             continue;
                         }
 
-                        embeddedFiles.AddRange(ParseSeparatedFileArgument(value, baseDirectory, diagnostics));
+                        foreach (var path in ParseSeparatedFileArgument(value, baseDirectory, diagnostics))
+                        {
+                            embeddedFiles.Add(ToCommandLineSourceFile(path));
+                        }
                         continue;
 
                     case "autoload":
@@ -916,6 +926,7 @@ namespace Pchp.CodeAnalysis.CommandLine
                 ChecksumAlgorithm = SourceHashAlgorithm.Sha1, // checksumAlgorithm,
                 MetadataReferences = metadataReferences.AsImmutable(),
                 AnalyzerReferences = analyzers.AsImmutable(),
+                AnalyzerConfigPaths = analyzerConfigPaths.AsImmutable(),
                 AdditionalFiles = additionalFiles.AsImmutable(),
                 ReferencePaths = referencePaths.AsImmutable(),
                 SourcePaths = ImmutableArray<string>.Empty, //sourcePaths.AsImmutable(),

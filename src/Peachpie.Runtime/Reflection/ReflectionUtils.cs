@@ -4,13 +4,14 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Pchp.Core.Dynamic;
 
 namespace Pchp.Core.Reflection
 {
-    public static class ReflectionUtils
+    public static partial class ReflectionUtils
     {
         /// <summary>
         /// Well-known name of the PHP constructor.
@@ -88,6 +89,33 @@ namespace Pchp.Core.Reflection
         }
 
         /// <summary>
+        /// Resolves lazy constant field in form of:<br/>
+        /// public static readonly Func&lt;Context, TResult&gt; FIELD;
+        /// </summary>
+        internal static bool TryBindLazyConstantField(FieldInfo fld, out Func<Context, PhpValue> getter)
+        {
+            if (fld.IsInitOnly && fld.IsStatic)
+            {
+                var rtype = fld.FieldType;
+                if (rtype.IsGenericType && rtype.GetGenericTypeDefinition() == typeof(Func<,>))
+                {
+                    // Func<Context, TResult>
+                    var g = rtype.GenericTypeArguments;
+                    if (g.Length == 2 && g[0] == typeof(Context))
+                    {
+                        var getter1 = (MulticastDelegate)fld.GetValue(null); // initonly
+
+                        getter = BinderHelpers.BindFuncInvoke<PhpValue>(getter1);
+                        return true;
+                    }
+                }
+            }
+
+            getter = null;
+            return false;
+        }
+
+        /// <summary>
         /// Determines whether given constructor is <c>PhpFieldsOnlyCtorAttribute</c>.
         /// </summary>
         public static bool IsPhpFieldsOnlyCtor(this ConstructorInfo ctor)
@@ -125,33 +153,6 @@ namespace Pchp.Core.Reflection
         /// Determines the type is not interface nor abstract.
         /// </summary>
         public static bool IsInstantiable(Type t) => t != null && !t.IsInterface && !t.IsAbstract; // => not static
-
-        /// <summary>
-        /// Determines whether given parameter allows <c>NULL</c> as the argument value.
-        /// </summary>
-        public static bool IsNullable(this ParameterInfo p)
-        {
-            Debug.Assert(typeof(PhpArray).IsValueType == false); // see TODO below
-
-            if (p.ParameterType.IsValueType &&
-                p.ParameterType != typeof(PhpValue) &&
-                //p.ParameterType != typeof(PhpArray) // TODO: uncomment when PhpArray will be struct
-                p.ParameterType != typeof(PhpString))
-            {
-                if (p.ParameterType.IsNullable_T(out var _))
-                {
-                    return true;
-                }
-
-                // NULL is not possible on value types
-                return false;
-            }
-            else
-            {
-                // NULL is explicitly disallowed?
-                return p.GetCustomAttribute<NotNullAttribute>() == null;
-            }
-        }
 
         /// <summary>
         /// Determines whether the method is declared in user's PHP code (within a user type or within a source script).

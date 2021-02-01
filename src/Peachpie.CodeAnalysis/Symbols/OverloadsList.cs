@@ -235,7 +235,7 @@ namespace Pchp.CodeAnalysis.Symbols
                 m.DeclaredAccessibility != Accessibility.Internal && // "internal"
                 (scope.ScopeIsDynamic || m.IsAccessible(scope.Scope)) &&  // method is accessible (or might be in runtime)
                 !m.IsInitFieldsOnly &&    // method is not a special .ctor which is not accessible from user's code
-                (!m.IsPhpHidden() || (m is SourceRoutineSymbol sourceSymbol && sourceSymbol.IsSpecializedOverload)) // ignore [PhpHidden] methods unless it's a specialized overload
+                (!m.IsPhpHidden || (m is SourceRoutineSymbol sourceSymbol && sourceSymbol.IsSpecializedOverload)) // ignore [PhpHidden] methods unless it's a specialized overload
                 );
         }
     }

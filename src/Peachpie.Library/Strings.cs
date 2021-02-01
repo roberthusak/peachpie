@@ -2217,17 +2217,16 @@ namespace Pchp.Library
         /// <summary>
         /// Converts special characters to HTML entities.
         /// </summary>
-        /// <param name="str">The string to convert.</param>
-        /// <param name="quoteStyle">Quote conversion.</param>
-        /// <param name="charSet">The character set used in conversion. This parameter is ignored.</param>
-        /// <param name="doubleEncode">When double_encode is turned off PHP will not encode existing html entities, the default is to convert everything.</param>
+        /// <param name="string">The string to convert.</param>
+        /// <param name="flags">Quote conversion.</param>
+        /// <param name="encoding">The character set used in conversion. This parameter is ignored.</param>
+        /// <param name="double_encode">When double_encode is turned off PHP will not encode existing html entities, the default is to convert everything.</param>
         /// <returns>The converted string.</returns>
-        [return: NotNull]
-        public static string/*!*/htmlspecialchars(string str, QuoteStyle quoteStyle = QuoteStyle.Compatible, string charSet = "ISO-8859-1", bool doubleEncode = true)
+        public static string/*!*/htmlspecialchars(string @string, QuoteStyle flags = QuoteStyle.Compatible | QuoteStyle.Html401, string encoding = "UTF-8", bool double_encode = true)
         {
-            return string.IsNullOrEmpty(str)
+            return string.IsNullOrEmpty(@string)
                 ? string.Empty
-                : HtmlSpecialCharsEncode(str, 0, str.Length, quoteStyle, charSet, !doubleEncode);
+                : HtmlSpecialCharsEncode(@string, 0, @string.Length, flags, encoding, !double_encode);
         }
 
         /// <summary>
@@ -3706,7 +3705,6 @@ namespace Pchp.Library
         /// </summary>
         /// <param name="str">The input string.</param>
         /// <returns><paramref name="str"/> with the first character converted to uppercase.</returns>
-        [return: NotNull]
         public static string ucfirst(string str)
         {
             if (string.IsNullOrEmpty(str))
@@ -3721,7 +3719,6 @@ namespace Pchp.Library
         /// </summary>
         /// <param name="str">The input string.</param>
         /// <returns>Returns the resulting string.</returns>
-        [return: NotNull]
         public static string lcfirst(string str)
         {
             if (string.IsNullOrEmpty(str))
@@ -3736,7 +3733,6 @@ namespace Pchp.Library
         /// </summary>
         /// <param name="str">The input string.</param>
         /// <returns><paramref name="str"/> with the first character of each word in a string converted to uppercase.</returns>
-        [return: NotNull]
         public static string ucwords(string str) => ucwords(str, " \t\r\n\f\v");
 
         /// <summary>
@@ -3745,7 +3741,6 @@ namespace Pchp.Library
         /// <param name="str">The input string.</param>
         /// <param name="delimiters">The word separator characters.</param>
         /// <returns><paramref name="str"/> with the first character of each word in a string converted to uppercase.</returns>
-        [return: NotNull]
         public static string ucwords(string str, string delimiters)
         {
             if (string.IsNullOrEmpty(str))
@@ -4075,27 +4070,22 @@ namespace Pchp.Library
         [return: CastToFalse]
         public static string vsprintf(Context ctx, string format, PhpArray arguments)
         {
-            if (format == null) return string.Empty;
-
-            PhpValue[] array;
-            if (arguments != null && arguments.Count != 0)
+            if (string.IsNullOrEmpty(format))
             {
-                array = new PhpValue[arguments.Count];
-                arguments.Values.CopyTo(array, 0);
+                return string.Empty;
+            }
+
+            var array = arguments != null ? arguments.GetValues() : Array.Empty<PhpValue>();
+            var result = FormatInternal(ctx, format, array);
+            if (result != null)
+            {
+                return result;
             }
             else
             {
-                array = Core.Utilities.ArrayUtils.EmptyValues;
-            }
-
-            var result = FormatInternal(ctx, format, array);
-            if (result == null)
-            {
                 PhpException.Throw(PhpError.Warning, LibResources.too_few_arguments);
-
                 return null;
             }
-            return result;
         }
 
         #endregion
@@ -4494,84 +4484,93 @@ namespace Pchp.Library
         /// </summary>
         /// <param name="str">The string to word-wrap.</param>
         /// <param name="width">The desired line length.</param>
-        /// <param name="lineBreak">The break string.</param>
+        /// <param name="break">The break string.</param>
         /// <param name="cut">If true, words longer than <paramref name="width"/> will be cut so that no line is longer
         /// than <paramref name="width"/>.</param>
         /// <returns>The word-wrapped string.</returns>
         /// <remarks>The only "break-point" character is space (' ').</remarks>
         /// <exception cref="PhpException">Thrown if the combination of <paramref name="width"/> and <paramref name="cut"/> is invalid.</exception>
         [return: CastToFalse]
-        public static string wordwrap(string str, int width = 75, string lineBreak = "\n", bool cut = false)
+        public static string wordwrap(string str, int width = 75, string @break = "\n", bool cut = false)
         {
+            if (string.IsNullOrEmpty(str))
+            {
+                return string.Empty;
+            }
+
+            if (string.IsNullOrEmpty(@break))
+            {
+                PhpException.Throw(PhpError.Warning, LibResources.arg_empty, nameof(@break));
+                return null; // return FALSE;
+            }
+
             if (width == 0 && cut)
             {
-                //PhpException.Throw(PhpError.Warning, LibResources.GetString("cut_forced_with_zero_width"));
-                //return null;
-                throw new ArgumentException();
+                PhpException.Throw(PhpError.Warning, LibResources.cut_forced_with_zero_width);
+                return null; // return FALSE;
             }
-            if (str == null) return null;
 
-            int length = str.Length;
-            StringBuilder result = new StringBuilder(length);
+            var result = StringBuilderUtilities.Pool.Get();
 
             // mimic the strange PHP behaviour when width < 0 and cut is true
             if (width < 0 && cut)
             {
-                result.Append(lineBreak);
+                result.Append(@break);
                 width = 1;
             }
 
-            int lastSpace = -1, lineStart = 0;
-            for (int i = 0; i < length; i++)
+            //
+            int lastspace = 0, linestart = 0;
+
+            for (int i = 0; i < str.Length; i++)
             {
-                if (str[i] == ' ')
-                {
-                    lastSpace = i;
-                    if (i - lineStart >= width + 1)
-                    {
-                        // cut is false if we get here
-                        if (lineStart == 0)
-                        {
-                            result.Append(str, 0, i);
-                        }
-                        else
-                        {
-                            result.Append(lineBreak);
-                            result.Append(str, lineStart, i - lineStart);
-                        }
+                var ch = str[i];
 
-                        lineStart = i + 1;
-                        continue;
-                    }
+                // check there is already an existing break:
+                if (ch == @break[0] && str.AsSpan(i).StartsWith(@break.AsSpan()))
+                {
+                    result.Append(str, linestart, i - linestart + @break.Length);
+                    
+                    lastspace = linestart = i + @break.Length;
+                    i = linestart - 1; // ++
                 }
-
-                if (i - lineStart >= width)
+                // check the space, and if it is a line boundary:
+                else if (ch == ' ')
                 {
-                    // we reached the specified width
+                    if (i - linestart >= width)
+                    {
+                        result.Append(str, linestart, i - linestart);
+                        result.Append(@break);
 
-                    if (lastSpace > lineStart) // obsolete: >=
-                    {
-                        if (lineStart > 0) result.Append(lineBreak);
-                        result.Append(str, lineStart, lastSpace - lineStart);
-                        lineStart = lastSpace + 1;
+                        linestart = i + 1;
                     }
-                    else if (cut)
-                    {
-                        if (lineStart > 0) result.Append(lineBreak);
-                        result.Append(str, lineStart, width);
-                        lineStart = i;
-                    }
+
+                    lastspace = i;
+                }
+                // cut if there was no space in this line:
+                else if (i - linestart >= width && cut && linestart >= lastspace)
+                {
+                    result.Append(str, linestart, i - linestart);
+                    result.Append(@break);
+                    lastspace = linestart = i;
+                }
+                // current word exceeds {width}
+                else if (i - linestart >= width && linestart < lastspace)
+                {
+                    result.Append(str, linestart, lastspace - linestart);
+                    result.Append(@break);
+                    lastspace = linestart = lastspace + 1;
                 }
             }
 
             // process the rest of str
-            if (lineStart < length || lastSpace == length - 1)
+            if (linestart < str.Length)
             {
-                if (lineStart > 0) result.Append(lineBreak);
-                result.Append(str, lineStart, length - lineStart);
+                result.Append(str, linestart, str.Length - linestart);
             }
 
-            return result.ToString();
+            //
+            return StringBuilderUtilities.GetStringAndReturn(result);
         }
 
         #endregion 
@@ -4602,7 +4601,7 @@ namespace Pchp.Library
             var format = new System.Globalization.NumberFormatInfo
             {
                 NumberDecimalDigits = Math.Max(num_decimal_places, 0), // TODO: .NET throws for decimals > 99
-                NumberDecimalSeparator = dec_separator ?? ".", // NULL ~ a defalt value
+                NumberDecimalSeparator = dec_separator ?? ".", // NULL ~ a default value
                 NumberGroupSeparator = thousands_separator ?? ",", // NULL ~ a default value
             };
 
@@ -4612,6 +4611,7 @@ namespace Pchp.Library
         /// <summary>
         /// Not supported.
         /// </summary>
+        [Obsolete]
         public static string money_format(string format, double number)
         {
             throw new NotImplementedException();
@@ -5536,7 +5536,6 @@ namespace Pchp.Library
         /// </summary>
         /// <param name="str">The string to convert.</param>
         /// <returns>The lowercased string or empty string if <paramref name="str"/> is null.</returns>
-        [return: NotNull]
         public static string strtolower(string str) => str != null ? str.ToLowerInvariant() : string.Empty;
         //{
         //    // TODO: Locale: return (str == null) ? string.Empty : str.ToLower(Locale.GetCulture(Locale.Category.CType));
@@ -5548,7 +5547,6 @@ namespace Pchp.Library
         /// </summary>
         /// <param name="str">The string to convert.</param>
         /// <returns>The uppercased string or empty string if <paramref name="str"/> is null.</returns>
-        [return: NotNull]
         public static string strtoupper(string str) => str != null ? str.ToUpperInvariant() : string.Empty;
         //{
         //    // TODO: Locale: return (str == null) ? string.Empty : str.ToUpper(Locale.GetCulture(Locale.Category.CType));
