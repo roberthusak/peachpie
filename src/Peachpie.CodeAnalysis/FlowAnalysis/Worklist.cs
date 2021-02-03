@@ -111,7 +111,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
             }
             
             // ensure caller is subscribed to routine's ExitBlock
-            ((ExitBlock)routine.ControlFlowGraph.Exit).Subscribe(caller);
+            ((ExitBlock)sourceRoutine.ControlFlowGraph.Exit).Subscribe(caller);
 
             // TODO: check if routine has to be reanalyzed => enqueue routine's StartBlock
 

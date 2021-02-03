@@ -105,7 +105,7 @@ namespace Peachpie.DiagnosticTests
         {
             if (x.Type != null)
             {
-                if (x.Type.IsAnonymousType)
+                if (x.Type.IsAnonymousType || x.PhpSyntax == null)
                 {
                     // nada
                 }

@@ -802,7 +802,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
 
             if (!x.IsImplicit && x.PhpSyntax != null &&
                 x.Operand.TypeRefMask.IsSingleType &&
-                x.TargetType == TypeCtx.GetTypes(x.Operand.TypeRefMask).FirstOrDefault())
+                x.TargetType.Equals(TypeCtx.GetTypes(x.Operand.TypeRefMask).FirstOrDefault()))
             {
                 _diagnostics.Add(_routine, x.PhpSyntax, ErrorCode.INF_RedundantCast);
             }
