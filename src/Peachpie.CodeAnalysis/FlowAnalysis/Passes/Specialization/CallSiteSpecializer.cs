@@ -53,6 +53,21 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                                 // TODO: Consider the most common specialization, not just the first one as now
                             }
                         }
+
+                        // Default values of not passed arguments
+                        for (int i = args.Length; i < function.SourceParameters.Length; i++)
+                        {
+                            var param = function.SourceParameters[i];
+                            if (param.Initializer != null)
+                            {
+                                var defaultType = SpecializationUtils.EstimateExpressionType(_compilation, function.TypeRefContext, param.Initializer);
+                                if (IsSpecialized(paramTypes[i], defaultType))
+                                {
+                                    paramTypes[i] = defaultType;
+                                    isSpecialized = true;
+                                }
+                            }
+                        }
                     }
 
                     if (isSpecialized)
