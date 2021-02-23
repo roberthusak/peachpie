@@ -25,6 +25,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Devsense.PHP.Syntax.Ast;
+using Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization;
 
 namespace Pchp.CodeAnalysis
 {
@@ -558,6 +559,8 @@ namespace Pchp.CodeAnalysis
                     // 3. Resolve operators and types
                     compiler.BindTypes();
                 }
+
+                //TypingCounter.CountTypingInfo(compilation);
 
                 // 4. Optionally create and analyse routine specializations
                 if (compilation.RoutineSpecializer != null)
