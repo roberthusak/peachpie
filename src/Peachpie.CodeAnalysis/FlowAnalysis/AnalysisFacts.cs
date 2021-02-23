@@ -341,6 +341,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
                     return true;
 
                 case "is_object":
+                    // TODO: Revisit, resources are not in fact objects
                     // Keep IncludesSubclasses flag in the true branch and clear it in the false branch
                     HandleTypeCheckingExpression(
                         arg,

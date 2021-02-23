@@ -491,6 +491,7 @@ namespace Pchp.Library
         {
             var obj = variable.AsObject();
             return obj != null && !(obj is __PHP_Incomplete_Class) && !(obj is PhpResource);
+            // TODO: __PHP_Incomplete_Class is an object since PHP 7.2.0
         }
 
         /// <summary>
