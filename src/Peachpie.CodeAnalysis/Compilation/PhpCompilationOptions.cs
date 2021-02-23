@@ -83,6 +83,19 @@ namespace Pchp.CodeAnalysis
         /// explicit type checking at call sites.
         /// </summary>
         CallSiteOverloadsBranch,
+
+        /// <summary>
+        /// Generates a type-specific overload for each routine where the parameter types are infered from their
+        /// usages inside the routine. Calls them only in situations when we know the types match.
+        /// </summary>
+        UsageOverloadsStatic,
+
+        /// <summary>
+        /// Generates a type-specific overload for each routine where the parameter types are infered from their
+        /// usages inside the routine. Attempts to call them as much as possible by explicit type checking at call
+        /// sites.
+        /// </summary>
+        UsageOverloadsBranch,
     }
 
     // TODO: Turn the enum to flags instead
@@ -97,13 +110,19 @@ namespace Pchp.CodeAnalysis
             optimization == ExperimentalOptimization.CallSiteOverloadsStatic ||
             optimization == ExperimentalOptimization.CallSiteOverloadsBranch;
 
+        public static bool HasUsageOverloads(this ExperimentalOptimization optimization) =>
+            optimization == ExperimentalOptimization.UsageOverloadsStatic ||
+            optimization == ExperimentalOptimization.UsageOverloadsBranch;
+
         public static bool HasStaticCallSites(this ExperimentalOptimization optimization) =>
             optimization == ExperimentalOptimization.PhpDocOverloadsStatic ||
-            optimization == ExperimentalOptimization.CallSiteOverloadsStatic;
+            optimization == ExperimentalOptimization.CallSiteOverloadsStatic ||
+            optimization == ExperimentalOptimization.UsageOverloadsStatic;
 
         public static bool HasBranchedCallSites(this ExperimentalOptimization optimization) =>
             optimization == ExperimentalOptimization.PhpDocOverloadsBranch ||
-            optimization == ExperimentalOptimization.CallSiteOverloadsBranch;
+            optimization == ExperimentalOptimization.CallSiteOverloadsBranch ||
+            optimization == ExperimentalOptimization.UsageOverloadsBranch;
     }
 
     /// <summary>

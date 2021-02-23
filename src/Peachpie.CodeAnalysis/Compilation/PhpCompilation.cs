@@ -180,6 +180,10 @@ namespace Pchp.CodeAnalysis
             {
                 RoutineSpecializer = new CallSiteSpecializer(this);
             }
+            else if (_options.ExperimentalOptimization.HasUsageOverloads())
+            {
+                RoutineSpecializer = new UsageSpecializer(this);
+            }
         }
 
         /// <summary>
