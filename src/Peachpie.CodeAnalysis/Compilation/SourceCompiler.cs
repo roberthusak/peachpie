@@ -221,8 +221,6 @@ namespace Pchp.CodeAnalysis
         /// </summary>
         void BindTypes(IEnumerable<SourceRoutineSymbol> specificRoutines = null)
         {
-            var binder = new ResultTypeBinder(_compilation);
-
             if (specificRoutines == null)
             {
                 // method bodies
@@ -231,7 +229,8 @@ namespace Pchp.CodeAnalysis
                 // field initializers
                 WalkTypes(type =>
                 {
-                    type.GetDeclaredMembers().OfType<SourceFieldSymbol>().ForEach(binder.Bind);
+                    type.GetDeclaredMembers().OfType<SourceFieldSymbol>().ForEach(
+                        field => new ResultTypeBinder(_compilation).Bind(field));
 
                 }, allowParallel: ConcurrentBuild);
             }
@@ -242,6 +241,8 @@ namespace Pchp.CodeAnalysis
 
             void BindRoutine(SourceRoutineSymbol routine)
             {
+                var binder = new ResultTypeBinder(_compilation);
+
                 // body
                 binder.Bind(routine);
 
