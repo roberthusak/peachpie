@@ -43,6 +43,8 @@ namespace Pchp.CodeAnalysis.Symbols
 
         internal ImmutableArray<SourceRoutineSymbol> SpecializedOverloads { get; set; } = ImmutableArray<SourceRoutineSymbol>.Empty;
 
+        public int TransformationCount { get; set; }
+
         ControlFlowGraph _cfg;
         LocalsTable _locals;
 

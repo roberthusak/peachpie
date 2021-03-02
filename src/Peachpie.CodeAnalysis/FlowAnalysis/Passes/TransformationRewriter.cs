@@ -42,6 +42,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes
             rewriter.TryTransformParameters();
 
             routine.UpdateControlFlowGraph(updatedCFG);
+            routine.TransformationCount += rewriter.TransformationCount;
 
             Debug.Assert(updatedCFG == currentCFG || rewriter.TransformationCount != 0); // cfg updated => transformations (not <= due to parameter transformations)
             return updatedCFG != currentCFG;
