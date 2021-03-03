@@ -15,8 +15,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
     {
         private readonly PhpCompilation _compilation;
 
-        private readonly Dictionary<SourceRoutineSymbol, ImmutableArray<TypeSymbol>> _specializations =
-            new Dictionary<SourceRoutineSymbol, ImmutableArray<TypeSymbol>>();
+        private readonly Dictionary<SourceRoutineSymbol, SpecializationSet> _specializations =
+            new Dictionary<SourceRoutineSymbol, SpecializationSet>();
 
         public UsageSpecializer(PhpCompilation compilation)
         {
@@ -44,7 +44,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
 
                     if (isSpecialized)
                     {
-                        _specializations[function] = paramTypes.ToImmutableArray();
+                        var specParams = paramTypes.ToImmutableArray();
+                        _specializations[function] = new SpecializationSet(specParams);
                     }
                 }
             }
@@ -104,7 +105,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
             return parameter.Type;
         }
 
-        public bool TryGetRoutineSpecializedParameters(SourceRoutineSymbol routine, out ImmutableArray<TypeSymbol> parameterTypes) =>
-            _specializations.TryGetValue(routine, out parameterTypes);
+        public bool TryGetRoutineSpecializedParameters(SourceRoutineSymbol routine, out SpecializationSet specializations) =>
+            _specializations.TryGetValue(routine, out specializations);
     }
 }

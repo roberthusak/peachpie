@@ -11,6 +11,6 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
     {
         void OnAfterAnalysis(CallGraph callGraph);
 
-        bool TryGetRoutineSpecializedParameters(SourceRoutineSymbol routine, out ImmutableArray<TypeSymbol> parameterTypes);
+        bool TryGetRoutineSpecializedParameters(SourceRoutineSymbol routine, out SpecializationSet specializations);
     }
 }

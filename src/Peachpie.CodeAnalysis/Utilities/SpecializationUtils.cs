@@ -37,7 +37,7 @@ namespace Peachpie.CodeAnalysis.Utilities
         public TypeCheckEmitter? Emitter { get; }
     }
 
-    internal static class SpecializationUtils
+    internal static partial class SpecializationUtils
     {
         private static TypeCheckEmitter CreateTypeCodeEmitter(int typeCode, Func<TypeRefContext, TypeRefMask, TypeRefMask> maskSelector)
         {

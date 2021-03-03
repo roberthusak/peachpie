@@ -264,7 +264,7 @@ namespace Pchp.CodeAnalysis
                     {
                         var overload = new SourceFunctionSymbol(routine.ContainingFile, (FunctionDecl) routine.Syntax)
                         {
-                            SpecializedParameterTypes = specParams
+                            SpecializedParameterTypes = specParams.Set.First()
                         };
 
                         routine.SpecializedOverloads = ImmutableArray.Create((SourceRoutineSymbol) overload);

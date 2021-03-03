@@ -18,8 +18,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
     {
         private readonly PhpCompilation _compilation;
 
-        private readonly Dictionary<SourceRoutineSymbol, ImmutableArray<TypeSymbol>> _specializations =
-            new Dictionary<SourceRoutineSymbol, ImmutableArray<TypeSymbol>>();
+        private readonly Dictionary<SourceRoutineSymbol, SpecializationSet> _specializations =
+            new Dictionary<SourceRoutineSymbol, SpecializationSet>();
 
         public CallSiteSpecializer(PhpCompilation compilation)
         {
@@ -30,73 +30,49 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
         {
             foreach (var function in _compilation.SourceSymbolCollection.GetFunctions())
             {
-                if (function.SourceParameters.Length > 0 && !_specializations.ContainsKey(function))
-                { 
-                    var parameters = function.SourceParameters;
+                var parameters = function.SourceParameters;
+                if (parameters.Length > 0 && !_specializations.ContainsKey(function))
+                {
+                    var specializations = SpecializationSet.CreateEmpty();
 
-                    // Discover what types have the arguments passed to the function parameters
-                    var paramStats = new Dictionary<TypeSymbol, int>[function.SourceParameters.Length];
                     foreach (var call in callGraph.GetCallerEdges(function))
                     {
                         var args = call.CallSite.CallExpression.ArgumentsInSourceOrder;
+                        var argTypes = new TypeSymbol[parameters.Length];
 
+                        bool isSpecialized = false;
                         for (int i = 0; i < parameters.Length; i++)
                         {
+                            var parameter = parameters[i];
+
                             var (typeCtx, argExpr) =
                                 (i < args.Length)
                                     ? (call.Caller.TypeRefContext, args[i].Value)               // Existing parameter
-                                    : (function.TypeRefContext, parameters[i].Initializer);     // Default value
+                                    : (function.TypeRefContext, parameter.Initializer);         // Default value
 
+                            argTypes[i] = parameter.Type;
                             if (argExpr != null)
                             {
                                 var argType = GeneralizeParameterType(
                                     SpecializationUtils.EstimateExpressionType(_compilation, typeCtx, argExpr));
-                                if (IsSpecialized(parameters[i].Type, argType))
+                                if (IsSpecialized(parameter.Type, argType))
                                 {
-                                    NoteParameterType(paramStats, i, argType);
+                                    argTypes[i] = argType;
+                                    isSpecialized = true;
                                 }
                             }
                         }
+
+                        if (isSpecialized)
+                        {
+                            specializations.Set.Add(argTypes.ToImmutableArray());
+                        }
                     }
 
-                    // Determine the specialized parameter types
-                    var paramTypes = new TypeSymbol[parameters.Length];
-                    bool isSpecialized = false;
-                    for (int i = 0; i < paramTypes.Length; i++)
+                    if (specializations.Set.Count > 0)
                     {
-                        // Select the most common specialized type if present
-                        paramTypes[i] =
-                            (paramStats[i]?.Count > 0)
-                                ? paramStats[i].Aggregate((a, b) => a.Value >= b.Value ? a : b).Key
-                                : parameters[i].Type;
-
-                        isSpecialized |= (paramTypes[i] != parameters[i].Type);
+                        _specializations[function] = specializations;
                     }
-
-                    if (isSpecialized)
-                    {
-                        _specializations[function] = paramTypes.ToImmutableArray();
-                    }
-                }
-            }
-
-            void NoteParameterType(Dictionary<TypeSymbol, int>[] paramStats, int paramIndex, TypeSymbol type)
-            {
-                if (paramIndex >= paramStats.Length)
-                {
-                    return;
-                }
-
-                paramStats[paramIndex] ??= new Dictionary<TypeSymbol, int>();
-
-                var types = paramStats[paramIndex];
-                if (types.TryGetValue(type, out int currentCount))
-                {
-                    types[type] = currentCount + 1;
-                }
-                else
-                {
-                    types[type] = 1;
                 }
             }
         }
@@ -117,7 +93,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
             }
         }
 
-        public bool TryGetRoutineSpecializedParameters(SourceRoutineSymbol routine, out ImmutableArray<TypeSymbol> parameterTypes) =>
-            _specializations.TryGetValue(routine, out parameterTypes);
+        public bool TryGetRoutineSpecializedParameters(SourceRoutineSymbol routine, out SpecializationSet specializations) =>
+            _specializations.TryGetValue(routine, out specializations);
     }
 }
