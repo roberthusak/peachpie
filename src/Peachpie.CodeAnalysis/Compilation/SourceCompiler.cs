@@ -257,22 +257,27 @@ namespace Pchp.CodeAnalysis
             var overloads = new ConcurrentBag<SourceRoutineSymbol>();
             this.WalkMethods(routine =>
             {
-                // TODO: Enable to add more specializations to a method (currently it sticks only with the first one)
                 if (routine.SpecializedOverloads.IsEmpty && !routine.IsSpecializedOverload)
                 {
-                    if (_compilation.RoutineSpecializer.TryGetRoutineSpecializedParameters(routine, out var specParams))
+                    if (_compilation.RoutineSpecializer.TryGetRoutineSpecializedParameters(routine, out var specializations))
                     {
-                        var overload = new SourceFunctionSymbol(routine.ContainingFile, (FunctionDecl) routine.Syntax)
+                        routine.SpecializedOverloads =
+                            specializations.Set
+                                .Select(specParams =>
+                                    new SourceFunctionSymbol(routine.ContainingFile, (FunctionDecl) routine.Syntax)
+                                    {
+                                        SpecializedParameterTypes = specParams
+                                    })
+                                .ToImmutableArray()
+                                .As<SourceRoutineSymbol>();
+
+                        foreach (var overload in routine.SpecializedOverloads)
                         {
-                            SpecializedParameterTypes = specParams.Set.First()
-                        };
+                            // Bind the overload and prepare for the next analysis
+                            _worklist.Enqueue(overload.ControlFlowGraph.Start);
 
-                        routine.SpecializedOverloads = ImmutableArray.Create((SourceRoutineSymbol) overload);
-
-                        // Bind the overload and prepare for the next analysis
-                        _worklist.Enqueue(overload.ControlFlowGraph.Start);
-
-                        overloads.Add(overload);
+                            overloads.Add(overload);
+                        }
                     }
                 }
             }, allowParallel: ConcurrentBuild);

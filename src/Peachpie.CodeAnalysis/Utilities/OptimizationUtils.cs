@@ -50,12 +50,25 @@ namespace Peachpie.CodeAnalysis.Utilities
 
         public static bool TryExtractOriginalFromSpecializedOverloads(IList<MethodSymbol> overloads, out SourceRoutineSymbol? orig)
         {
-            // TODO: Generalize for multiple overloads and orders (now it is strongly coupled with SourceSymbolProvider.ResolveFunction)
-            if (overloads.Count == 2 &&
-                overloads[1] is SourceRoutineSymbol origRoutine && origRoutine.SpecializedOverloads.Length > 0 &&
-                origRoutine.SpecializedOverloads[0] == overloads[0])
+            var origCandidate =
+                overloads
+                    .OfType<SourceRoutineSymbol>()
+                    .FirstOrDefault(overload => overload.SpecializedOverloads.Length > 0);
+
+            if (origCandidate == null || overloads.Count < 2)       // A single method can be considered ambiguous if its declaration is conditional (we are not interested in that case)
             {
-                orig = origRoutine;
+                orig = null;
+                return false;
+            }
+
+            bool allAreSpecOverloads =
+                overloads
+                    .All(overload =>
+                        overload == origCandidate || origCandidate.SpecializedOverloads.Contains(overload));
+
+            if (allAreSpecOverloads)
+            {
+                orig = origCandidate;
                 return true;
             }
             else
@@ -143,7 +156,7 @@ namespace Peachpie.CodeAnalysis.Utilities
             {
                 // We removed some of the overloads, recreate the ambiguous method symbol with the smaller set
                 resultOverloadsBuilder.Add(origOverload!);
-                return new AmbiguousMethodSymbol(ImmutableArray<MethodSymbol>.CastUp(resultOverloadsBuilder.MoveToImmutable()), true);
+                return new AmbiguousMethodSymbol(ImmutableArray<MethodSymbol>.CastUp(resultOverloadsBuilder.ToImmutable()), true);
             }
         }
 

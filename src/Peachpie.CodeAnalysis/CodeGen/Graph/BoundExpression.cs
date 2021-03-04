@@ -2853,8 +2853,8 @@ namespace Pchp.CodeAnalysis.Semantics
             var diffParamInfo = new List<(int, SpecializationInfo, TypeRefMask)>();
             var argumentBuilder = _arguments.ToBuilder();   // To evaluate complicated expressions to a temporary variable before passing as arguments
 
-            // TODO Generalize for multiple overloads
-            var specializedOverload = specializedOverloads.Single();
+            // Only the most promising overload is selected for a branched call
+            var specializedOverload = specializedOverloads.First();
 
             Debug.Assert(origOverload.SourceParameters.Length == specializedOverload.SourceParameters.Length);
             for (int i = 0; i < Math.Min(origOverload.SourceParameters.Length, _arguments.Length); i++)
