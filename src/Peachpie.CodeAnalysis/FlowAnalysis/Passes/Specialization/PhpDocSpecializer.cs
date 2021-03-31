@@ -31,25 +31,32 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                 _specializations = new Dictionary<SourceRoutineSymbol, SpecializationSet>();
                 foreach (var function in _compilation.SourceSymbolCollection.GetFunctions())
                 {
-                    if (function.SourceParameters.Any(CanBeParameterSpecialized))
+                    var parameters = function.SourceParameters;
+                    if (parameters.Length > 0)
                     {
-                        var specParams =
-                            function.SourceParameters
-                                .Select(p => p.TryGetTypeFromPhpDoc(out var type) ? type : p.Type)
-                                .ToImmutableArray();
-                        _specializations.Add(function, new SpecializationSet(specParams));
+                        var specializations = SpecializationSet.CreateEmpty();
+
+                        bool isSpecialized = false;
+                        foreach (var parameter in parameters)
+                        {
+                            if (parameter.Type.Is_PhpValue() && parameter.TryGetTypesFromPhpDoc(out var types))
+                            {
+                                isSpecialized = true;
+                                specializations.AddParameterTypeVariants(types);
+                            }
+                            else
+                            {
+                                specializations.AddParameterTypeVariants(new []{parameter.Type});
+                            }
+                        }
+
+                        if (isSpecialized)
+                        {
+                            _specializations.Add(function, specializations);
+                        }
                     }
-                }
-            }
 
-            static bool CanBeParameterSpecialized(SourceParameterSymbol parameter)
-            {
-                if (parameter.Type.Is_PhpValue() && parameter.TryGetTypeFromPhpDoc(out var type))
-                {
-                    return !type.Is_PhpValue();
                 }
-
-                return false;
             }
         }
 

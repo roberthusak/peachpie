@@ -28,24 +28,49 @@ namespace Peachpie.CodeAnalysis.Utilities
         {
             if (parameter.PHPDoc != null && parameter.PHPDoc.TypeNamesArray.Length != 0)
             {
-                var typectx = parameter.Routine.TypeRefContext;
-                var tmask = PHPDoc.GetTypeMask(typectx, parameter.PHPDoc.TypeNamesArray, parameter.Routine.GetNamingContext());
-
-                // Add null as a type if it is specified as a default value
-                if (parameter.Initializer?.ConstantValue.IsNull() == true)
-                {
-                    tmask |= typectx.GetNullTypeMask();
-                }
-
-                if (!tmask.IsVoid && !tmask.IsAnyType)
-                {
-                    type = parameter.DeclaringCompilation.GetTypeFromTypeRef(typectx, tmask);
-                    return true;
-                }
+                type = GetSingleTypeFromPhpDoc(parameter, parameter.PHPDoc.TypeNamesArray);
+                return type != parameter.Type;
             }
 
             type = null;
             return false;
+        }
+
+        public static bool TryGetTypesFromPhpDoc(this SourceParameterSymbol parameter, out SortedSet<TypeSymbol>? types)
+        {
+            if (parameter.PHPDoc != null && parameter.PHPDoc.TypeNamesArray.Length != 0)
+            {
+                types = new SortedSet<TypeSymbol>(SpecializationUtils.ParameterTypeComparer);
+                foreach (var typeName in parameter.PHPDoc.TypeNamesArray)
+                {
+                    var type = GetSingleTypeFromPhpDoc(parameter, new[] {typeName});
+                    types.Add(type);
+                }
+
+                return !(types.Count == 1 && types.Single().Equals(parameter.Type));
+            }
+
+            types = null;
+            return false;
+        }
+
+        private static TypeSymbol GetSingleTypeFromPhpDoc(SourceParameterSymbol parameter, string[] typeNames)
+        {
+            var typectx = parameter.Routine.TypeRefContext;
+            var tmask = PHPDoc.GetTypeMask(typectx, typeNames, parameter.Routine.GetNamingContext());
+
+            // Add null as a type if it is specified as a default value
+            if (parameter.Initializer?.ConstantValue.IsNull() == true)
+            {
+                tmask |= typectx.GetNullTypeMask();
+            }
+
+            if (!tmask.IsVoid && !tmask.IsAnyType)
+            {
+                return parameter.DeclaringCompilation.GetTypeFromTypeRef(typectx, tmask);
+            }
+
+            return parameter.Type;
         }
 
         public static bool TryExtractOriginalFromSpecializedOverloads(IList<MethodSymbol> overloads, out SourceRoutineSymbol? orig)
