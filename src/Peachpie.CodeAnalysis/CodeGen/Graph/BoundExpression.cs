@@ -5336,6 +5336,11 @@ namespace Pchp.CodeAnalysis.Semantics
                 cg.EmitConversion(new CommonConversion(true, false, false, false, false, false, op), arrayType, cg.CoreTypes.Boolean, op: indexType);
                 return cg.CoreTypes.Boolean;
             }
+            else if (arrayType.SpecialType == SpecialType.System_Boolean)
+            {
+                cg.Builder.EmitBoolConstant(false);
+                return cg.CoreTypes.Boolean;
+            }
             else
             {
                 throw cg.NotImplementedException($"offsetExists({arrayType}, {indexType})", this);
