@@ -1161,12 +1161,8 @@ namespace Pchp.CodeAnalysis.Semantics
 
             if (cg.HasUnoptimizedLocals == false) // usual case - optimized locals
             {
-                // TODO: cleanup
-                var tmask = srcparam.Routine.ControlFlowGraph.GetLocalTypeMask(srcparam.Name);
-                var clrtype = cg.DeclaringCompilation.GetTypeFromTypeRef(srcparam.Routine, tmask);
-
                 // target local must differ from source parameter ?
-                if (srcparam.IsFake || (srcparam.Type != cg.CoreTypes.PhpValue && srcparam.Type != cg.CoreTypes.PhpAlias && srcparam.Type != clrtype))
+                if (srcparam.NeedsDifferentLocalType(out var clrtype))
                 {
                     var loc = cg.Builder.LocalSlotManager.DeclareLocal(
                         (Cci.ITypeReference)clrtype, new SynthesizedLocalSymbol(srcparam.Routine, srcparam.Name, clrtype), srcparam.Name,

@@ -281,6 +281,23 @@ namespace Pchp.CodeAnalysis.Symbols
             return result;
         }
 
+        public bool NeedsDifferentLocalType(out TypeSymbol type)
+        {
+            var tmask = Routine.ControlFlowGraph.GetLocalTypeMask(Name);
+            var clrtype = DeclaringCompilation.GetTypeFromTypeRef(Routine, tmask);
+
+            if (IsFake || (!Type.Is_PhpValue() && !Type.Is_PhpAlias() && !Type.Equals(clrtype)))
+            {
+                type = clrtype;
+                return true;
+            }
+            else
+            {
+                type = null;
+                return false;
+            }
+        }
+
         public override RefKind RefKind
         {
             get
