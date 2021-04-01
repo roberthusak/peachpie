@@ -390,7 +390,10 @@ namespace Pchp.CodeAnalysis
         {
             Contract.ThrowIfNull(routine);
 
-            DiagnosticWalker<VoidStruct>.Analyse(_diagnostics, routine);
+            if (!routine.IsSpecializedOverload)
+            {
+                DiagnosticWalker<VoidStruct>.Analyse(_diagnostics, routine);
+            }
         }
 
         internal void DiagnoseFiles()
