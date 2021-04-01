@@ -71,14 +71,14 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                 if (paramInfo.CalledMethods.Count > 0)
                 {
                     candidateTypes.RemoveWhere(type =>
-                        !paramInfo.CalledMethods.Any(methodName =>
+                        !paramInfo.CalledMethods.All(methodName =>
                             type.GetMembers(methodName).FirstOrDefault() is MethodSymbol));
                 }
 
                 if (paramInfo.AccessedFields.Count > 0)
                 {
                     candidateTypes.RemoveWhere(type =>
-                        !paramInfo.AccessedFields.Any(fieldName =>
+                        !paramInfo.AccessedFields.All(fieldName =>
                             type.GetMembers(fieldName).FirstOrDefault() is FieldSymbol));
                 }
 
