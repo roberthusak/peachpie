@@ -189,7 +189,9 @@ namespace Peachpie.CodeAnalysis.Utilities
                     return new SpecializationInfo(SpecializationKind.Always);
                 }
             }
-            else if (exprTypeEst.IsReferenceType && paramType.IsReferenceType)
+            else if (exprTypeEst.IsReferenceType && paramType.IsReferenceType
+                && exprTypeEst.SpecialType != SpecialType.System_String && !exprTypeEst.Is_PhpString() && !exprTypeEst.Is_PhpAlias() && !exprTypeEst.Is_PhpArray()
+                && paramType.SpecialType != SpecialType.System_String && !paramType.Is_PhpString() && !paramType.Is_PhpAlias() && !paramType.Is_PhpArray())
             {
                 if (paramType.IsAssignableFrom(exprTypeEst))
                 {
@@ -197,6 +199,7 @@ namespace Peachpie.CodeAnalysis.Utilities
                 }
                 else
                 {
+                    // TODO: Detect when a type can never be the same or inherited from another one
                     return new SpecializationInfo(SpecializationKind.RuntimeDependent, ClassCheckEmitter);
                 }
             }
