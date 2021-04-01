@@ -150,9 +150,10 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
 
         public override VoidStruct VisitInstanceOf(BoundInstanceOfEx x)
         {
-            if (x.AsType.Type != null && x.Operand is BoundVariableRef { Variable: ParameterReference paramRef })
+            if (x.AsType.Type is TypeSymbol type && !type.IsErrorType() 
+                && x.Operand is BoundVariableRef { Variable: ParameterReference paramRef })
             {
-                _paramInfos[paramRef.Parameter].TypeChecks.Add(GeneralizeParameterType((TypeSymbol)x.AsType.Type));
+                _paramInfos[paramRef.Parameter].TypeChecks.Add(GeneralizeParameterType(type));
             }
 
             return base.VisitInstanceOf(x);
