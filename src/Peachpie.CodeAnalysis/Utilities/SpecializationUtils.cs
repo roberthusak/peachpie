@@ -241,9 +241,13 @@ namespace Peachpie.CodeAnalysis.Utilities
                 // Estimate the type from the common cases
                 return expr switch
                 {
-                    // Stick e.g. to the types of temporal variables, but original parameter types can change in the routine body
-                    BoundVariableRef { Variable: LocalVariableReference { IsOptimized: true, Type: var type, VariableKind: var kind } }
+                    // Stick to the types of temporal variables
+                    BoundVariableRef { Variable: LocalVariableReference { Type: var type, VariableKind: var kind } }
                         when kind != VariableKind.Parameter => type,
+
+                    // Original parameter types can change in the routine body (when other type is assigned to the parameter inside the body)
+                    BoundVariableRef { Variable: ParameterReference { Parameter: SourceParameterSymbol srcParam } } =>
+                        srcParam.NeedsDifferentLocalType(out var type) ? type : srcParam.Type,
 
                     BoundRoutineCall { TargetMethod: { ReturnType: var type } method } =>
                         method.CastToFalse ? compilation.CoreTypes.PhpValue : type,
