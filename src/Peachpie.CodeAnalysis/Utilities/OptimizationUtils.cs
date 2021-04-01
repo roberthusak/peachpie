@@ -28,8 +28,7 @@ namespace Peachpie.CodeAnalysis.Utilities
         {
             if (parameter.PHPDoc != null && parameter.PHPDoc.TypeNamesArray.Length != 0)
             {
-                type = GetSingleTypeFromPhpDoc(parameter, parameter.PHPDoc.TypeNamesArray);
-                return type != parameter.Type;
+                return TryGetSingleTypeFromPhpDoc(parameter, parameter.PHPDoc.TypeNamesArray, out type);
             }
 
             type = null;
@@ -43,18 +42,20 @@ namespace Peachpie.CodeAnalysis.Utilities
                 types = new SortedSet<TypeSymbol>(SpecializationUtils.ParameterTypeComparer);
                 foreach (var typeName in parameter.PHPDoc.TypeNamesArray)
                 {
-                    var type = GetSingleTypeFromPhpDoc(parameter, new[] {typeName});
-                    types.Add(type);
+                    if (TryGetSingleTypeFromPhpDoc(parameter, new[] {typeName}, out var type))
+                    {
+                        types.Add(type!);
+                    }
                 }
 
-                return !(types.Count == 1 && types.Single().Equals(parameter.Type));
+                return types.Count > 0;
             }
 
             types = null;
             return false;
         }
 
-        private static TypeSymbol GetSingleTypeFromPhpDoc(SourceParameterSymbol parameter, string[] typeNames)
+        private static bool TryGetSingleTypeFromPhpDoc(SourceParameterSymbol parameter, string[] typeNames, out TypeSymbol? type)
         {
             var typectx = parameter.Routine.TypeRefContext;
             var tmask = PHPDoc.GetTypeMask(typectx, typeNames, parameter.Routine.GetNamingContext());
@@ -67,10 +68,12 @@ namespace Peachpie.CodeAnalysis.Utilities
 
             if (!tmask.IsVoid && !tmask.IsAnyType)
             {
-                return parameter.DeclaringCompilation.GetTypeFromTypeRef(typectx, tmask);
+                type = parameter.DeclaringCompilation.GetTypeFromTypeRef(typectx, tmask);
+                return true;
             }
 
-            return parameter.Type;
+            type = null;
+            return false;
         }
 
         public static bool TryExtractOriginalFromSpecializedOverloads(IList<MethodSymbol> overloads, out SourceRoutineSymbol? orig)
