@@ -30,38 +30,43 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                 var parameters = function.SourceParameters;
                 if (parameters.Length > 0 && !_specializations.ContainsKey(function))
                 {
+                    var specializations = SpecializationSet.CreateEmpty();
+
                     var paramInfos = ParameterUsageAnalyzer.AnalyseParameterUsages(function);
-
                     Debug.Assert(parameters.Length == paramInfos.Length);
-                    var paramTypes = new TypeSymbol[paramInfos.Length];
-                    bool isSpecialized = false;
 
-                    for (int i = 0; i < paramInfos.Length; i++)
+                    bool isSpecialized = false;
+                    for (int i = 0; i < parameters.Length; i++)
                     {
-                        paramTypes[i] = TrySpecializeParameter(parameters[i], paramInfos[i]);
-                        isSpecialized |= (paramTypes[i] != parameters[i].Type); 
+                        var parameter = parameters[i];
+                        if (parameter.Type.Is_PhpValue() && TryGetParameterTypeVariants(parameter, paramInfos[i], out var types))
+                        {
+                            isSpecialized = true;
+                            specializations.AddParameterTypeVariants(types);
+                        }
+                        else
+                        {
+                            specializations.AddParameterTypeVariants(new[] { parameter.Type });
+                        }
                     }
 
                     if (isSpecialized)
                     {
-                        var specParams = paramTypes.ToImmutableArray();
-                        _specializations[function] = new SpecializationSet(specParams);
+                        _specializations[function] = specializations;
                     }
                 }
             }
         }
 
-        private TypeSymbol TrySpecializeParameter(SourceParameterSymbol parameter, ParameterUsageInfo paramInfo)
+        private bool TryGetParameterTypeVariants(SourceParameterSymbol parameter, ParameterUsageInfo paramInfo, out HashSet<TypeSymbol> types)
         {
             if (parameter.IsParams)
             {
-                return parameter.Type;
+                types = null;
+                return false;
             }
 
-            if (paramInfo.TypeChecks.Count == 1)
-            {
-                return paramInfo.TypeChecks.Single();
-            }
+            types = new HashSet<TypeSymbol>(paramInfo.TypeChecks);
 
             if (paramInfo.AccessedFields.Count > 0 || paramInfo.CalledMethods.Count > 0)
             {
@@ -82,27 +87,33 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                             type.GetMembers(fieldName).FirstOrDefault() is FieldSymbol));
                 }
 
-                if (candidateTypes.Count == 1)
+                if (candidateTypes.Count > 0 && candidateTypes.Count <= 4)
                 {
-                    return candidateTypes.Single();
+                    types.UnionWith(candidateTypes);
                 }
                 else
                 {
-                    return _compilation.CoreTypes.Object;
+                    types.Add(_compilation.CoreTypes.Object);
                 }
             }
 
             if ((paramInfo.Flags & ParameterUsageFlags.ArrayItemAccess) != 0)
             {
-                return _compilation.CoreTypes.PhpArray;
+                types.Add(_compilation.CoreTypes.PhpArray);
             }
 
             if ((paramInfo.Flags & ParameterUsageFlags.PassedToConcat) != 0)
             {
-                return _compilation.CoreTypes.PhpString;
+                types.Add(_compilation.CoreTypes.PhpString);
             }
 
-            return parameter.Type;
+            if ((paramInfo.Flags & ParameterUsageFlags.NullCheck) != 0 &&
+                !types.Any(type => type.IsReferenceType))
+            {
+                types.Add(_compilation.CoreTypes.Object);
+            }
+
+            return types.Count > 0;
         }
 
         public bool TryGetRoutineSpecializedParameters(SourceRoutineSymbol routine, out SpecializationSet specializations) =>
