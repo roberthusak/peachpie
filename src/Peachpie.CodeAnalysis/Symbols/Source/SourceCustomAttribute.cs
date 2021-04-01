@@ -197,7 +197,7 @@ namespace Pchp.CodeAnalysis.Symbols
                                     {
                                         BoundLiteral lit => lit.ConstantValue.Value.ToString(),
                                         null => i.ToString(),
-                                        _ => Roslyn.Utilities.ExceptionUtilities.UnexpectedValue(array.Items[i].Key),
+                                        _ => throw Roslyn.Utilities.ExceptionUtilities.UnexpectedValue(array.Items[i].Key),
                                     });
                                     output.Append('"');
                                     output.Append(':');
