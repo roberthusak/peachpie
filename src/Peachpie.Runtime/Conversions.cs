@@ -1438,6 +1438,7 @@ namespace Pchp.Core
             PhpTypeCode.MutableString => value.MutableStringBlob.ToString(ctx.StringEncoding),
             PhpTypeCode.Object => Convert.ToString(value.Object),
             PhpTypeCode.Alias => ToString(value.Alias.Value, ctx),
+            PhpTypeCode.PhpArray => (string) value.Array,
             _ => throw PhpException.TypeErrorException(),
         };
 
@@ -1452,11 +1453,9 @@ namespace Pchp.Core
         }
 
         /// <summary>
-        /// Unconvertible.
-        /// Throws <c>TypeError</c> exception.
+        /// Returns "Array", throws a notice.
         /// </summary>
-        // [FatalError]
-        public static string ToString(PhpArray _) => throw PhpException.TypeErrorException();
+        public static string ToString(PhpArray array) => (string)array;
     }
 
     #endregion
