@@ -99,6 +99,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                             break;
 
                         case "is_string":
+                            _paramInfos[paramRef.Parameter].TypeChecks.Add(CoreTypes.String);
                             _paramInfos[paramRef.Parameter].TypeChecks.Add(CoreTypes.PhpString);
                             break;
 

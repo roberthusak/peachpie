@@ -71,31 +71,38 @@ namespace Pchp.CodeAnalysis
         PhpDocForceOnlyFunctions,
 
         /// <summary>
-        /// Generates a type-specific overload for each routine where the parameter types are infered from the
+        /// Generates a type-specific overload for each routine where the parameter types are inferred from the
         /// types of the argument the routine is called with. Calls them only in situations when we know the
         /// types match.
         /// </summary>
         CallSiteOverloadsStatic,
 
         /// <summary>
-        /// Generates a type-specific overload for each routine where the parameter types are infered from the
+        /// Generates a type-specific overload for each routine where the parameter types are inferred from the
         /// types of the argument the routine is called with. Attempts to call them as much as possible by
         /// explicit type checking at call sites.
         /// </summary>
         CallSiteOverloadsBranch,
 
         /// <summary>
-        /// Generates a type-specific overload for each routine where the parameter types are infered from their
+        /// Generates a type-specific overload for each routine where the parameter types are inferred from their
         /// usages inside the routine. Calls them only in situations when we know the types match.
         /// </summary>
         UsageOverloadsStatic,
 
         /// <summary>
-        /// Generates a type-specific overload for each routine where the parameter types are infered from their
+        /// Generates a type-specific overload for each routine where the parameter types are inferred from their
         /// usages inside the routine. Attempts to call them as much as possible by explicit type checking at call
         /// sites.
         /// </summary>
         UsageOverloadsBranch,
+
+        /// <summary>
+        /// Generates a type-specific overload for each routine where the parameter types are based on the optimization
+        /// opportunities inside the routine while being called with these types from the outside. Calls them only in
+        /// situations when we know the types match.
+        /// </summary>
+        TargetedOverloadsStatic,
     }
 
     // TODO: Turn the enum to flags instead
@@ -117,7 +124,8 @@ namespace Pchp.CodeAnalysis
         public static bool HasStaticCallSites(this ExperimentalOptimization optimization) =>
             optimization == ExperimentalOptimization.PhpDocOverloadsStatic ||
             optimization == ExperimentalOptimization.CallSiteOverloadsStatic ||
-            optimization == ExperimentalOptimization.UsageOverloadsStatic;
+            optimization == ExperimentalOptimization.UsageOverloadsStatic ||
+            optimization == ExperimentalOptimization.TargetedOverloadsStatic;
 
         public static bool HasBranchedCallSites(this ExperimentalOptimization optimization) =>
             optimization == ExperimentalOptimization.PhpDocOverloadsBranch ||
