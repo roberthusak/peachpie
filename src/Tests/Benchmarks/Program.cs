@@ -7,7 +7,7 @@ namespace Benchmarks
     {
         static void Main(string[] args)
         {
-            var summary = BenchmarkRunner.Run<PhpArrayBenchmark>();
+            var summaries = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
 
             //var b = new PhpArrayBenchmark { Index = 47, };
             //for (int i = 0; i < 219200000; i++)
