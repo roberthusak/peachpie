@@ -42,95 +42,92 @@ namespace Pchp.CodeAnalysis
     /// <summary>
     /// Options for enabling experimental optimization methods.
     /// </summary>
+    [Flags]
     public enum ExperimentalOptimization
     {
-        None = default,
-
-        /// <summary>
-        /// Generates a type-specific overload for each routine with parameter types specified in PhpDocs,
-        /// calls them only in situations when we know the types match.
-        /// </summary>
-        PhpDocOverloadsStatic,
-
-        /// <summary>
-        /// Generates a type-specific overload for each routine with parameter types specified in PhpDocs,
-        /// attempts to call them as much as possible using dynamic call sites.
-        /// </summary>
-        PhpDocOverloadsDynamic,
-
-        /// <summary>
-        /// Generates a type-specific overload for each routine with parameter types specified in PhpDocs,
-        /// attempts to call them as much as possible by explicit type checking at call sites.
-        /// </summary>
-        PhpDocOverloadsBranch,
+        None = 0,
 
         /// <summary>
         /// When <see cref="PhpDocTypes.ParameterTypes"/> or <see cref="PhpDocTypes.ReturnTypes"/> are used,
-        /// this switch cause them to be applied only on global functions, not on methods.
+        /// this switch causes them to be applied only on global functions, not on methods.
         /// </summary>
-        PhpDocForceOnlyFunctions,
+        PhpDocForceOnlyFunctions = 1 << 0,
+
+        #region Overload creation
+
+        /// <summary>
+        /// Generates a type-specific overload for each routine with parameter types specified in PhpDocs.
+        /// </summary>
+        PhpDocOverloads = 1 << 1,
 
         /// <summary>
         /// Generates a type-specific overload for each routine where the parameter types are inferred from the
-        /// types of the argument the routine is called with. Calls them only in situations when we know the
-        /// types match.
+        /// types of the argument the routine is called with.
         /// </summary>
-        CallSiteOverloadsStatic,
-
-        /// <summary>
-        /// Generates a type-specific overload for each routine where the parameter types are inferred from the
-        /// types of the argument the routine is called with. Attempts to call them as much as possible by
-        /// explicit type checking at call sites.
-        /// </summary>
-        CallSiteOverloadsBranch,
+        CallSiteOverloads = 1 << 2,
 
         /// <summary>
         /// Generates a type-specific overload for each routine where the parameter types are inferred from their
-        /// usages inside the routine. Calls them only in situations when we know the types match.
+        /// usages inside the routine.
         /// </summary>
-        UsageOverloadsStatic,
-
-        /// <summary>
-        /// Generates a type-specific overload for each routine where the parameter types are inferred from their
-        /// usages inside the routine. Attempts to call them as much as possible by explicit type checking at call
-        /// sites.
-        /// </summary>
-        UsageOverloadsBranch,
+        UsageOverloads = 1 << 3,
 
         /// <summary>
         /// Generates a type-specific overload for each routine where the parameter types are based on the optimization
-        /// opportunities inside the routine while being called with these types from the outside. Calls them only in
-        /// situations when we know the types match.
+        /// opportunities inside the routine while being called with these types from the outside.
         /// </summary>
-        TargetedOverloadsStatic,
+        TargetedOverloads = 1 << 4,
+
+        #endregion
+
+        #region Call sites
+
+        /// <summary>
+        /// Attempt to call the specialized overloads as much as possible using dynamic call sites.
+        /// </summary>
+        DynamicCallSites = 1 << 8,
+
+        /// <summary>
+        /// Attempts to call the specialized overloads as much as possible by explicit type checking at call sites.
+        /// </summary>
+        BranchedCallSites = 1 << 9,
+
+        #endregion
+
+        // TODO: These are for backward compatibility with wpdotnet-sdk fork, remove them when not needed anymore
+        #region Common combinations
+
+        PhpDocOverloadsStatic = PhpDocOverloads,
+        PhpDocOverloadsDynamic = PhpDocOverloads | DynamicCallSites,
+        PhpDocOverloadsBranch = PhpDocOverloads | BranchedCallSites,
+
+        CallSiteOverloadsStatic = CallSiteOverloads,
+        CallSiteOverloadsBranch = CallSiteOverloads | BranchedCallSites,
+
+        UsageOverloadsStatic = UsageOverloads,
+        UsageOverloadsBranch = UsageOverloads | BranchedCallSites,
+
+        TargetedOverloadsStatic = TargetedOverloads,
+
+        #endregion
     }
 
-    // TODO: Turn the enum to flags instead
     public static class ExperimentalOptimizationExtensions
     {
         public static bool HasPhpDocOverloads(this ExperimentalOptimization optimization) =>
-            optimization == ExperimentalOptimization.PhpDocOverloadsStatic ||
-            optimization == ExperimentalOptimization.PhpDocOverloadsDynamic ||
-            optimization == ExperimentalOptimization.PhpDocOverloadsBranch;
+            (optimization & ExperimentalOptimization.PhpDocOverloads) != 0;
 
         public static bool HasCallSiteOverloads(this ExperimentalOptimization optimization) =>
-            optimization == ExperimentalOptimization.CallSiteOverloadsStatic ||
-            optimization == ExperimentalOptimization.CallSiteOverloadsBranch;
+            (optimization & ExperimentalOptimization.CallSiteOverloads) != 0;
 
         public static bool HasUsageOverloads(this ExperimentalOptimization optimization) =>
-            optimization == ExperimentalOptimization.UsageOverloadsStatic ||
-            optimization == ExperimentalOptimization.UsageOverloadsBranch;
+            (optimization & ExperimentalOptimization.UsageOverloads) != 0;
 
         public static bool HasStaticCallSites(this ExperimentalOptimization optimization) =>
-            optimization == ExperimentalOptimization.PhpDocOverloadsStatic ||
-            optimization == ExperimentalOptimization.CallSiteOverloadsStatic ||
-            optimization == ExperimentalOptimization.UsageOverloadsStatic ||
-            optimization == ExperimentalOptimization.TargetedOverloadsStatic;
+            (optimization & (ExperimentalOptimization.DynamicCallSites | ExperimentalOptimization.BranchedCallSites )) == 0;
 
         public static bool HasBranchedCallSites(this ExperimentalOptimization optimization) =>
-            optimization == ExperimentalOptimization.PhpDocOverloadsBranch ||
-            optimization == ExperimentalOptimization.CallSiteOverloadsBranch ||
-            optimization == ExperimentalOptimization.UsageOverloadsBranch;
+            (optimization & ExperimentalOptimization.BranchedCallSites) != 0;
     }
 
     /// <summary>
