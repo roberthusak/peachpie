@@ -8,7 +8,7 @@ using Pchp.Core;
 namespace Benchmarks
 {
     [SimpleJob(RuntimeMoniker.NetCoreApp31)]
-    public class PhpStringBenchmark
+    public class PhpStringEchoBenchmark
     {
         readonly Context _ctx = Context.CreateEmpty();
 
