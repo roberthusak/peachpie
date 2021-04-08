@@ -112,6 +112,11 @@ namespace Pchp.Core
         public static string ToString(PhpString value, Context ctx) => value.ToString(ctx);
 
         /// <summary>
+        /// Replaces <c>null</c> with an empty string;
+        /// </summary>
+        public static string ToString(string value) => value ?? "";
+
+        /// <summary>
         /// Converts mutable string to byte[].
         /// </summary>
         public static byte[] ToBytes(PhpString value, Context ctx) => value.ToBytes(ctx);

@@ -2339,6 +2339,11 @@ namespace Pchp.CodeAnalysis.Semantics
                     throw cg.NotImplementedException($"Conversion from {t} to {target}");
                 }
             }
+            else if (conv.IsIdentity && target.SpecialType == SpecialType.System_String
+                     && cg.TypeRefContext.IsNull(this.Operand.TypeRefMask))
+            {
+                cg.EmitCall(ILOpCode.Call, cg.CoreMethods.Operators.ToString_String);
+            }
             else
             {
                 cg.EmitConversion(conv, t, target);
