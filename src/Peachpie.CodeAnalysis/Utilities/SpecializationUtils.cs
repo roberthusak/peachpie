@@ -189,9 +189,7 @@ namespace Peachpie.CodeAnalysis.Utilities
                     return new SpecializationInfo(SpecializationKind.Always);
                 }
             }
-            else if (exprTypeEst.IsReferenceType && paramType.IsReferenceType
-                && exprTypeEst.SpecialType != SpecialType.System_String && !exprTypeEst.Is_PhpString() && !exprTypeEst.Is_PhpAlias() && !exprTypeEst.Is_PhpArray()
-                && paramType.SpecialType != SpecialType.System_String && !paramType.Is_PhpString() && !paramType.Is_PhpAlias() && !paramType.Is_PhpArray())
+            else if (exprTypeEst.Is_Class() && paramType.Is_Class())
             {
                 if (paramType.IsAssignableFrom(exprTypeEst))
                 {
@@ -259,5 +257,19 @@ namespace Peachpie.CodeAnalysis.Utilities
                 };
             }
         }
+
+        public static bool IsTypeSpecializationEnabled(ExperimentalOptimization options, TypeSymbol type) =>
+            (options & ExperimentalOptimization.SpecializeAll) == ExperimentalOptimization.SpecializeAll
+            || ((options & ExperimentalOptimization.SpecializeString) != 0
+                && type.SpecialType == SpecialType.System_String)
+            || ((options & ExperimentalOptimization.SpecializePhpString) != 0
+                && type.Is_PhpString())
+            || ((options & ExperimentalOptimization.SpecializeNumbers) != 0
+                && (type.SpecialType == SpecialType.System_Int64 || type.SpecialType == SpecialType.System_Double || type.Is_PhpNumber()))
+            || ((options & ExperimentalOptimization.SpecializePhpArray) != 0
+                && type.Is_PhpArray())
+            || ((options & ExperimentalOptimization.SpecializeObjects) != 0
+                && type.Is_Class())
+            || (options & ExperimentalOptimization.SpecializeMiscellaneous) != 0;
     }
 }

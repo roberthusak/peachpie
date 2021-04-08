@@ -43,6 +43,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                         if (parameter.Type.Is_PhpValue()
                             && ((paramInfo.Flags & ParameterUsageFlags.PassedToConcat) != 0
                                 || paramInfo.TypeChecks.Contains(_compilation.CoreTypes.String))
+                            && (_compilation.Options.ExperimentalOptimization & ExperimentalOptimization.SpecializeString) != 0
                             && IsArgumentTypePassed(_compilation.CoreTypes.String))
                         {
                             isSpecialized = true;

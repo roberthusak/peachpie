@@ -94,20 +94,33 @@ namespace Pchp.CodeAnalysis
 
         #endregion
 
+        #region Specialized parameter types
+
+        SpecializeString = 1 << 12,
+        SpecializePhpString = 1 << 13,
+        SpecializeNumbers = 1 << 14,
+        SpecializePhpArray = 1 << 15,
+        SpecializeObjects = 1 << 16,
+        SpecializeMiscellaneous = 1 << 17,
+
+        SpecializeAll = SpecializeString | SpecializePhpString | SpecializeNumbers | SpecializePhpArray | SpecializeObjects,
+
+        #endregion
+
         // TODO: These are for backward compatibility with wpdotnet-sdk fork, remove them when not needed anymore
         #region Common combinations
 
-        PhpDocOverloadsStatic = PhpDocOverloads,
-        PhpDocOverloadsDynamic = PhpDocOverloads | DynamicCallSites,
-        PhpDocOverloadsBranch = PhpDocOverloads | BranchedCallSites,
+        PhpDocOverloadsStatic = PhpDocOverloads | SpecializeAll,
+        PhpDocOverloadsDynamic = PhpDocOverloads | SpecializeAll | DynamicCallSites,
+        PhpDocOverloadsBranch = PhpDocOverloads | SpecializeAll | BranchedCallSites,
 
-        CallSiteOverloadsStatic = CallSiteOverloads,
-        CallSiteOverloadsBranch = CallSiteOverloads | BranchedCallSites,
+        CallSiteOverloadsStatic = CallSiteOverloads | SpecializeAll,
+        CallSiteOverloadsBranch = CallSiteOverloads | SpecializeAll | BranchedCallSites,
 
-        UsageOverloadsStatic = UsageOverloads,
-        UsageOverloadsBranch = UsageOverloads | BranchedCallSites,
+        UsageOverloadsStatic = UsageOverloads | SpecializeAll,
+        UsageOverloadsBranch = UsageOverloads | SpecializeAll | BranchedCallSites,
 
-        TargetedOverloadsStatic = TargetedOverloads,
+        TargetedOverloadsStatic = TargetedOverloads | SpecializeAll,
 
         #endregion
     }

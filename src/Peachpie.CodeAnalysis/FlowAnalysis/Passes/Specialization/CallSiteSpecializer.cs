@@ -53,9 +53,9 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                             argTypes[i] = parameter.Type;
                             if (argExpr != null)
                             {
-                                var argType = GeneralizeParameterType(
-                                    SpecializationUtils.EstimateExpressionType(_compilation, typeCtx, argExpr));
-                                if (IsSpecialized(parameter.Type, argType))
+                                var argType = SpecializationUtils.EstimateExpressionType(_compilation, typeCtx, argExpr);
+                                if (IsSpecialized(parameter.Type, argType)
+                                    && SpecializationUtils.IsTypeSpecializationEnabled(_compilation.Options.ExperimentalOptimization, argType))
                                 {
                                     argTypes[i] = argType;
                                     isSpecialized = true;
@@ -79,19 +79,6 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
 
         private static bool IsSpecialized(TypeSymbol paramType, TypeSymbol argType) =>
             paramType.Is_PhpValue() && !argType.Is_PhpValue() && !argType.Is_PhpAlias() && argType.SpecialType != SpecialType.System_Void && !argType.IsErrorType();
-
-        private TypeSymbol GeneralizeParameterType(TypeSymbol type)
-        {
-            // TODO: Handle other types as well if useful (e.g. PhpNumber)
-            if (type.SpecialType == SpecialType.System_String)
-            {
-                return _compilation.CoreTypes.PhpString;
-            }
-            else
-            {
-                return type;
-            }
-        }
 
         public bool TryGetRoutineSpecializedParameters(SourceRoutineSymbol routine, out SpecializationSet specializations) =>
             _specializations.TryGetValue(routine, out specializations);

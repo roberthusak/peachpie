@@ -39,7 +39,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                         bool isSpecialized = false;
                         foreach (var parameter in parameters)
                         {
-                            if (parameter.Type.Is_PhpValue() && parameter.TryGetTypesFromPhpDoc(out var types))
+                            if (parameter.Type.Is_PhpValue() && parameter.TryGetTypesFromPhpDoc(out var types)
+                                && FilterTypesByOptions(types))
                             {
                                 isSpecialized = true;
                                 specializations.AddParameterTypeVariants(types);
@@ -55,8 +56,15 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                             _specializations.Add(function, specializations);
                         }
                     }
-
                 }
+            }
+
+            bool FilterTypesByOptions(SortedSet<TypeSymbol> types)
+            {
+                types.RemoveWhere(type =>
+                    !SpecializationUtils.IsTypeSpecializationEnabled(_compilation.Options.ExperimentalOptimization, type));
+
+                return types.Count > 0;
             }
         }
 

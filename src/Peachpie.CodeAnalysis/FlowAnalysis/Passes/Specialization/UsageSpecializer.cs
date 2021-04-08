@@ -8,6 +8,7 @@ using Pchp.CodeAnalysis;
 using Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization;
 using Pchp.CodeAnalysis.Symbols;
 using Peachpie.CodeAnalysis.FlowAnalysis.Graph;
+using Peachpie.CodeAnalysis.Utilities;
 
 namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
 {
@@ -112,6 +113,9 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
             {
                 types.Add(_compilation.CoreTypes.Object);
             }
+
+            types.RemoveWhere(type =>
+                !SpecializationUtils.IsTypeSpecializationEnabled(_compilation.Options.ExperimentalOptimization, type));
 
             return types.Count > 0;
         }

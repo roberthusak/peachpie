@@ -137,6 +137,11 @@ namespace Pchp.CodeAnalysis.Symbols
             return t.MetadataName == "PhpNumber" && (t.ContainingAssembly as AssemblySymbol)?.IsPeachpieCorLibrary == true;
         }
 
+        public static bool Is_Class(this TypeSymbol t)
+        {
+            return t.IsReferenceType && !t.IsStringType() && !t.Is_PhpString() && !t.Is_PhpAlias() && !t.Is_PhpArray();
+        }
+
         /// <summary>
         /// Determines the type is <c>Func{Context,PhpValue}</c>.
         /// </summary>
