@@ -32,7 +32,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                     var paramInfos = ParameterUsageAnalyzer.AnalyseParameterUsages(function);
                     Debug.Assert(parameters.Length == paramInfos.Length);
 
-                    var argTypes = new TypeSymbol[parameters.Length];
+                    var specializations = SpecializationSet.CreateEmpty();
 
                     bool isSpecialized = false;
                     for (int i = 0; i < parameters.Length; i++)
@@ -40,15 +40,17 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                         var parameter = parameters[i];
                         var paramInfo = paramInfos[i];
 
-                        argTypes[i] = parameter.Type;
-
-                        if (parameter.Type != _compilation.CoreTypes.String
+                        if (parameter.Type.Is_PhpValue()
                             && ((paramInfo.Flags & ParameterUsageFlags.PassedToConcat) != 0
                                 || paramInfo.TypeChecks.Contains(_compilation.CoreTypes.String))
                             && IsArgumentTypePassed(_compilation.CoreTypes.String))
                         {
-                            argTypes[i] = _compilation.CoreTypes.String;
                             isSpecialized = true;
+                            specializations.AddParameterTypeVariants(new [] { parameter.Type, _compilation.CoreTypes.String });
+                        }
+                        else
+                        {
+                            specializations.AddParameterTypeVariants(new [] { parameter.Type });
                         }
 
                         bool IsArgumentTypePassed(TypeSymbol type)
@@ -74,7 +76,11 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
 
                     if (isSpecialized)
                     {
-                        _specializations[function] = new SpecializationSet(argTypes.ToImmutableArray());
+                        // Remove the variant with no specializations
+                        specializations.Set.RemoveWhere(types =>
+                            types.SequenceEqual(from parameter in parameters select parameter.Type));
+
+                        _specializations[function] = specializations;
                     }
                 }
             }
