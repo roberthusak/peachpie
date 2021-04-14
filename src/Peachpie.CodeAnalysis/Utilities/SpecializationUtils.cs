@@ -184,7 +184,8 @@ namespace Peachpie.CodeAnalysis.Utilities
             else if (exprTypeEst.Is_PhpString() || exprTypeEst.SpecialType == SpecialType.System_String)
             {
                 // We can always convert between .NET and PHP strings
-                if (paramType.Is_PhpString() || paramType.SpecialType == SpecialType.System_String)
+                if ((paramType.Is_PhpString() || paramType.SpecialType == SpecialType.System_String)
+                    && (compilation.Options.ExperimentalOptimization & ExperimentalOptimization.DisableStringParameterCasting) == 0)
                 {
                     return new SpecializationInfo(SpecializationKind.Always);
                 }

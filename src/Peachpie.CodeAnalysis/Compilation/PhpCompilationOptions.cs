@@ -107,6 +107,11 @@ namespace Pchp.CodeAnalysis
 
         #endregion
 
+        /// <summary>
+        /// Disable casting <c>PhpString</c> to parameters specialized to <see cref="string"/>.
+        /// </summary>
+        DisableStringParameterCasting = 1 << 20,
+
         // TODO: These are for backward compatibility with wpdotnet-sdk fork, remove them when not needed anymore
         #region Common combinations
 
