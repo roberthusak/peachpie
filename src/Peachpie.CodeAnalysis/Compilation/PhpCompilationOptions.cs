@@ -112,6 +112,11 @@ namespace Pchp.CodeAnalysis
         /// </summary>
         DisableStringParameterCasting = 1 << 20,
 
+        /// <summary>
+        /// Use <c>RuntimeTracing</c> to trace all the source routine calls.
+        /// </summary>
+        RoutineCallTracing = 1 << 21,
+
         // TODO: These are for backward compatibility with wpdotnet-sdk fork, remove them when not needed anymore
         #region Common combinations
 

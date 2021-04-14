@@ -153,7 +153,7 @@ namespace Pchp.CodeAnalysis.Symbols
             Void, Object, Byte, Int32, Long, Double, Boolean, String, Exception,
             RuntimeTypeHandle, RuntimeMethodHandle,
             stdClass, ArrayAccess, Closure, Generator, Iterator, Traversable, Stringable, GeneratorStateMachineDelegate, MainDelegate, IntPtr,
-            RuntimeCounters, CompilationCountersAttribute;
+            RuntimeCounters, RuntimeTracing, CompilationCountersAttribute;
 
         public CoreTypes(PhpCompilation compilation)
         {
@@ -247,6 +247,7 @@ namespace Pchp.CodeAnalysis.Symbols
             IntPtr = CreateFromFullName("System.IntPtr");
 
             RuntimeCounters = Create("RuntimeCounters");
+            RuntimeTracing = Create("RuntimeTracing");
             CompilationCountersAttribute = Create("CompilationCountersAttribute");
         }
 

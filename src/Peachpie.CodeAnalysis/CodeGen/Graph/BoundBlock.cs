@@ -83,6 +83,13 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
                 OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkSpecializedOverloadCall);
             }
 
+            // Trace routine call
+            if ((cg.DeclaringCompilation.Options.ExperimentalOptimization & ExperimentalOptimization.RoutineCallTracing) != 0)
+            {
+                cg.Builder.EmitStringConstant(cg.Routine.Name);
+                cg.EmitCall(ILOpCode.Call, cg.CoreMethods.RuntimeTracing.TraceRoutineCall_string.Symbol);
+            }
+
             // in case of script, declare the script, functions and types
             if (cg.Routine is SourceGlobalMethodSymbol)
             {

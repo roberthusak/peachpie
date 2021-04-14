@@ -238,6 +238,7 @@ namespace Pchp.CodeAnalysis.Symbols
         public readonly DynamicHolder Dynamic;
         public readonly ReflectionHolder Reflection;
         public readonly RuntimeCountersHolder RuntimeCounters;
+        public readonly RuntimeTracingHolder RuntimeTracing;
 
         /// <summary>Property name of <c>ScriptAttribute.IsAutoloaded</c>.</summary>
         public static string ScriptAttribute_IsAutoloaded => "IsAutoloaded";
@@ -260,6 +261,7 @@ namespace Pchp.CodeAnalysis.Symbols
             Dynamic = new DynamicHolder(types);
             Reflection = new ReflectionHolder(types);
             RuntimeCounters = new RuntimeCountersHolder(types);
+            RuntimeTracing = new RuntimeTracingHolder(types);
         }
 
         public struct OperatorsHolder
@@ -1058,6 +1060,17 @@ namespace Pchp.CodeAnalysis.Symbols
                 MarkBranchedCallCheck, MarkBranchedCallOriginalSelect, MarkBranchedCallSpecializedSelect,
                 MarkRoutineCall, MarkGlobalFunctionCall,
                 MarkOriginalOverloadCall, MarkSpecializedOverloadCall;
+        }
+
+        public readonly struct RuntimeTracingHolder
+        {
+            public RuntimeTracingHolder(CoreTypes ct)
+            {
+                TraceRoutineCall_string = ct.RuntimeTracing.Method("TraceRoutineCall", ct.String);
+            }
+
+            public readonly CoreMethod
+                TraceRoutineCall_string;
         }
     }
 }
