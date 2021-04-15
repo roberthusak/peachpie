@@ -117,6 +117,14 @@ namespace Pchp.CodeAnalysis
         /// </summary>
         RoutineCallTracing = 1 << 21,
 
+        /// <summary>
+        /// Use <c>RuntimeTracing</c> to trace all the parameters source routines are called with.
+        /// </summary>
+        /// <remarks>
+        /// Must be set in combination with <see cref="RoutineCallTracing"/>.
+        /// </remarks>
+        RoutineCallParameterTracing = 1 << 22,
+
         // TODO: These are for backward compatibility with wpdotnet-sdk fork, remove them when not needed anymore
         #region Common combinations
 

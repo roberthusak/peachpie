@@ -9,9 +9,25 @@ namespace Pchp.Core
     {
         public static StreamWriter TraceWriter { get; set; }
 
-        public static void TraceRoutineCall(string routine)
+        public static void TraceRoutineCallStart(string type, string routine)
         {
-            TraceWriter?.WriteLine(routine);
+            if (TraceWriter != null)
+            {
+                TraceWriter.Write(type);
+                TraceWriter.Write('.');
+                TraceWriter.Write(routine);
+                TraceWriter.Write('(');
+            }
+        }
+
+        public static void TraceRoutineCallParameter(PhpValue value)
+        {
+            TraceWriter?.Write(value.ToStringUtf8());
+        }
+
+        public static void TraceRoutineCallEnd()
+        {
+            TraceWriter?.WriteLine();
         }
     }
 }

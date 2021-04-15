@@ -84,10 +84,25 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
             }
 
             // Trace routine call
-            if ((cg.DeclaringCompilation.Options.ExperimentalOptimization & ExperimentalOptimization.RoutineCallTracing) != 0)
+            var optimization = cg.DeclaringCompilation.Options.ExperimentalOptimization;
+            if ((optimization & ExperimentalOptimization.RoutineCallTracing) != 0)
             {
+                cg.Builder.EmitStringConstant(cg.Routine.ContainingType.Name);
                 cg.Builder.EmitStringConstant(cg.Routine.Name);
-                cg.EmitCall(ILOpCode.Call, cg.CoreMethods.RuntimeTracing.TraceRoutineCall_string.Symbol);
+                cg.EmitCall(ILOpCode.Call, cg.CoreMethods.RuntimeTracing.TraceRoutineCallStart_string_string.Symbol);
+
+                // Trace parameters
+                if ((optimization & ExperimentalOptimization.RoutineCallParameterTracing) != 0)
+                {
+                    foreach (var parameter in cg.Routine.SourceParameters)
+                    {
+                        var paramType = parameter.EmitLoad(cg.Builder);
+                        cg.EmitConvert(paramType, default, cg.CoreTypes.PhpValue);
+                        cg.EmitCall(ILOpCode.Call, cg.CoreMethods.RuntimeTracing.TraceRoutineCallParameter_PhpValue.Symbol);
+                    }
+                }
+
+                cg.EmitCall(ILOpCode.Call, cg.CoreMethods.RuntimeTracing.TraceRoutineCallEnd.Symbol);
             }
 
             // in case of script, declare the script, functions and types

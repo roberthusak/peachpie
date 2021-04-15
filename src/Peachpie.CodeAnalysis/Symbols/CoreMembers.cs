@@ -1066,11 +1066,13 @@ namespace Pchp.CodeAnalysis.Symbols
         {
             public RuntimeTracingHolder(CoreTypes ct)
             {
-                TraceRoutineCall_string = ct.RuntimeTracing.Method("TraceRoutineCall", ct.String);
+                TraceRoutineCallStart_string_string = ct.RuntimeTracing.Method("TraceRoutineCallStart", ct.String, ct.String);
+                TraceRoutineCallParameter_PhpValue = ct.RuntimeTracing.Method("TraceRoutineCallParameter", ct.PhpValue);
+                TraceRoutineCallEnd = ct.RuntimeTracing.Method("TraceRoutineCallEnd");
             }
 
             public readonly CoreMethod
-                TraceRoutineCall_string;
+                TraceRoutineCallStart_string_string, TraceRoutineCallParameter_PhpValue, TraceRoutineCallEnd;
         }
     }
 }
