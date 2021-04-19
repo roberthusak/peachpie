@@ -254,6 +254,9 @@ namespace Peachpie.CodeAnalysis.Utilities
                     BoundRoutineCall { TargetMethod: { ReturnType: var type } method } =>
                         method.CastToFalse ? compilation.CoreTypes.PhpValue : type,
 
+                    BoundGlobalConst constant
+                        when compilation.GlobalSemantics.ResolveConstant(constant.Name.ToString()) is FieldSymbol constField && constField.IsConst => constField.Type,
+
                     _ => compilation.GetTypeFromTypeRef(typeCtx, exprTypeMask)
                 };
             }
