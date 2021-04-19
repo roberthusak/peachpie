@@ -97,8 +97,19 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
                     foreach (var parameter in cg.Routine.SourceParameters)
                     {
                         var paramType = parameter.EmitLoad(cg.Builder);
-                        cg.EmitConvert(paramType, default, cg.CoreTypes.PhpValue);
-                        cg.EmitCall(ILOpCode.Call, cg.CoreMethods.RuntimeTracing.TraceRoutineCallParameter_PhpValue.Symbol);
+                        if (parameter.IsParams || parameter.IsFake)
+                        {
+                            // <arguments>
+                            cg.EmitCall(ILOpCode.Call, cg.CoreMethods.RuntimeTracing.TraceRoutineCallParameters_PhpValueArray_Symbol);
+
+                            break;  // In case of IsFake, the remaining parameters are not really present
+                        }
+                        else
+                        {
+                            // Any other parameter
+                            cg.EmitConvert(paramType, default, cg.CoreTypes.PhpValue);
+                            cg.EmitCall(ILOpCode.Call, cg.CoreMethods.RuntimeTracing.TraceRoutineCallParameter_PhpValue.Symbol); 
+                        }
                     }
                 }
 

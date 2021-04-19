@@ -1064,8 +1064,12 @@ namespace Pchp.CodeAnalysis.Symbols
 
         public readonly struct RuntimeTracingHolder
         {
+            private readonly CoreTypes _coreTypes;
+
             public RuntimeTracingHolder(CoreTypes ct)
             {
+                _coreTypes = ct;
+
                 TraceRoutineCallStart_string_string = ct.RuntimeTracing.Method("TraceRoutineCallStart", ct.String, ct.String);
                 TraceRoutineCallParameter_PhpValue = ct.RuntimeTracing.Method("TraceRoutineCallParameter", ct.PhpValue);
                 TraceRoutineCallEnd = ct.RuntimeTracing.Method("TraceRoutineCallEnd");
@@ -1073,6 +1077,10 @@ namespace Pchp.CodeAnalysis.Symbols
 
             public readonly CoreMethod
                 TraceRoutineCallStart_string_string, TraceRoutineCallParameter_PhpValue, TraceRoutineCallEnd;
+
+            // FIXME: This workaround is currently needed, because CoreTypes does not contain PhpValue[]
+            public readonly MethodSymbol TraceRoutineCallParameters_PhpValueArray_Symbol =>
+                _coreTypes.RuntimeTracing.Symbol.LookupMethods("TraceRoutineCallParameters").Single();
         }
     }
 }

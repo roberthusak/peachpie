@@ -25,6 +25,17 @@ namespace Pchp.Core
             TraceWriter?.Write(value.ToStringUtf8());
         }
 
+        public static void TraceRoutineCallParameters(PhpValue[] values)
+        {
+            if (TraceWriter != null)
+            {
+                foreach (var value in values)
+                {
+                    TraceWriter.Write(value.ToStringUtf8());
+                }
+            }
+        }
+
         public static void TraceRoutineCallEnd()
         {
             TraceWriter?.WriteLine();
