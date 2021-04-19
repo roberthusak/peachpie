@@ -9,6 +9,8 @@ namespace Pchp.Core
     {
         public static StreamWriter TraceWriter { get; set; }
 
+        private static bool _writeCommaBeforeParam;
+
         public static void TraceRoutineCallStart(string type, string routine)
         {
             if (TraceWriter != null)
@@ -22,23 +24,32 @@ namespace Pchp.Core
 
         public static void TraceRoutineCallParameter(PhpValue value)
         {
-            TraceWriter?.Write(value.ToStringUtf8());
+            if (TraceWriter != null)
+            {
+                if (_writeCommaBeforeParam)
+                {
+                    TraceWriter.Write(", ");
+                }
+
+                TraceWriter.Write(value.ToStringUtf8());
+            }
+
+            _writeCommaBeforeParam = true;
         }
 
         public static void TraceRoutineCallParameters(PhpValue[] values)
         {
-            if (TraceWriter != null)
+            foreach (var value in values)
             {
-                foreach (var value in values)
-                {
-                    TraceWriter.Write(value.ToStringUtf8());
-                }
+                TraceRoutineCallParameter(value);
             }
         }
 
         public static void TraceRoutineCallEnd()
         {
-            TraceWriter?.WriteLine();
+            TraceWriter?.WriteLine(')');
+
+            _writeCommaBeforeParam = false;
         }
     }
 }
