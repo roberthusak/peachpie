@@ -64,27 +64,31 @@ namespace Pchp.CodeAnalysis.Semantics.Graph
                 // TODO: emit parameters checks
             }
 
+            var optimization = cg.DeclaringCompilation.Options.ExperimentalOptimization;
+
             // Record routine call
-            OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkRoutineCall);
+            if ((optimization & ExperimentalOptimization.RoutineCallCounting) != 0)
+            {
+                OptimizationUtils.EmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkRoutineCall);
 
-            if (cg.Routine is SourceFunctionSymbol)
-            {
-                // Record global function call
-                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkGlobalFunctionCall);
-            }
+                if (cg.Routine is SourceFunctionSymbol)
+                {
+                    // Record global function call
+                    OptimizationUtils.EmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkGlobalFunctionCall);
+                }
 
-            // In case of a routine with specialized overloads, emit counter increment for both the original method and the overload
-            if (!cg.Routine.SpecializedOverloads.IsEmpty)
-            {
-                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkOriginalOverloadCall);
-            }
-            else if (cg.Routine.IsSpecializedOverload)
-            {
-                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkSpecializedOverloadCall);
+                // In case of a routine with specialized overloads, emit counter increment for both the original method and the overload
+                if (!cg.Routine.SpecializedOverloads.IsEmpty)
+                {
+                    OptimizationUtils.EmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkOriginalOverloadCall);
+                }
+                else if (cg.Routine.IsSpecializedOverload)
+                {
+                    OptimizationUtils.EmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkSpecializedOverloadCall);
+                }
             }
 
             // Trace routine call
-            var optimization = cg.DeclaringCompilation.Options.ExperimentalOptimization;
             if ((optimization & ExperimentalOptimization.RoutineCallTracing) != 0)
             {
                 cg.Builder.EmitStringConstant(cg.Routine.ContainingType.Name);

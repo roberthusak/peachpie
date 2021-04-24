@@ -2909,12 +2909,15 @@ namespace Pchp.CodeAnalysis.Semantics
 
             if (diffParamInfo.Count > 0)
             {
+                bool doEmitCounters = (cg.DeclaringCompilation.Options.ExperimentalOptimization & ExperimentalOptimization.RoutineCallCounting) != 0;
+
                 // (arg1.Is... && arg3.Is...) ? SpecializedOverload(arg1, arg2, arg3) : OrigOverload(arg1, arg2, arg3)
 
                 object falseLbl = new object();
                 object endLbl = new object();
 
-                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallCheck);
+                if (doEmitCounters)
+                    OptimizationUtils.EmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallCheck);
 
                 foreach ((int i, var specInfo, var _) in diffParamInfo)
                 {
@@ -2930,7 +2933,8 @@ namespace Pchp.CodeAnalysis.Semantics
                     arg.TypeRefMask = specializedMask;
                 }
 
-                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallSpecializedSelect);
+                if (doEmitCounters)
+                    OptimizationUtils.EmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallSpecializedSelect);
 
                 var specReturnType = cg.EmitCall(opcode, specializedOverload, this.Instance, arguments, staticType);
                 cg.EmitConvert(specReturnType, default, returnType);
@@ -2944,7 +2948,8 @@ namespace Pchp.CodeAnalysis.Semantics
 
                 cg.Builder.MarkLabel(falseLbl);
 
-                OptimizationUtils.TryEmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallOriginalSelect);
+                if (doEmitCounters)
+                    OptimizationUtils.EmitRuntimeCounterMark(cg, cg.CoreMethods.RuntimeCounters.MarkBranchedCallOriginalSelect);
 
                 var realReturnType = cg.EmitCall(opcode, origOverload, this.Instance, arguments, staticType);
                 Debug.Assert(realReturnType == returnType);

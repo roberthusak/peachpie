@@ -125,6 +125,11 @@ namespace Pchp.CodeAnalysis
         /// </remarks>
         RoutineCallParameterTracing = 1 << 22,
 
+        /// <summary>
+        /// Use <c>RuntimeCounters</c> to count invocations of various routine types.
+        /// </summary>
+        RoutineCallCounting = 1 << 23,
+
         // TODO: These are for backward compatibility with wpdotnet-sdk fork, remove them when not needed anymore
         #region Common combinations
 

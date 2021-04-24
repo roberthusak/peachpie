@@ -188,8 +188,7 @@ namespace Peachpie.CodeAnalysis.Utilities
             }
         }
 
-        [Conditional("DEBUG")]
-        public static void TryEmitRuntimeCounterMark(CodeGenerator cg, CoreMethod incrementMethod)
+        public static void EmitRuntimeCounterMark(CodeGenerator cg, CoreMethod incrementMethod)
         {
             Debug.Assert(incrementMethod.DeclaringClass == cg.CoreTypes.RuntimeCounters.Symbol);
 
