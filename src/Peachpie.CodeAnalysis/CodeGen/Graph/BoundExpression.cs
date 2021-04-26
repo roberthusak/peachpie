@@ -2893,7 +2893,7 @@ namespace Pchp.CodeAnalysis.Semantics
                     var specInfo = SpecializationUtils.GetInfo(
                         cg.DeclaringCompilation,
                         cg.Routine.TypeRefContext,
-                        _arguments[i].Value,
+                        argumentBuilder[i].Value,
                         specializedOverload.SourceParameters[i].Type);
                     
                     Debug.Assert(specInfo.Kind != SpecializationKind.Never);
