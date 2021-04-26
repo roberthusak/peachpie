@@ -26,10 +26,24 @@ namespace Benchmarks
             return SubCallee((PhpValue)value);
         }
 
+        private int PhpStringCallee(PhpString value)
+        {
+            var value2 = new PhpString(value);
+            return SubCallee(value2);
+        }
+
         [Benchmark(Baseline = true)]
         public int PassPhpValue() => PhpValueCallee("foo");
 
         [Benchmark]
         public int PassString() => StringCallee("foo");
+
+        [Benchmark]
+        public int PassPhpString() => PhpStringCallee("foo");
+
+        private static readonly PhpString FooPhpString = "foo";
+
+        [Benchmark]
+        public int PassExistingPhpString() => PhpStringCallee(FooPhpString);
     }
 }
