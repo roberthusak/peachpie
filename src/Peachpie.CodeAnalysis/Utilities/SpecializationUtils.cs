@@ -111,6 +111,24 @@ namespace Peachpie.CodeAnalysis.Utilities
             };
         }
 
+        private static TypeCheckEmitter CreateNotNullCheckEmitter()
+        {
+            return (cg, expr, to) =>
+            {
+                Debug.Assert(to.IsReferenceType);
+
+                var place = expr.Place();
+                Debug.Assert(place.Type.IsReferenceType);
+
+                // arg != null
+                cg.EmitNotNull(place);
+
+                // Cannot be null if the test succeeds
+                var toMask = TypeRefFactory.CreateMask(cg.TypeRefContext, to);
+                return cg.TypeRefContext.WithoutNull(toMask);
+            };
+        }
+
         // TODO: Aliases are not handled, the dynamic overloading is skipped instead. Handle them as well.
         private static readonly TypeCheckEmitter PhpValueBoolCheckEmitter = CreateTypeCodeEmitter(1, (c, _) => c.GetBooleanTypeMask());
         private static readonly TypeCheckEmitter PhpValueLongCheckEmitter = CreateTypeCodeEmitter(2, (c, _) => c.GetLongTypeMask());
@@ -122,6 +140,8 @@ namespace Peachpie.CodeAnalysis.Utilities
         private static readonly TypeCheckEmitter PhpValuePhpStringCheckEmitter = CreateMethodEmitter(cg => cg.CoreMethods.PhpValue.IsStringNoAlias, (c, _) => c.GetWritableStringTypeMask());
 
         private static readonly TypeCheckEmitter ClassCheckEmitter = CreateClassCheckEmitter();
+
+        private static readonly TypeCheckEmitter NotNullCheckEmitter = CreateNotNullCheckEmitter();
 
         public static SpecializationInfo GetInfo(PhpCompilation compilation, TypeRefContext typeCtx, BoundExpression expr, TypeSymbol paramType)
         {
@@ -186,22 +206,18 @@ namespace Peachpie.CodeAnalysis.Utilities
             }
             else if (exprTypeEst.Is_PhpString() || exprTypeEst.SpecialType == SpecialType.System_String)
             {
-                // TODO: Handle nullability
-
-                // We can always convert between .NET and PHP strings
+                // We can convert between .NET and PHP strings if allowed in options
                 if ((paramType.Is_PhpString() || paramType.SpecialType == SpecialType.System_String)
-                    && (optimization & ExperimentalOptimization.DisableStringParameterCasting) == 0)
+                    && ((optimization & ExperimentalOptimization.DisableStringParameterCasting) == 0 || exprTypeEst == paramType))
                 {
-                    return new SpecializationInfo(SpecializationKind.Always);
+                    return GetReferenceTypeSpecialization();
                 }
             }
             else if (exprTypeEst.Is_Class() && paramType.Is_Class())
             {
-                // TODO: Handle nullability
-
                 if (paramType.IsAssignableFrom(exprTypeEst))
                 {
-                    return new SpecializationInfo(SpecializationKind.Always);
+                    return GetReferenceTypeSpecialization();
                 }
                 else
                 {
@@ -211,6 +227,11 @@ namespace Peachpie.CodeAnalysis.Utilities
             }
 
             return new SpecializationInfo(SpecializationKind.Never);
+
+            SpecializationInfo GetReferenceTypeSpecialization() =>
+                (isNullParamAllowed || !exprTypeEst.IsReferenceType || !typeCtx.IsNull(exprMask))
+                    ? new SpecializationInfo(SpecializationKind.Always)
+                    : new SpecializationInfo(SpecializationKind.RuntimeDependent, NotNullCheckEmitter);
         }
 
         /// <summary>
