@@ -143,16 +143,35 @@ namespace Peachpie.CodeAnalysis.Utilities
 
                 bool allAlways = true;
                 bool anyNever = false;
-                for (int i = 0; i < Math.Min(specializedOverload.SourceParameters.Length, arguments.Length); i++)
+                for (int i = 0; i < specializedOverload.SourceParameters.Length; i++)
                 {
+                    var param = specializedOverload.SourceParameters[i];
+
+                    BoundExpression argValue;
+                    TypeRefContext valueTypeRefContext;
+                    if (i < arguments.Length)
+                    {
+                        argValue = arguments[i].Value;
+                        valueTypeRefContext = typeRefContext;
+                    }
+                    else
+                    {
+                        if (param.Initializer == null)
+                        {
+                            allAlways = false;
+                            anyNever = true;
+                            break;
+                        }
+                        else
+                        {
+                            argValue = param.Initializer;
+                            valueTypeRefContext = specializedOverload.TypeRefContext;
+                        }
+                    }
+
                     if (origOverload.SourceParameters[i].Type != specializedOverload.SourceParameters[i].Type)
                     {
-                        // TODO: Handle constants specially
-
-                        var arg = arguments[i];
-                        //var argType = typeRefContext.
-                        var param = specializedOverload.SourceParameters[i];
-                        var specInfo = SpecializationUtils.GetInfo(ambiguousRoutine.Ambiguities[0].DeclaringCompilation, typeRefContext, arg.Value, param.Type);
+                        var specInfo = SpecializationUtils.GetInfo(ambiguousRoutine.Ambiguities[0].DeclaringCompilation, valueTypeRefContext, argValue, param.Type);
                         allAlways &= specInfo.Kind == SpecializationKind.Always;
                         anyNever |= specInfo.Kind == SpecializationKind.Never;
                     }
