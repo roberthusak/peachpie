@@ -113,9 +113,14 @@ namespace Pchp.CodeAnalysis
         DisableStringParameterCasting = 1 << 20,
 
         /// <summary>
+        /// Allow only non-null reference type arguments for specialized parameters.
+        /// </summary>
+        ForceSpecializedParametersNotNull = 1 << 21,
+
+        /// <summary>
         /// Use <c>RuntimeTracing</c> to trace all the source routine calls.
         /// </summary>
-        RoutineCallTracing = 1 << 21,
+        RoutineCallTracing = 1 << 24,
 
         /// <summary>
         /// Use <c>RuntimeTracing</c> to trace all the parameters source routines are called with.
@@ -123,7 +128,7 @@ namespace Pchp.CodeAnalysis
         /// <remarks>
         /// Must be set in combination with <see cref="RoutineCallTracing"/>.
         /// </remarks>
-        RoutineCallParameterTracing = 1 << 22,
+        RoutineCallParameterTracing = 1 << 25,
 
         /// <summary>
         /// Use <c>RuntimeCounters</c> to count invocations of various routine types.

@@ -34,6 +34,12 @@ namespace Pchp.CodeAnalysis.Symbols
         TypeSymbol _lazyType;
 
         /// <summary>
+        /// The compiler guarantees that the parameter will not be <c>null</c>.
+        /// As a result, we can rely on it in the routine body and do not need to check it.
+        /// </summary>
+        private readonly bool _isNotNullGuaranteed;
+
+        /// <summary>
         /// Optional. The parameter initializer expression i.e. bound <see cref="FormalParam.InitValue"/>.
         /// </summary>
         public override BoundExpression Initializer => _initializer;
@@ -146,6 +152,12 @@ namespace Pchp.CodeAnalysis.Symbols
                 ? new SemanticsBinder(DeclaringCompilation, routine.ContainingFile.SyntaxTree, locals: null, routine: routine, self: routine.ContainingType as SourceTypeSymbol)
                     .BindAttributes(phpattrs)
                 : ImmutableArray<AttributeData>.Empty;
+            
+            var optimization = routine.DeclaringCompilation.Options.ExperimentalOptimization;
+            _isNotNullGuaranteed =
+                (optimization & ExperimentalOptimization.ForceSpecializedParametersNotNull) != 0
+                && specializedType != null && !specializedType.Is_PhpValue()                        // TODO: If needed, generalize to work with parameters with a type hint as well
+                && !_syntax.IsVariadic;
 
             PHPDoc = ptagOpt;
         }
@@ -195,6 +207,11 @@ namespace Pchp.CodeAnalysis.Symbols
         {
             get
             {
+                if (_isNotNullGuaranteed)
+                {
+                    return true;
+                }
+
                 // when providing type hint, only allow null if explicitly specified:
                 if (_syntax.TypeHint == null || _syntax.TypeHint is NullableTypeRef || DefaultsToNull)
                 {

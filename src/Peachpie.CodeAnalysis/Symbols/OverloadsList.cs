@@ -155,6 +155,11 @@ namespace Pchp.CodeAnalysis.Symbols
 
             var result2 = new List<MethodSymbol>();
 
+            // Ignore NULL flags if not being explicitly checked in parameter specializations
+            bool ignoreParamNullFlag =
+                !(result[0] is SourceRoutineSymbol)
+                || (optimization & ExperimentalOptimization.ForceSpecializedParametersNotNull) == 0;
+
             foreach (var m in result)
             {
                 var nmandatory = 0;
@@ -178,10 +183,16 @@ namespace Pchp.CodeAnalysis.Symbols
                         hasunpacking |= args[p.Index].IsUnpacking;
 
                         // TODO: check args[i] is convertible to p.Type
-                        var p_type = typeCtx.WithoutNull(p.Type);
-                        var a_type = typeCtx.WithoutNull(args[p.Index].Value.TypeRefMask);
+                        var p_type = p.Type;
+                        var a_type = args[p.Index].Value.TypeRefMask;
 
-                        match &= a_type == p_type && !hasunpacking; // check types match (ignoring NULL flag)
+                        if (ignoreParamNullFlag)
+                        {
+                            p_type = typeCtx.WithoutNull(p_type);
+                            a_type = typeCtx.WithoutNull(a_type);
+                        }
+
+                        match &= a_type == p_type && !hasunpacking; // check types match
                     }
                 }
 

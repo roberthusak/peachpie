@@ -125,8 +125,11 @@ namespace Peachpie.CodeAnalysis.Utilities
 
         public static SpecializationInfo GetInfo(PhpCompilation compilation, TypeRefContext typeCtx, BoundExpression expr, TypeSymbol paramType)
         {
+            var optimization = compilation.Options.ExperimentalOptimization;
+            bool isNullParamAllowed = (optimization & ExperimentalOptimization.ForceSpecializedParametersNotNull) == 0;
+
             var exprMask = EstimateExpressionTypeRefMask(typeCtx, expr);
-            var paramMask = TypeRefFactory.CreateMask(typeCtx, paramType);
+            var paramMask = TypeRefFactory.CreateMask(typeCtx, paramType, !isNullParamAllowed);
 
             // Estimate the resulting type of the expression
             var exprTypeEst = EstimateExpressionType(compilation, typeCtx, expr, exprMask);
@@ -142,7 +145,7 @@ namespace Peachpie.CodeAnalysis.Utilities
                 return new SpecializationInfo(SpecializationKind.Always);
             }
 
-            if (((exprMask & ~paramMask) == 0 && !exprMask.IsVoid) || exprTypeEst == paramType)
+            if (((exprMask & ~paramMask) == 0 && !exprMask.IsVoid) || (exprTypeEst == paramType && (isNullParamAllowed || !typeCtx.IsNull(exprMask))))
             {
                 return new SpecializationInfo(SpecializationKind.Always);
             }
@@ -183,15 +186,19 @@ namespace Peachpie.CodeAnalysis.Utilities
             }
             else if (exprTypeEst.Is_PhpString() || exprTypeEst.SpecialType == SpecialType.System_String)
             {
+                // TODO: Handle nullability
+
                 // We can always convert between .NET and PHP strings
                 if ((paramType.Is_PhpString() || paramType.SpecialType == SpecialType.System_String)
-                    && (compilation.Options.ExperimentalOptimization & ExperimentalOptimization.DisableStringParameterCasting) == 0)
+                    && (optimization & ExperimentalOptimization.DisableStringParameterCasting) == 0)
                 {
                     return new SpecializationInfo(SpecializationKind.Always);
                 }
             }
             else if (exprTypeEst.Is_Class() && paramType.Is_Class())
             {
+                // TODO: Handle nullability
+
                 if (paramType.IsAssignableFrom(exprTypeEst))
                 {
                     return new SpecializationInfo(SpecializationKind.Always);
