@@ -37,14 +37,24 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
         TypeRefMask[]/*!*/_varsType;
 
         /// <summary>
-        /// Mask of initialized variables in this state.
+        /// Mask of possibly initialized variables in this state.
         /// </summary>
         /// <remarks>
         /// Single bits indicates the corresponding variable was set.
         /// <c>0</c> determines the variable was not set in any code path.
         /// <c>1</c> determines the variable may be set.
         /// </remarks>
-        ulong _initializedMask;
+        private ulong _possiblyInitializedMask;
+
+        /// <summary>
+        /// Mask of certainly initialized variables in this state.
+        /// </summary>
+        /// <remarks>
+        /// Single bits indicates the corresponding variable was set.
+        /// <c>0</c> determines the variable may not be set in a code path.
+        /// <c>1</c> determines the variable is set in all the code paths.
+        /// </remarks>
+        private ulong _certainlyInitializedMask;
 
         /// <summary>
         /// Version of the analysis this state was created for.
@@ -67,14 +77,15 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
 
             //
             FlowContext = state1.FlowContext;
-            _varsType = EnumeratorExtension.MergeArrays(state1._varsType, state2._varsType, MergeType);
-            _initializedMask = state1._initializedMask | state2._initializedMask;
+            _varsType = MergeTypes(state1, state2);
+            _possiblyInitializedMask = state1._possiblyInitializedMask | state2._possiblyInitializedMask;
+            _certainlyInitializedMask = state1._certainlyInitializedMask & state2._certainlyInitializedMask;
 
             // intersection of other variable flags
             if (state1._notes != null && state2._notes != null)
             {
                 _notes = new HashSet<NoteData>(state1._notes);
-                _notes.Intersect(state2._notes);
+                _notes.Intersect(state2._notes);                    // TODO: Fix to IntersectWith (Intersect is an immutable method from LINQ)
             }
 
             Version = state1.Version;
@@ -97,7 +108,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
             Contract.ThrowIfNull(flowCtx);
 
             FlowContext = flowCtx;
-            _initializedMask = (ulong)0;
+            _possiblyInitializedMask = (ulong)0;
+            _certainlyInitializedMask = (ulong)0;
 
             // initial size of the array
             var countHint = (flowCtx.Routine != null)
@@ -116,7 +128,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
         {
             // clone internal state
 
-            _initializedMask = other._initializedMask;
+            _possiblyInitializedMask = other._possiblyInitializedMask;
+            _certainlyInitializedMask = other._certainlyInitializedMask;
 
             if (other._notes != null)
             {
@@ -155,7 +168,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
 
             if (other == null ||
                 other.FlowContext != FlowContext ||
-                other._initializedMask != _initializedMask)
+                other._possiblyInitializedMask != _possiblyInitializedMask ||
+                other._certainlyInitializedMask != _certainlyInitializedMask)
                 return false;
 
             return EnumeratorExtension.EqualEntries(_varsType, other._varsType);
@@ -286,8 +300,9 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
                 SetLocalType(v, tmask);
             }
 
-            // all initialized
-            _initializedMask = ~0u;
+            // all posibly initialized but none certainly
+            _possiblyInitializedMask = ~0u;
+            _certainlyInitializedMask = 0;
         }
 
         /// <summary>
@@ -297,7 +312,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
         public bool IsLocalSet(VariableHandle handle)
         {
             handle.ThrowIfInvalid();
-            return handle.Slot >= FlowContext.BitsCount || (_initializedMask & (1ul << handle)) != 0;
+            return handle.Slot >= FlowContext.BitsCount || (_possiblyInitializedMask & (1ul << handle)) != 0;
         }
 
         public void FlowThroughReturn(TypeRefMask type)
@@ -310,7 +325,9 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
             int varindex = handle.Slot;
             if (varindex >= 0 && varindex < FlowContext.BitsCount)
             {
-                _initializedMask |= 1ul << varindex;
+                ulong varMask = 1ul << varindex;
+                _possiblyInitializedMask |= varMask;
+                _certainlyInitializedMask |= varMask;
             }
         }
 
@@ -319,7 +336,9 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
             var varindex = handle.Slot;
             if (varindex >= 0 && varindex < FlowContext.BitsCount)
             {
-                _initializedMask &= ~(1ul << varindex);
+                var varMask = ~(1ul << varindex);
+                _possiblyInitializedMask &= varMask;
+                _certainlyInitializedMask &= varMask;
             }
         }
 
@@ -447,17 +466,48 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
             //_varKindMap[varname] = kind;
         }
 
-        /// <summary>
-        /// Merges given types coming from two flows.
-        /// Uninitialized value (<c>0L</c>) is treated as <c>NULL</c>.
-        /// </summary>
-        TypeRefMask MergeType(TypeRefMask t1, TypeRefMask t2)
+        TypeRefMask[] MergeTypes(FlowState state1, FlowState state2 /*TypeRefMask[] types1, TypeRefMask[] types2, ulong initialized1, ulong initialized2*/)
         {
-            var result = t1 | t2;
-
-            if (t1.IsDefault || t2.IsDefault)
+            // lets state1._varsType.Length <= state2._varsType.Length
+            if (state1._varsType.Length > state2._varsType.Length)
             {
-                result |= TypeRefContext.GetNullTypeMask();
+                var h = state2;
+                state2 = state1;
+                state1 = h;
+            }
+
+            var types1 = state1._varsType;
+            var types2 = state2._varsType;
+
+            var result = new TypeRefMask[types2.Length];
+            int i = 0;
+            for (; i < types1.Length; i++)
+            {
+                var mask1 = types1[i];
+                var mask2 = types2[i];
+
+                var resultMask = mask1 | mask2;
+
+                if ((mask1.IsDefault && (state1._certainlyInitializedMask & (1ul << i)) == 0)
+                    || (mask2.IsDefault && (state2._certainlyInitializedMask & (1ul << i)) == 0))
+                {
+                    resultMask |= TypeRefContext.GetNullTypeMask();
+                }
+
+                result[i] = resultMask;
+            }
+
+            if (i < types2.Length)
+            {
+                Array.Copy(types2, i, result, i, types2.Length - i);
+                var initializedMask = state1._certainlyInitializedMask;
+                for (; i < types2.Length; i++)
+                {
+                    if ((initializedMask & (1ul << i)) == 0)
+                    {
+                        result[i] |= TypeRefContext.GetNullTypeMask();
+                    }
+                }
             }
 
             return result;
