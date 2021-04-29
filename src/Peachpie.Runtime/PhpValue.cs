@@ -171,6 +171,8 @@ namespace Pchp.Core
             }
         }
 
+        public bool IsNumberNoAlias() => TypeCode == PhpTypeCode.Long || TypeCode == PhpTypeCode.Double;
+
         /// <summary>
         /// Gets the long field of the value.
         /// Does not perform a conversion, expects the value is of type long.

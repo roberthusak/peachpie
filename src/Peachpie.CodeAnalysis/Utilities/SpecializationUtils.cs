@@ -137,7 +137,13 @@ namespace Peachpie.CodeAnalysis.Utilities
         private static readonly TypeCheckEmitter PhpValueStringCheckEmitter = CreateTypeCodeEmitter(5, (c, _) => c.GetStringTypeMask());
         private static readonly TypeCheckEmitter PhpValueObjectCheckEmitter = CreateTypeCodeEmitter(7, (c, m) => c.GetObjectsFromMask(m));
 
-        private static readonly TypeCheckEmitter PhpValuePhpStringCheckEmitter = CreateMethodEmitter(cg => cg.CoreMethods.PhpValue.IsStringNoAlias, (c, _) => c.GetWritableStringTypeMask());
+        private static readonly TypeCheckEmitter PhpValuePhpStringCheckEmitter = CreateMethodEmitter(
+            cg => cg.CoreMethods.PhpValue.IsStringNoAlias,
+            (c, _) => c.GetWritableStringTypeMask());
+
+        private static readonly TypeCheckEmitter PhpValuePhpNumberCheckEmitter = CreateMethodEmitter(
+            cg => cg.CoreMethods.PhpValue.IsNumberNoAlias,
+            (c, _) => c.GetNumberTypeMask());
 
         private static readonly TypeCheckEmitter ClassCheckEmitter = CreateClassCheckEmitter();
 
@@ -182,6 +188,10 @@ namespace Peachpie.CodeAnalysis.Utilities
                 else if (paramType.SpecialType == SpecialType.System_Double)
                 {
                     return new SpecializationInfo(SpecializationKind.RuntimeDependent, PhpValueDoubleCheckEmitter);
+                }
+                else if (paramType.Is_PhpNumber() && (optimization & ExperimentalOptimization.AllowPhpNumberRuntimeSpecialization) != 0)
+                {
+                    return new SpecializationInfo(SpecializationKind.RuntimeDependent, PhpValuePhpNumberCheckEmitter);
                 }
                 else if (paramType.Is_PhpArray())
                 {

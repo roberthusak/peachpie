@@ -118,6 +118,11 @@ namespace Pchp.CodeAnalysis
         ForceSpecializedParametersNotNull = 1 << 21,
 
         /// <summary>
+        /// Allow to emit argument specialization check of <c>PhpNumber</c> from <c>PhpValue</c>.
+        /// </summary>
+        AllowPhpNumberRuntimeSpecialization = 1 << 22,
+
+        /// <summary>
         /// Use <c>RuntimeTracing</c> to trace all the source routine calls.
         /// </summary>
         RoutineCallTracing = 1 << 24,
