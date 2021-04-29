@@ -1018,6 +1018,12 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
             //
             var type = TypeCtx.GetArraysFromMask(or);
 
+            if (IsArrayOnly(lValType) || IsArrayOnly(rValType))
+            {
+                // Adding array with something other than an array would cause exception
+                return TypeCtx.GetArrayTypeMask();
+            }
+
             //
             if (or.IsAnyType || TypeCtx.IsNumber(or) || type == 0) // !this.TypeRefContext.IsArray(lValType & rValType))
                 type |= TypeCtx.GetNumberTypeMask();    // anytype or an operand is number or operands are not a number nor both are not array
