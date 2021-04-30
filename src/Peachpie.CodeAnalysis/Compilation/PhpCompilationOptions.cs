@@ -118,14 +118,19 @@ namespace Pchp.CodeAnalysis
         ForceSpecializedParametersNotNull = 1 << 21,
 
         /// <summary>
+        /// Prevent removing not null checks in parameters specialized to be distinct from null.
+        /// </summary>
+        RetainSpecializedParametersNotNullCheck = 1 << 22,
+
+        /// <summary>
         /// Allow to emit argument specialization check of <c>PhpNumber</c> from <c>PhpValue</c>.
         /// </summary>
-        AllowPhpNumberRuntimeSpecialization = 1 << 22,
+        AllowPhpNumberRuntimeSpecialization = 1 << 23,
 
         /// <summary>
         /// Use <c>RuntimeTracing</c> to trace all the source routine calls.
         /// </summary>
-        RoutineCallTracing = 1 << 24,
+        RoutineCallTracing = 1 << 29,
 
         /// <summary>
         /// Use <c>RuntimeTracing</c> to trace all the parameters source routines are called with.
@@ -133,12 +138,12 @@ namespace Pchp.CodeAnalysis
         /// <remarks>
         /// Must be set in combination with <see cref="RoutineCallTracing"/>.
         /// </remarks>
-        RoutineCallParameterTracing = 1 << 25,
+        RoutineCallParameterTracing = 1 << 30,
 
         /// <summary>
         /// Use <c>RuntimeCounters</c> to count invocations of various routine types.
         /// </summary>
-        RoutineCallCounting = 1 << 23,
+        RoutineCallCounting = 1 << 31,
 
         // TODO: These are for backward compatibility with wpdotnet-sdk fork, remove them when not needed anymore
         #region Common combinations

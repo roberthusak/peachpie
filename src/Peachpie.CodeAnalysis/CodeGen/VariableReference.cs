@@ -843,7 +843,8 @@ namespace Pchp.CodeAnalysis.Semantics
             // TODO: check union types
 
             // check NotNull
-            if (srcparam.HasNotNull && !srcparam.IsNotNullGuaranteed)
+            if (srcparam.HasNotNull
+                && (!srcparam.IsNotNullGuaranteed || (cg.DeclaringCompilation.Options.ExperimentalOptimization & ExperimentalOptimization.RetainSpecializedParametersNotNullCheck) != 0))
             {
                 if ((valueplace.Type.IsReferenceType /*|| valueplace.Type.Is_PhpValue()*/) && valueplace.Type != cg.CoreTypes.PhpAlias)
                 {
