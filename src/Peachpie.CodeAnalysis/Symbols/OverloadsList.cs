@@ -162,8 +162,7 @@ namespace Pchp.CodeAnalysis.Symbols
 
             foreach (var m in result)
             {
-                var nmandatory = 0;
-                var hasoptional = false;
+                bool hasMandatory = true;   // FIXME: Specialized routines might currently have "gaps" between parameters with default values
                 var hasparams = false;
                 var match = true;
                 var hasunpacking = false;
@@ -174,9 +173,7 @@ namespace Pchp.CodeAnalysis.Symbols
                 {
                     var p = expectedparams[i];
 
-                    hasoptional |= p.DefaultValue != null;
                     hasparams |= p.IsVariadic;
-                    if (!hasoptional && !hasparams) nmandatory++;
 
                     if (p.Index < args.Length)
                     {
@@ -194,10 +191,15 @@ namespace Pchp.CodeAnalysis.Symbols
 
                         match &= a_type == p_type && !hasunpacking; // check types match
                     }
+                    else if (p.DefaultValue == null && !hasparams)
+                    {
+                        hasMandatory = false;
+                        break;
+                    }
                 }
 
                 //
-                if ((args.Length >= nmandatory || hasunpacking) && (hasparams || args.Length <= expectedparams.Count))
+                if ((hasMandatory || hasunpacking) && (hasparams || args.Length <= expectedparams.Count))
                 {
                     // TODO: this is naive implementation of overload resolution,
                     // make it properly using Conversion Cost
