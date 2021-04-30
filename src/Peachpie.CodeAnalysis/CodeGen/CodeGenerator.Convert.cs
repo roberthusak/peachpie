@@ -314,6 +314,12 @@ namespace Pchp.CodeAnalysis.CodeGen
                 // Template: (PhpArray)<STACK>
                 return EmitCastClass(from, CoreTypes.PhpArray);
             }
+            else if (IsArrayOnly(fromHint))
+            {
+                EmitPhpValueAddr();
+                return EmitCall(ILOpCode.Call, CoreMethods.PhpValue.Array.Getter)
+                    .Expect(CoreTypes.PhpArray);
+            }
             else
             {
                 // Template: ((PhpValue)<from>).GetArray()
