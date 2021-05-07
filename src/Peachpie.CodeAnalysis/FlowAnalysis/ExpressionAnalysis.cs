@@ -1596,16 +1596,16 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
             {
                 x.ConstantValue = ConstantValueExtensions.AsOptional(false);
             }
-            else if (x.Operand is BoundVariableRef vref && vref.Name.IsDirect)
+            else if (branch != ConditionBranch.AnyResult && x.Operand is BoundVariableRef vref && vref.Name.IsDirect)
             {
-                if (branch == ConditionBranch.ToTrue)
-                {
-                    // if (Variable is T) => variable is T in True branch state
-                    var vartype = x.AsType.GetTypeRefMask(TypeCtx);
-                    if (opTypeMask.IsRef) vartype = vartype.WithRefFlag; // keep IsRef flag
+                var resultingTypeMask = TypeCtx.ExpandMaskSubclasses(x.AsType.GetTypeRefMask(TypeCtx).WithSubclasses);
 
-                    State.SetLocalType(State.GetLocalHandle(vref.Name.NameValue), vartype);
-                }
+                AnalysisFacts.HandleTypeCheckingExpression(
+                    vref,
+                    resultingTypeMask,
+                    branch,
+                    State,
+                    checkExpr: x);
             }
 
             //
