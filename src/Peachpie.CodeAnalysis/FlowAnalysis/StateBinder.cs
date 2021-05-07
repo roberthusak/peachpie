@@ -39,6 +39,13 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
             {
                 var local = state.GetLocalHandle(new VariableName(p.Name));
                 var ptype = p.GetResultType(typeCtx);
+
+                if (p.Type.Is_Class())
+                {
+                    // Passing a subclass is still valid
+                    ptype = ptype.WithSubclasses;
+                }
+
                 state.SetLocalType(local, ptype);
             }
 

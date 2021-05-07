@@ -217,6 +217,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
                 }
             }
 
+            public int Index => _index;
+
             /// <summary>
             /// Moves to the next item.
             /// </summary>
@@ -1060,6 +1062,38 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
                 || (IsLambda(a) && IsLambda(b))
                 || (GetTypes(a).Any(t => t == BoundTypeRefFactory.ResourceTypeRef) && IsObject(b))
                 || (IsObject(a) && GetTypes(b).Any(t => t == BoundTypeRefFactory.ResourceTypeRef));
+        }
+
+        public TypeRefMask ExpandMaskSubclasses(TypeRefMask mask)
+        {
+            if (mask.IsAnyType || !mask.IncludesSubclasses)
+            {
+                return mask;
+            }
+
+            var objectMask = GetObjectsFromMask(mask);
+            var otherObjectMask = new TypeRefMask(_isObjectMask & ~mask);
+            if (objectMask.IsVoid || otherObjectMask.IsVoid)
+            {
+                return mask;
+            }
+
+            foreach (var maskTypeRef in GetTypes(objectMask))
+            {
+                var otherTypeRefEnumerator = this.GetObjectTypes(otherObjectMask).GetEnumerator();
+                while (otherTypeRefEnumerator.MoveNext())
+                {
+                    var contextTypeRef = otherTypeRefEnumerator.Current;
+                    if (maskTypeRef.Type is TypeSymbol maskType
+                        && contextTypeRef.Type is TypeSymbol contextType
+                        && maskType.IsAssignableFrom(contextType))
+                    {
+                        mask |= 1ul << otherTypeRefEnumerator.Index;
+                    }
+                }
+            }
+
+            return mask;
         }
 
         #endregion

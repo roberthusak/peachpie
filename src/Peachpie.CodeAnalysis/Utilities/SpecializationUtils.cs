@@ -135,7 +135,7 @@ namespace Peachpie.CodeAnalysis.Utilities
         private static readonly TypeCheckEmitter PhpValueDoubleCheckEmitter = CreateTypeCodeEmitter(3, (c, _) => c.GetDoubleTypeMask());
         private static readonly TypeCheckEmitter PhpValuePhpArrayCheckEmitter = CreateTypeCodeEmitter(4, (c, _) => c.GetArrayTypeMask());
         private static readonly TypeCheckEmitter PhpValueStringCheckEmitter = CreateTypeCodeEmitter(5, (c, _) => c.GetStringTypeMask());
-        private static readonly TypeCheckEmitter PhpValueObjectCheckEmitter = CreateTypeCodeEmitter(7, (c, m) => c.GetObjectsFromMask(m));
+        private static readonly TypeCheckEmitter PhpValueObjectCheckEmitter = CreateTypeCodeEmitter(7, (c, m) => c.GetSystemObjectTypeMask().WithSubclasses);
 
         private static readonly TypeCheckEmitter PhpValuePhpStringCheckEmitter = CreateMethodEmitter(
             cg => cg.CoreMethods.PhpValue.IsStringNoAlias,
