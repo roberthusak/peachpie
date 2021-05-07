@@ -1588,8 +1588,6 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
             Accept(x.Operand);
             x.AsType.Accept(this);
 
-            // TOOD: x.ConstantValue // in case we know and the operand is a local variable (we can ignore the expression and emit result immediatelly)
-
             var opTypeMask = x.Operand.TypeRefMask;
             if (x.Operand is BoundLiteral
                 || (!opTypeMask.IsAnyType && !opTypeMask.IsRef && !Routine.TypeRefContext.IsObject(opTypeMask)))
