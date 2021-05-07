@@ -1598,6 +1598,10 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
             {
                 var resultingTypeMask = TypeCtx.ExpandMaskSubclasses(x.AsType.GetTypeRefMask(TypeCtx).WithSubclasses);
 
+                var varHandle = State.GetLocalHandle(vref.Name.NameValue);
+                var varTypeMask = State.GetLocalType(varHandle);
+                State.SetLocalType(varHandle, TypeCtx.ExpandMaskSubclasses(varTypeMask));    // Shouldn't change semantics but prevents from false unreachability
+
                 AnalysisFacts.HandleTypeCheckingExpression(
                     vref,
                     resultingTypeMask,

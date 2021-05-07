@@ -96,6 +96,14 @@ namespace Pchp.CodeAnalysis.Semantics
         public abstract ITypeSymbol EmitLoadTypeInfo(CodeGenerator cg, bool throwOnError = false);
         public abstract ITypeSymbol ResolveTypeSymbol(PhpCompilation compilation);
 
+        public void EnsureTypeSymbol(PhpCompilation compilation)
+        {
+            if (ResolvedType == null)
+            {
+                ResolvedType = (TypeSymbol)ResolveTypeSymbol(compilation);
+            }
+        }
+
         /// <summary>
         /// Gets type mask of the type reference in given context.
         /// </summary>

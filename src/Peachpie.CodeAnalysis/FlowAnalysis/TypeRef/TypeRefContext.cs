@@ -1078,15 +1078,17 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
                 return mask;
             }
 
-            foreach (var maskTypeRef in GetTypes(objectMask))
+            foreach (BoundTypeRef maskTypeRef in GetTypes(objectMask))
             {
+                maskTypeRef.EnsureTypeSymbol(_compilation);
+
                 var otherTypeRefEnumerator = this.GetObjectTypes(otherObjectMask).GetEnumerator();
                 while (otherTypeRefEnumerator.MoveNext())
                 {
-                    var contextTypeRef = otherTypeRefEnumerator.Current;
-                    if (maskTypeRef.Type is TypeSymbol maskType
-                        && contextTypeRef.Type is TypeSymbol contextType
-                        && maskType.IsAssignableFrom(contextType))
+                    var contextTypeRef = (BoundTypeRef)otherTypeRefEnumerator.Current;
+                    contextTypeRef.EnsureTypeSymbol(_compilation);
+
+                    if (((TypeSymbol)maskTypeRef.Type).IsAssignableFrom((TypeSymbol)contextTypeRef.Type))
                     {
                         mask |= 1ul << otherTypeRefEnumerator.Index;
                     }
