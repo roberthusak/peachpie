@@ -110,9 +110,13 @@ namespace Pchp.CodeAnalysis.Semantics
         }
 
         public virtual IBoundTypeRef Transfer(TypeRefContext source, TypeRefContext target) => this;
-        public virtual bool Equals(IBoundTypeRef other) => ReferenceEquals(this, other);
+
+        public virtual bool Equals(IBoundTypeRef other) =>
+            ReferenceEquals(this, other)
+            || (this.Type != null && SymbolEqualityComparer.Default.Equals(this.Type, other?.Type));
+
         public override bool Equals(object obj) => obj is IBoundTypeRef t && Equals(t);
-        public override int GetHashCode() => base.GetHashCode();
+        public override int GetHashCode() => base.GetHashCode();        // FIXME: Fix to match Equals if necessary (beware the overrides..)
 
         public override OperationKind Kind => OperationKind.None;
         public LangElement PhpSyntax { get; set; }
