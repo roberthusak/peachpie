@@ -171,7 +171,7 @@ namespace Peachpie.CodeAnalysis.Utilities
 
                     if (origOverload.SourceParameters[i].Type != specializedOverload.SourceParameters[i].Type)
                     {
-                        var specInfo = SpecializationUtils.GetInfo(ambiguousRoutine.Ambiguities[0].DeclaringCompilation, valueTypeRefContext, argValue, param.Type);
+                        var specInfo = SpecializationUtils.GetInfo(ambiguousRoutine.Ambiguities[0].DeclaringCompilation, valueTypeRefContext, argValue, param.Specialization);
                         allAlways &= specInfo.Kind == SpecializationKind.Always;
                         anyNever |= specInfo.Kind == SpecializationKind.Never;
                     }

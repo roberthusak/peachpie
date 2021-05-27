@@ -62,7 +62,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
             bool FilterTypesByOptions(SortedSet<TypeSymbol> types)
             {
                 types.RemoveWhere(type =>
-                    !SpecializationUtils.IsTypeSpecializationEnabled(_compilation.Options.ExperimentalOptimization, type));
+                    !SpecializationUtils.IsSpecializationEnabled(_compilation.Options.ExperimentalOptimization, type));
 
                 return types.Count > 0;
             }

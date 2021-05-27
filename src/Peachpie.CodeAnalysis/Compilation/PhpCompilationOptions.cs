@@ -101,9 +101,12 @@ namespace Pchp.CodeAnalysis
         SpecializeNumbers = 1 << 14,
         SpecializePhpArray = 1 << 15,
         SpecializeObjects = 1 << 16,
-        SpecializeMiscellaneous = 1 << 17,
+        SpecializeNull = 1 << 17,
+        SpecializeMiscellaneous = 1 << 18,
 
-        SpecializeAll = SpecializeString | SpecializePhpString | SpecializeNumbers | SpecializePhpArray | SpecializeObjects,
+        SpecializeCommon = SpecializeString | SpecializePhpString | SpecializeNumbers | SpecializePhpArray | SpecializeObjects,
+
+        SpecializeAll = SpecializeCommon | SpecializeNull | SpecializeMiscellaneous,
 
         #endregion
 

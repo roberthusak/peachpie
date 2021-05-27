@@ -16,6 +16,7 @@ using Devsense.PHP.Syntax;
 using Devsense.PHP.Text;
 using System.Globalization;
 using System.Threading;
+using Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization;
 using Peachpie.CodeAnalysis.Semantics;
 
 namespace Pchp.CodeAnalysis.Symbols
@@ -34,7 +35,7 @@ namespace Pchp.CodeAnalysis.Symbols
         /// <summary>Internal true/false values. Initially all false.</summary>
         protected CommonFlags _commonflags;
 
-        internal ImmutableArray<TypeSymbol> SpecializedParameterTypes { get; set; }
+        internal ImmutableArray<SpecializedParam> SpecializedParameterTypes { get; set; }
 
         // TODO: Put to CommonFlags
         internal bool IsSpecializedOverload => !SpecializedParameterTypes.IsDefault;

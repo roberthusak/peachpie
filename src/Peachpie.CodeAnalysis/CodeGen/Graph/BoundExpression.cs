@@ -2894,7 +2894,7 @@ namespace Pchp.CodeAnalysis.Semantics
                         cg.DeclaringCompilation,
                         cg.Routine.TypeRefContext,
                         argumentBuilder[i].Value,
-                        specializedOverload.SourceParameters[i].Type);
+                        specializedOverload.SourceParameters[i].Specialization);
                     
                     Debug.Assert(specInfo.Kind != SpecializationKind.Never);
 

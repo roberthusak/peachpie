@@ -10,6 +10,7 @@ using Devsense.PHP.Syntax.Ast;
 using Devsense.PHP.Syntax;
 using Pchp.CodeAnalysis.Semantics;
 using System.Threading;
+using Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization;
 using Peachpie.CodeAnalysis.Utilities;
 
 namespace Pchp.CodeAnalysis.Symbols
@@ -32,6 +33,8 @@ namespace Pchp.CodeAnalysis.Symbols
         ImmutableArray<AttributeData> _attributes;
 
         TypeSymbol _lazyType;
+
+        internal SpecializedParam Specialization { get; }
 
         /// <summary>
         /// The compiler guarantees that the parameter will not be <c>null</c>.
@@ -124,17 +127,17 @@ namespace Pchp.CodeAnalysis.Symbols
         }
         FieldSymbol _lazyDefaultValueField;
 
-        public SourceParameterSymbol(SourceRoutineSymbol routine, FormalParam syntax, int relindex, PHPDocBlock.ParamTag ptagOpt, TypeSymbol specializedType = null)
+        public SourceParameterSymbol(SourceRoutineSymbol routine, FormalParam syntax, int relindex, PHPDocBlock.ParamTag ptagOpt, SpecializedParam specialization = default)
         {
             Contract.ThrowIfNull(routine);
             Contract.ThrowIfNull(syntax);
             Debug.Assert(relindex >= 0);
 
-
             _routine = routine;
             _syntax = syntax;
             _relindex = relindex;
-            _lazyType = specializedType;
+            _lazyType = specialization.Type;
+            Specialization = specialization;
 
             var initializer = (syntax.InitValue != null)
                 ? new SemanticsBinder(DeclaringCompilation, routine.ContainingFile.SyntaxTree, locals: null, routine: null, self: routine.ContainingType as SourceTypeSymbol)
@@ -142,8 +145,8 @@ namespace Pchp.CodeAnalysis.Symbols
                     .SingleBoundElement()
                 : null;
             _initializer =
-                (specializedType == null || initializer == null
-                 || SpecializationUtils.GetInfo(routine.DeclaringCompilation, routine.TypeRefContext, initializer, specializedType).Kind == SpecializationKind.Always)
+                (specialization.Type == null || initializer == null
+                 || SpecializationUtils.GetInfo(routine.DeclaringCompilation, routine.TypeRefContext, initializer, specialization).Kind == SpecializationKind.Always)
                     ? initializer
                     : null;
 
@@ -156,7 +159,7 @@ namespace Pchp.CodeAnalysis.Symbols
             var optimization = routine.DeclaringCompilation.Options.ExperimentalOptimization;
             IsNotNullGuaranteed =
                 (optimization & ExperimentalOptimization.ForceSpecializedParametersNotNull) != 0
-                && specializedType != null && !specializedType.Is_PhpValue()                        // TODO: If needed, generalize to work with parameters with a type hint as well
+                && specialization.Type != null && !specialization.Type.Is_PhpValue()                        // TODO: If needed, generalize to work with parameters with a type hint as well
                 && !_syntax.IsVariadic;
 
             PHPDoc = ptagOpt;

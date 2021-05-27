@@ -7,6 +7,7 @@ using System.Text;
 using System.Collections.Immutable;
 using Devsense.PHP.Syntax;
 using Devsense.PHP.Syntax.Ast;
+using Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization;
 
 namespace Pchp.CodeAnalysis.FlowAnalysis
 {
@@ -40,7 +41,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
                 var local = state.GetLocalHandle(new VariableName(p.Name));
                 var ptype = p.GetResultType(typeCtx);
 
-                if (p.Type.Is_Class())
+                if (p.Type.Is_Class() && (p.Specialization.Flags & SpecializationFlags.IsNull) == 0)
                 {
                     // Passing a subclass is still valid
                     ptype = ptype.WithSubclasses;

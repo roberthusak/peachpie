@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Text;
 using Microsoft.CodeAnalysis;
+using Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization;
 using Pchp.CodeAnalysis.Symbols;
 
 namespace Peachpie.CodeAnalysis.Utilities
@@ -12,7 +13,7 @@ namespace Peachpie.CodeAnalysis.Utilities
     {
         public static IComparer<TypeSymbol> ParameterTypeComparer { get; } = new ParameterTypeComparerImpl();
 
-        public static IComparer<ImmutableArray<TypeSymbol>> SpecializationComparer { get; } = new SpecializationComparerImpl();
+        public static IComparer<ImmutableArray<SpecializedParam>> SpecializationComparer { get; } = new SpecializationComparerImpl();
 
         private class ParameterTypeComparerImpl : IComparer<TypeSymbol>
         {
@@ -84,9 +85,9 @@ namespace Peachpie.CodeAnalysis.Utilities
             }
         }
 
-        private class SpecializationComparerImpl : IComparer<ImmutableArray<TypeSymbol>>
+        private class SpecializationComparerImpl : IComparer<ImmutableArray<SpecializedParam>>
         {
-            public int Compare(ImmutableArray<TypeSymbol> x, ImmutableArray<TypeSymbol> y)
+            public int Compare(ImmutableArray<SpecializedParam> x, ImmutableArray<SpecializedParam> y)
             {
                 // Lexicographic comparison
                 Debug.Assert(x.Length == y.Length);

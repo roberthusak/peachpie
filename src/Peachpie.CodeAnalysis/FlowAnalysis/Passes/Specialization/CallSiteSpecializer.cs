@@ -38,7 +38,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                     foreach (var call in callGraph.GetCallerEdges(function))
                     {
                         var args = call.CallSite.CallExpression.ArgumentsInSourceOrder;
-                        var argTypes = new TypeSymbol[parameters.Length];
+                        var argSpecs = new SpecializedParam[parameters.Length];
 
                         bool isSpecialized = false;
                         for (int i = 0; i < parameters.Length; i++)
@@ -50,14 +50,17 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                                     ? (call.Caller.TypeRefContext, args[i].Value)               // Existing parameter
                                     : (function.TypeRefContext, parameter.Initializer);         // Default value
 
-                            argTypes[i] = parameter.Type;
+                            argSpecs[i] = parameter.Type;
                             if (argExpr != null)
                             {
                                 var argType = SpecializationUtils.EstimateExpressionType(_compilation, typeCtx, argExpr);
+                                var specializationFlags = GetSpecializationFlags(_compilation, typeCtx, argExpr);
+                                var argSpec = new SpecializedParam(argType, specializationFlags);
+
                                 if (IsSpecialized(parameter.Type, argType)
-                                    && SpecializationUtils.IsTypeSpecializationEnabled(_compilation.Options.ExperimentalOptimization, argType))
+                                    && SpecializationUtils.IsSpecializationEnabled(_compilation.Options.ExperimentalOptimization, argSpec))
                                 {
-                                    argTypes[i] = argType;
+                                    argSpecs[i] = argSpec;
                                     isSpecialized = true;
                                 }
                             }
@@ -65,7 +68,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
 
                         if (isSpecialized)
                         {
-                            specializations.Set.Add(argTypes.ToImmutableArray());
+                            specializations.Set.Add(argSpecs.ToImmutableArray());
                         }
                     }
 
@@ -75,6 +78,19 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                     }
                 }
             }
+        }
+
+        private static SpecializationFlags GetSpecializationFlags(PhpCompilation compilation, TypeRefContext typeCtx, BoundExpression expr)
+        {
+            var flags = SpecializationFlags.None;
+
+            var typeMask = SpecializationUtils.EstimateExpressionTypeRefMask(typeCtx, expr);
+            if (typeCtx.IsNull(typeMask))
+            {
+                flags |= SpecializationFlags.IsNull;
+            }
+
+            return flags;
         }
 
         private static bool IsSpecialized(TypeSymbol paramType, TypeSymbol argType) =>

@@ -14,6 +14,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization;
 
 namespace Pchp.CodeAnalysis.Symbols
 {
@@ -163,6 +164,10 @@ namespace Pchp.CodeAnalysis.Symbols
                         callableMask |= ctx.GetNullTypeMask();
 
                     return callableMask;
+                }
+                else if ((ps.Specialization.Flags & SpecializationFlags.IsNull) != 0)
+                {
+                    return ctx.GetNullTypeMask();
                 }
 
                 // TODO: handle union types precisely, now we resolve them mostly as PhpValue which results in AnyType mask

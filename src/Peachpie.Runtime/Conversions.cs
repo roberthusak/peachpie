@@ -96,7 +96,11 @@ namespace Pchp.Core
         /// </summary>
         public static string ToString(object value)
         {
-            if (value is IPhpConvertible conv)   // TODO: should be sufficient to call just ToString(), implementations of IPhpConvertible override ToString always
+            if (value == null)
+            {
+                return null;
+            }
+            else if (value is IPhpConvertible conv)   // TODO: should be sufficient to call just ToString(), implementations of IPhpConvertible override ToString always
             {
                 return conv.ToString();
             }

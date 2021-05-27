@@ -12,20 +12,23 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
 {
     internal readonly struct SpecializationSet
     {
-        public SortedSet<ImmutableArray<TypeSymbol>> Set { get; }
+        public SortedSet<ImmutableArray<SpecializedParam>> Set { get; }
 
-        private SpecializationSet(SortedSet<ImmutableArray<TypeSymbol>> set)
+        private SpecializationSet(SortedSet<ImmutableArray<SpecializedParam>> set)
         {
             Set = set;
         }
 
-        public SpecializationSet(ImmutableArray<TypeSymbol> specialization)
+        public SpecializationSet(ImmutableArray<SpecializedParam> specialization)
             : this(CreateEmptySet())
         {
             Set.Add(specialization);
         }
 
-        public void AddParameterTypeVariants(IEnumerable<TypeSymbol> types)
+        public void AddParameterTypeVariants(IEnumerable<TypeSymbol> types) =>
+            AddParameterTypeVariants(types.Select(t => new SpecializedParam(t)));
+
+        public void AddParameterTypeVariants(IEnumerable<SpecializedParam> types)
         {
             if (Set.Count == 0)
             {
@@ -48,7 +51,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
         public static SpecializationSet CreateEmpty() =>
             new SpecializationSet(CreateEmptySet());
 
-        private static SortedSet<ImmutableArray<TypeSymbol>> CreateEmptySet() =>
-            new SortedSet<ImmutableArray<TypeSymbol>>(SpecializationUtils.SpecializationComparer);
+        private static SortedSet<ImmutableArray<SpecializedParam>> CreateEmptySet() =>
+            new SortedSet<ImmutableArray<SpecializedParam>>(SpecializationUtils.SpecializationComparer);
     }
 }

@@ -907,6 +907,8 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
         /// </summary>
         public bool IsNull(TypeRefMask mask) { return (mask.Mask & _isNullMask) != 0 && !mask.IsAnyType; }
 
+        public bool IsNullOnly(TypeRefMask mask) { return IsNull(mask) && (mask.TypesMask & ~_isNullMask) == 0; }
+
         /// <summary>
         /// Gets value indicating the type represents <c>NULL</c> or <c>void</c> (not <c>mixed</c>).
         /// </summary>

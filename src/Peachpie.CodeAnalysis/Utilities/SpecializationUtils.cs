@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Pchp.CodeAnalysis;
 using Pchp.CodeAnalysis.CodeGen;
 using Pchp.CodeAnalysis.FlowAnalysis;
+using Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization;
 using Pchp.CodeAnalysis.Semantics;
 using Pchp.CodeAnalysis.Symbols;
 
@@ -130,6 +131,7 @@ namespace Peachpie.CodeAnalysis.Utilities
         }
 
         // TODO: Aliases are not handled, the dynamic overloading is skipped instead. Handle them as well.
+        private static readonly TypeCheckEmitter PhpValueNullCheckEmitter = CreateTypeCodeEmitter(0, (c, m) => c.GetSystemObjectTypeMask().WithSubclasses);
         private static readonly TypeCheckEmitter PhpValueBoolCheckEmitter = CreateTypeCodeEmitter(1, (c, _) => c.GetBooleanTypeMask());
         private static readonly TypeCheckEmitter PhpValueLongCheckEmitter = CreateTypeCodeEmitter(2, (c, _) => c.GetLongTypeMask());
         private static readonly TypeCheckEmitter PhpValueDoubleCheckEmitter = CreateTypeCodeEmitter(3, (c, _) => c.GetDoubleTypeMask());
@@ -149,13 +151,17 @@ namespace Peachpie.CodeAnalysis.Utilities
 
         private static readonly TypeCheckEmitter NotNullCheckEmitter = CreateNotNullCheckEmitter();
 
-        public static SpecializationInfo GetInfo(PhpCompilation compilation, TypeRefContext typeCtx, BoundExpression expr, TypeSymbol paramType)
+        public static SpecializationInfo GetInfo(PhpCompilation compilation, TypeRefContext typeCtx, BoundExpression expr, SpecializedParam paramSpec)
         {
+            var paramType = paramSpec.Type;
             var optimization = compilation.Options.ExperimentalOptimization;
             bool isNullParamAllowed = (optimization & ExperimentalOptimization.ForceSpecializedParametersNotNull) == 0;
 
             var exprMask = EstimateExpressionTypeRefMask(typeCtx, expr);
-            var paramMask = TypeRefFactory.CreateMask(typeCtx, paramType, !isNullParamAllowed);
+            var paramMask =
+                (paramSpec.Flags & SpecializationFlags.IsNull) != 0
+                ? typeCtx.GetNullTypeMask()
+                : TypeRefFactory.CreateMask(typeCtx, paramType, !isNullParamAllowed);
 
             // Estimate the resulting type of the expression
             var exprTypeEst = EstimateExpressionType(compilation, typeCtx, expr, exprMask);
@@ -177,7 +183,11 @@ namespace Peachpie.CodeAnalysis.Utilities
             }
             else if (exprTypeEst.Is_PhpValue())
             {
-                if (paramType.SpecialType == SpecialType.System_Boolean)
+                if ((paramSpec.Flags & SpecializationFlags.IsNull) != 0)
+                {
+                    return new SpecializationInfo(SpecializationKind.RuntimeDependent, PhpValueNullCheckEmitter);
+                }
+                else if (paramType.SpecialType == SpecialType.System_Boolean)
                 {
                     return new SpecializationInfo(SpecializationKind.RuntimeDependent, PhpValueBoolCheckEmitter);
                 }
@@ -300,18 +310,20 @@ namespace Peachpie.CodeAnalysis.Utilities
             }
         }
 
-        public static bool IsTypeSpecializationEnabled(ExperimentalOptimization options, TypeSymbol type) =>
+        public static bool IsSpecializationEnabled(ExperimentalOptimization options, SpecializedParam specialization) =>
             (options & ExperimentalOptimization.SpecializeAll) == ExperimentalOptimization.SpecializeAll
             || ((options & ExperimentalOptimization.SpecializeString) != 0
-                && type.SpecialType == SpecialType.System_String)
+                && specialization.Type.SpecialType == SpecialType.System_String)
             || ((options & ExperimentalOptimization.SpecializePhpString) != 0
-                && type.Is_PhpString())
+                && specialization.Type.Is_PhpString())
             || ((options & ExperimentalOptimization.SpecializeNumbers) != 0
-                && (type.SpecialType == SpecialType.System_Int64 || type.SpecialType == SpecialType.System_Double || type.Is_PhpNumber()))
+                && (specialization.Type.SpecialType == SpecialType.System_Int64 || specialization.Type.SpecialType == SpecialType.System_Double || specialization.Type.Is_PhpNumber()))
             || ((options & ExperimentalOptimization.SpecializePhpArray) != 0
-                && type.Is_PhpArray())
+                && specialization.Type.Is_PhpArray())
             || ((options & ExperimentalOptimization.SpecializeObjects) != 0
-                && type.Is_Class())
+                && (specialization.Flags & SpecializationFlags.IsNull) != 0)
+            || ((options & ExperimentalOptimization.SpecializeNull) != 0
+                && specialization.Type.SpecialType == SpecialType.System_Object)
             || (options & ExperimentalOptimization.SpecializeMiscellaneous) != 0;
     }
 }

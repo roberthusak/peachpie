@@ -79,7 +79,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                     {
                         // Remove the variant with no specializations
                         specializations.Set.RemoveWhere(types =>
-                            types.SequenceEqual(from parameter in parameters select parameter.Type));
+                            types.SequenceEqual(from parameter in parameters select new SpecializedParam(parameter.Type)));
 
                         _specializations[function] = specializations;
                     }
