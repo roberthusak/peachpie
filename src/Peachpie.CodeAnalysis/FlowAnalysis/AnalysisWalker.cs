@@ -198,6 +198,11 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
                     Visit((BoundIsSetEx)condition, branch);
                     return true;
                 }
+                if (condition is BoundVariableRef varRef)
+                {
+                    Visit(varRef, branch);
+                    return true;
+                }
                 //if (condition is EmptyEx)
                 //{
                 //    VisitEmptyEx((EmptyEx)condition, branch);
@@ -268,6 +273,11 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
         protected virtual void Visit(BoundIsSetEx x, ConditionBranch branch)
         {
             base.VisitIsSet(x);
+        }
+
+        protected virtual void Visit(BoundVariableRef x, ConditionBranch branch)
+        {
+            base.VisitVariableRef(x);
         }
 
         #endregion

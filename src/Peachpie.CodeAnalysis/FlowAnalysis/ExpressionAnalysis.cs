@@ -548,7 +548,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
             }
         }
 
-        protected virtual void VisitLocalVariableRef(BoundVariableRef x, VariableHandle local)
+        protected virtual void VisitLocalVariableRef(BoundVariableRef x, VariableHandle local, ConditionBranch branch)
         {
             Debug.Assert(local.IsValid);
 
@@ -694,9 +694,26 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
                 State.SetGreaterThanLongMin(local, false);
                 State.SetVarUninitialized(local);
             }
+
+            if (branch != ConditionBranch.AnyResult)
+            {
+                // The variable is being converted to boolean, NULL always converts to FALSE
+                if (TypeCtx.IsNullOnly(x.TypeRefMask) && !x.TypeRefMask.IsRef)
+                {
+                    x.ConstantValue = false;
+                }
+
+                // TODO: Remove NULL type in TRUE branch
+            }
         }
 
         public override T VisitVariableRef(BoundVariableRef x)
+        {
+            Visit(x, ConditionBranch.AnyResult);
+            return default;
+        }
+
+        protected override void Visit(BoundVariableRef x, ConditionBranch branch)
         {
             if (x.Name.IsDirect)
             {
@@ -707,7 +724,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
                 }
                 else
                 {
-                    VisitLocalVariableRef(x, State.GetLocalHandle(x.Name.NameValue));
+                    VisitLocalVariableRef(x, State.GetLocalHandle(x.Name.NameValue), branch);
                 }
             }
             else
@@ -737,8 +754,6 @@ namespace Pchp.CodeAnalysis.FlowAnalysis
 
                 }
             }
-
-            return default;
         }
 
         public override T VisitIncDec(BoundIncDecEx x)
