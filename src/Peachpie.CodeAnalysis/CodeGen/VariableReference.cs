@@ -10,6 +10,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Symbols;
 using Microsoft.CodeAnalysis.CodeGen;
 using Pchp.CodeAnalysis.CodeGen;
+using Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization;
 using Pchp.CodeAnalysis.Symbols;
 using Peachpie.CodeAnalysis.Utilities;
 using Cci = Microsoft.Cci;
@@ -866,6 +867,20 @@ namespace Pchp.CodeAnalysis.Semantics
                     cg.Builder.EmitIntConstant(srcparam.ParameterIndex + 1);
                     cg.EmitPop(cg.EmitCall(ILOpCode.Call, cg.CoreMethods.Operators.ThrowIfArgumentNull_object_int));
                 }
+            }
+
+            // The routine was compiled with the assumption that the parameter is null, check that it was right (only if specified in configuration)
+            // TODO: Add dedicated flag for this check
+            if ((srcparam.Specialization.Flags & SpecializationFlags.IsNull) != 0
+                && (cg.DeclaringCompilation.Options.ExperimentalOptimization & ExperimentalOptimization.RetainSpecializedParametersNotNullCheck) != 0)
+            {
+                Debug.Assert(valueplace.Type.IsReferenceType);
+                Debug.Assert(valueplace.Type != cg.CoreTypes.PhpAlias);
+
+                // ThrowIfArgumentNotNull(value, arg)
+                valueplace.EmitLoad(cg.Builder);
+                cg.Builder.EmitIntConstant(srcparam.ParameterIndex + 1);
+                cg.EmitPop(cg.EmitCall(ILOpCode.Call, cg.CoreMethods.Operators.ThrowIfArgumentNotNull_object_int));
             }
 
             // check callable

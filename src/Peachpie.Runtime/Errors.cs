@@ -292,6 +292,14 @@ namespace Pchp.Core
             }
         }
 
+        public static void ThrowIfArgumentNotNull(object value, int arg)
+        {
+            if (!ReferenceEquals(value, null))
+            {
+                throw new ArgumentException($"Parameter {arg} was not NULL although it was expected to be");
+            }
+        }
+
         public static void ThrowIfArgumentNotCallable(Context ctx, RuntimeTypeHandle callerCtx, PhpValue value, bool nullAllowed, int arg)
         {
             if (nullAllowed && value.IsNull)
