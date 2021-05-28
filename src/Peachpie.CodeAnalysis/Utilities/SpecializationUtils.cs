@@ -310,20 +310,32 @@ namespace Peachpie.CodeAnalysis.Utilities
             }
         }
 
-        public static bool IsSpecializationEnabled(ExperimentalOptimization options, SpecializedParam specialization) =>
-            (options & ExperimentalOptimization.SpecializeAll) == ExperimentalOptimization.SpecializeAll
-            || ((options & ExperimentalOptimization.SpecializeString) != 0
-                && specialization.Type.SpecialType == SpecialType.System_String)
-            || ((options & ExperimentalOptimization.SpecializePhpString) != 0
-                && specialization.Type.Is_PhpString())
-            || ((options & ExperimentalOptimization.SpecializeNumbers) != 0
-                && (specialization.Type.SpecialType == SpecialType.System_Int64 || specialization.Type.SpecialType == SpecialType.System_Double || specialization.Type.Is_PhpNumber()))
-            || ((options & ExperimentalOptimization.SpecializePhpArray) != 0
-                && specialization.Type.Is_PhpArray())
-            || ((options & ExperimentalOptimization.SpecializeObjects) != 0
-                && specialization.Type.Is_Class())
-            || ((options & ExperimentalOptimization.SpecializeNull) != 0
-                && (specialization.Flags & SpecializationFlags.IsNull) != 0)
-            || (options & ExperimentalOptimization.SpecializeMiscellaneous) != 0;
+        public static bool IsSpecializationEnabled(ExperimentalOptimization options, SpecializedParam specialization)
+        {
+            if ((options & ExperimentalOptimization.SpecializeAll) == ExperimentalOptimization.SpecializeAll)
+            {
+                return true;
+            }
+
+            if ((specialization.Flags & SpecializationFlags.IsNull) != 0)
+            {
+                return (options & ExperimentalOptimization.SpecializeNull) != 0;
+            }
+            else
+            {
+                return
+                      ((options & ExperimentalOptimization.SpecializeString) != 0
+                          && specialization.Type.SpecialType == SpecialType.System_String)
+                      || ((options & ExperimentalOptimization.SpecializePhpString) != 0
+                          && specialization.Type.Is_PhpString())
+                      || ((options & ExperimentalOptimization.SpecializeNumbers) != 0
+                          && (specialization.Type.SpecialType == SpecialType.System_Int64 || specialization.Type.SpecialType == SpecialType.System_Double || specialization.Type.Is_PhpNumber()))
+                      || ((options & ExperimentalOptimization.SpecializePhpArray) != 0
+                          && specialization.Type.Is_PhpArray())
+                      || ((options & ExperimentalOptimization.SpecializeObjects) != 0
+                          && specialization.Type.Is_Class())
+                      || (options & ExperimentalOptimization.SpecializeMiscellaneous) != 0;
+            }
+        }
     }
 }

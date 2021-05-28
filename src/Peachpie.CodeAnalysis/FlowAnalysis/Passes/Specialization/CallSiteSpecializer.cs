@@ -96,10 +96,10 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
             var flags = SpecializationFlags.None;
 
             var typeMask = SpecializationUtils.EstimateExpressionTypeRefMask(typeCtx, expr);
-            if (typeCtx.IsNull(typeMask))
+            if (typeCtx.IsNullOnly(typeMask))
             {
                 flags |= SpecializationFlags.IsNull;
-            }
+            } 
 
             return flags;
         }
