@@ -630,6 +630,16 @@ namespace Pchp.CodeAnalysis.CodeGen
                 return;
             }
 
+            if (from.SpecialType == SpecialType.System_Object
+                && TypeRefContext.IsNullOnly(fromHint)
+                && (to.Is_PhpValue() || to.IsReferenceType))
+            {
+                // null -> PhpValue, object
+                EmitPop(from);
+                EmitLoadDefault(to);
+                return;
+            }
+
             //
             from = EmitSpecialize(from, fromHint);
 
