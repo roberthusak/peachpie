@@ -53,11 +53,9 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                             argSpecs[i] = parameter.Type;
                             if (argExpr != null)
                             {
-                                var argType = SpecializationUtils.EstimateExpressionType(_compilation, typeCtx, argExpr);
-                                var specializationFlags = GetSpecializationFlags(_compilation, typeCtx, argExpr);
-                                var argSpec = new SpecializedParam(argType, specializationFlags);
+                                var argSpec = TryGetArgumentSpecialization(typeCtx, argExpr);
 
-                                if (IsSpecialized(parameter.Type, argType)
+                                if (IsSpecialized(parameter.Type, argSpec.Type)
                                     && SpecializationUtils.IsSpecializationEnabled(_compilation.Options.ExperimentalOptimization, argSpec))
                                 {
                                     argSpecs[i] = argSpec;
@@ -78,6 +76,19 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                     }
                 }
             }
+        }
+
+        private SpecializedParam TryGetArgumentSpecialization(TypeRefContext typeCtx, BoundExpression argExpr)
+        {
+            var argType = SpecializationUtils.EstimateExpressionType(_compilation, typeCtx, argExpr);
+
+            var specializationFlags = GetSpecializationFlags(_compilation, typeCtx, argExpr);
+            if ((specializationFlags & SpecializationFlags.IsNull) != 0)
+            {
+                argType = _compilation.CoreTypes.Object;
+            }
+
+            return new SpecializedParam(argType, specializationFlags);
         }
 
         private static SpecializationFlags GetSpecializationFlags(PhpCompilation compilation, TypeRefContext typeCtx, BoundExpression expr)

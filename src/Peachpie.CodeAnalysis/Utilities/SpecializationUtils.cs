@@ -321,9 +321,9 @@ namespace Peachpie.CodeAnalysis.Utilities
             || ((options & ExperimentalOptimization.SpecializePhpArray) != 0
                 && specialization.Type.Is_PhpArray())
             || ((options & ExperimentalOptimization.SpecializeObjects) != 0
-                && (specialization.Flags & SpecializationFlags.IsNull) != 0)
-            || ((options & ExperimentalOptimization.SpecializeNull) != 0
                 && specialization.Type.SpecialType == SpecialType.System_Object)
+            || ((options & ExperimentalOptimization.SpecializeNull) != 0
+                && (specialization.Flags & SpecializationFlags.IsNull) != 0)
             || (options & ExperimentalOptimization.SpecializeMiscellaneous) != 0;
     }
 }
