@@ -14,78 +14,59 @@ using Peachpie.CodeAnalysis.Utilities;
 
 namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
 {
-    internal class CallSiteSpecializer : IRoutineSpecializer
+    internal class CallSiteSpecializer : CommonRoutineSpecializer
     {
-        private readonly PhpCompilation _compilation;
+        public CallSiteSpecializer(PhpCompilation compilation) : base(compilation)
+        {}
 
-        private readonly Dictionary<SourceRoutineSymbol, SpecializationSet> _specializations =
-            new Dictionary<SourceRoutineSymbol, SpecializationSet>();
-
-        public CallSiteSpecializer(PhpCompilation compilation)
+        protected override void GatherSpecializations(CallGraph callGraph, SourceFunctionSymbol function, SpecializationSet specializations)
         {
-            _compilation = compilation;
-        }
+            var parameters = function.SourceParameters;
 
-        public void OnAfterAnalysis(CallGraph callGraph)
-        {
-            foreach (var function in _compilation.SourceSymbolCollection.GetFunctions())
+            foreach (var call in callGraph.GetCallerEdges(function))
             {
-                var parameters = function.SourceParameters;
-                if (parameters.Length > 0 && !_specializations.ContainsKey(function))
+                var args = call.CallSite.CallExpression.ArgumentsInSourceOrder;
+                var argSpecs = new SpecializedParam[parameters.Length];
+
+                bool isSpecialized = false;
+                for (int i = 0; i < parameters.Length; i++)
                 {
-                    var specializations = SpecializationSet.CreateEmpty();
+                    var parameter = parameters[i];
 
-                    foreach (var call in callGraph.GetCallerEdges(function))
+                    var (typeCtx, argExpr) =
+                        (i < args.Length)
+                            ? (call.Caller.TypeRefContext, args[i].Value)               // Existing parameter
+                            : (function.TypeRefContext, parameter.Initializer);         // Default value
+
+                    argSpecs[i] = parameter.Type;
+                    if (argExpr != null)
                     {
-                        var args = call.CallSite.CallExpression.ArgumentsInSourceOrder;
-                        var argSpecs = new SpecializedParam[parameters.Length];
+                        var argSpec = TryGetArgumentSpecialization(typeCtx, argExpr);
 
-                        bool isSpecialized = false;
-                        for (int i = 0; i < parameters.Length; i++)
+                        if (IsSpecialized(parameter.Type, argSpec.Type)
+                            && SpecializationUtils.IsSpecializationEnabled(Compilation.Options.ExperimentalOptimization, argSpec))
                         {
-                            var parameter = parameters[i];
-
-                            var (typeCtx, argExpr) =
-                                (i < args.Length)
-                                    ? (call.Caller.TypeRefContext, args[i].Value)               // Existing parameter
-                                    : (function.TypeRefContext, parameter.Initializer);         // Default value
-
-                            argSpecs[i] = parameter.Type;
-                            if (argExpr != null)
-                            {
-                                var argSpec = TryGetArgumentSpecialization(typeCtx, argExpr);
-
-                                if (IsSpecialized(parameter.Type, argSpec.Type)
-                                    && SpecializationUtils.IsSpecializationEnabled(_compilation.Options.ExperimentalOptimization, argSpec))
-                                {
-                                    argSpecs[i] = argSpec;
-                                    isSpecialized = true;
-                                }
-                            }
-                        }
-
-                        if (isSpecialized)
-                        {
-                            specializations.Set.Add(argSpecs.ToImmutableArray());
+                            argSpecs[i] = argSpec;
+                            isSpecialized = true;
                         }
                     }
+                }
 
-                    if (specializations.Set.Count > 0)
-                    {
-                        _specializations[function] = specializations;
-                    }
+                if (isSpecialized)
+                {
+                    specializations.Set.Add(argSpecs.ToImmutableArray());
                 }
             }
         }
 
         private SpecializedParam TryGetArgumentSpecialization(TypeRefContext typeCtx, BoundExpression argExpr)
         {
-            var argType = SpecializationUtils.EstimateExpressionType(_compilation, typeCtx, argExpr);
+            var argType = SpecializationUtils.EstimateExpressionType(Compilation, typeCtx, argExpr);
 
-            var specializationFlags = GetSpecializationFlags(_compilation, typeCtx, argExpr);
+            var specializationFlags = GetSpecializationFlags(Compilation, typeCtx, argExpr);
             if ((specializationFlags & SpecializationFlags.IsNull) != 0)
             {
-                argType = _compilation.CoreTypes.Object;
+                argType = Compilation.CoreTypes.Object;
             }
 
             return new SpecializedParam(argType, specializationFlags);
@@ -106,8 +87,5 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
 
         private static bool IsSpecialized(TypeSymbol paramType, TypeSymbol argType) =>
             paramType.Is_PhpValue() && !argType.Is_PhpValue() && !argType.Is_PhpAlias() && argType.SpecialType != SpecialType.System_Void && !argType.IsErrorType();
-
-        public bool TryGetRoutineSpecializedParameters(SourceRoutineSymbol routine, out SpecializationSet specializations) =>
-            _specializations.TryGetValue(routine, out specializations);
     }
 }

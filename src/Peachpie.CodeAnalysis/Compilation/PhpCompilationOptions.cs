@@ -131,6 +131,11 @@ namespace Pchp.CodeAnalysis
         AllowPhpNumberRuntimeSpecialization = 1 << 23,
 
         /// <summary>
+        /// Enable to produce procedure specializations even when there are already existing ones from previous specialization rounds.
+        /// </summary>
+        EnableIncrementalSpecialization = 1 << 24,
+
+        /// <summary>
         /// Produce an extra file with the list of all the specializations.
         /// </summary>
         RecordSpecializationList = 1 << 27,

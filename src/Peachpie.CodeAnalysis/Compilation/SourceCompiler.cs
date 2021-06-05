@@ -257,28 +257,40 @@ namespace Pchp.CodeAnalysis
             var overloads = new ConcurrentBag<SourceRoutineSymbol>();
             this.WalkMethods(routine =>
             {
-                if (routine.SpecializedOverloads.IsEmpty && !routine.IsSpecializedOverload)
+                if (!routine.IsSpecializedOverload
+                    && _compilation.RoutineSpecializer.TryGetRoutineSpecializedParameters(routine, out var specializations)
+                    && specializations.Set.Count > routine.SpecializedOverloads.Length)
                 {
-                    if (_compilation.RoutineSpecializer.TryGetRoutineSpecializedParameters(routine, out var specializations))
-                    {
-                        routine.SpecializedOverloads =
-                            specializations.Set
-                                .Select(specParams =>
-                                    new SourceFunctionSymbol(routine.ContainingFile, (FunctionDecl) routine.Syntax)
-                                    {
-                                        SpecializedParameterTypes = specParams
-                                    })
-                                .ToImmutableArray()
-                                .As<SourceRoutineSymbol>();
+                    routine.SpecializedOverloads =
+                        specializations.Set
+                            .Select(specializedParams =>
+                            {
+                                var existingOverload =
+                                    routine.SpecializedOverloads
+                                        .FirstOrDefault(overload => overload.SpecializedParameterTypes == specializedParams);
 
-                        foreach (var overload in routine.SpecializedOverloads)
-                        {
-                            // Bind the overload and prepare for the next analysis
-                            _worklist.Enqueue(overload.ControlFlowGraph.Start);
+                                if (existingOverload != null)
+                                {
+                                    return existingOverload;
+                                }
+                                else
+                                {
+                                    var newOverload =
+                                        new SourceFunctionSymbol(routine.ContainingFile, (FunctionDecl) routine.Syntax)
+                                        {
+                                            SpecializedParameterTypes = specializedParams
+                                        };
 
-                            overloads.Add(overload);
-                        }
-                    }
+                                    // Bind the overload and prepare for the next analysis
+                                    _worklist.Enqueue(newOverload.ControlFlowGraph.Start);
+
+                                    overloads.Add(newOverload);
+
+                                    return newOverload;
+                                }
+                            })
+                            .ToImmutableArray()
+                            .As<SourceRoutineSymbol>();
                 }
             }, allowParallel: ConcurrentBuild);
 
