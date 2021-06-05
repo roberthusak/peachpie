@@ -131,6 +131,11 @@ namespace Pchp.CodeAnalysis
         AllowPhpNumberRuntimeSpecialization = 1 << 23,
 
         /// <summary>
+        /// Produce an extra file with the time the whole compilation took.
+        /// </summary>
+        RecordCompilationTime = 1 << 28,
+
+        /// <summary>
         /// Use <c>RuntimeTracing</c> to trace all the source routine calls.
         /// </summary>
         RoutineCallTracing = 1 << 29,

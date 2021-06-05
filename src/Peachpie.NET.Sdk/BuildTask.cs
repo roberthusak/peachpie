@@ -296,6 +296,8 @@ namespace Peachpie.NET.Sdk.Tools
             // compile
             try
             {
+                var stopwatch = Stopwatch.StartNew();
+
                 var resultCode = PhpCompilerDriver.Run(
                     PhpCommandLineParser.Default,
                     null,
@@ -307,6 +309,13 @@ namespace Peachpie.NET.Sdk.Tools
                     analyzerLoader: new SimpleAnalyzerAssemblyLoader(),
                     output: new LogWriter(this.Log),
                     cancellationToken: _cancellation.Token);
+
+                stopwatch.Stop();
+
+                if (ExperimentalOptimization.Contains(Pchp.CodeAnalysis.ExperimentalOptimization.RecordCompilationTime.ToString()))
+                {
+                    RecordCompilationTime(stopwatch.ElapsedMilliseconds);
+                }
                 
                 return resultCode == 0;
             }
@@ -330,6 +339,15 @@ namespace Peachpie.NET.Sdk.Tools
             {
                 this.Log.LogErrorFromException(ex, true);
             }
+        }
+
+        private void RecordCompilationTime(long elapsedMs)
+        {
+            string filePath = Path.Combine(
+                Path.GetDirectoryName(OutputPath)!,
+                "CompilationTime.txt");
+
+            File.WriteAllText(filePath, elapsedMs.ToString());
         }
 
         bool AddNoEmpty(List<string> args, string optionName, string optionValue)
