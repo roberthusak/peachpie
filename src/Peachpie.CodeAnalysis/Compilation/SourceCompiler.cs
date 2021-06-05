@@ -525,6 +525,44 @@ namespace Pchp.CodeAnalysis
             return true;
         }
 
+        void RecordSpecializationList(PhpCompilation compilation)
+        {
+            string outputDir = Path.Combine(compilation.Options.BaseDirectory, "specializations");
+            Directory.CreateDirectory(outputDir);
+
+            string outputFile = Path.Combine(outputDir, compilation.AssemblyName + ".txt");
+            using var writer = new StreamWriter(outputFile);
+
+            WalkMethods((routine) =>
+            {
+                foreach (var overload in routine.SpecializedOverloads)
+                {
+                    writer.Write(routine.ContainingType.Name);
+                    writer.Write('.');
+                    writer.Write(routine.Name);
+                    writer.Write('(');
+
+                    bool first = true;
+                    foreach (var parameter in overload.SourceParameters)
+                    {
+                        if (first)
+                            first = false;
+                        else
+                            writer.Write(", ");
+
+                        writer.Write(parameter.Type.Name);
+                    }
+
+                    writer.WriteLine(')');
+                }
+
+                if (routine.SpecializedOverloads.Length > 0)
+                {
+                    writer.WriteLine();
+                }
+            });
+        }
+
         public static IEnumerable<Diagnostic> BindAndAnalyze(PhpCompilation compilation, CancellationToken cancellationToken)
         {
             var manager = compilation.GetBoundReferenceManager();   // ensure the references are resolved! (binds ReferenceManager)
@@ -613,6 +651,12 @@ namespace Pchp.CodeAnalysis
                 compiler.DiagnoseMethods();
                 compiler.DiagnoseTypes();
                 compiler.DiagnoseFiles();
+            }
+
+            if ((compilation.Options.ExperimentalOptimization & ExperimentalOptimization.RecordSpecializationList) != 0)
+            {
+                // 8. Optionally, output the list of all specializations
+                compiler.RecordSpecializationList(compilation);
             }
 
             //

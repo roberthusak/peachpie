@@ -131,6 +131,11 @@ namespace Pchp.CodeAnalysis
         AllowPhpNumberRuntimeSpecialization = 1 << 23,
 
         /// <summary>
+        /// Produce an extra file with the list of all the specializations.
+        /// </summary>
+        RecordSpecializationList = 1 << 27,
+
+        /// <summary>
         /// Produce an extra file with the time the whole compilation took.
         /// </summary>
         RecordCompilationTime = 1 << 28,
