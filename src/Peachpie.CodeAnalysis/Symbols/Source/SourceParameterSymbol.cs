@@ -210,6 +210,11 @@ namespace Pchp.CodeAnalysis.Symbols
         {
             get
             {
+                if ((Specialization.Flags & SpecializationFlags.IsNull) != 0)
+                {
+                    return false;
+                }
+
                 if (IsNotNullGuaranteed)
                 {
                     return true;
