@@ -93,10 +93,16 @@ namespace Peachpie.CodeAnalysis.Utilities
                 Debug.Assert(x.Length == y.Length);
                 for (int i = 0; i < x.Length; i++)
                 {
-                    int result = ParameterTypeComparer.Compare(x[i], y[i]);
-                    if (result != 0)
+                    int flagResult = x[i].Flags - y[i].Flags;
+                    if (flagResult != 0)
                     {
-                        return result;
+                        return flagResult;
+                    }
+
+                    int typeResult = ParameterTypeComparer.Compare(x[i], y[i]);
+                    if (typeResult != 0)
+                    {
+                        return typeResult;
                     }
                 }
                 return 0;
