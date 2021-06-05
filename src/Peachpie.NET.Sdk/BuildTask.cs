@@ -312,7 +312,8 @@ namespace Peachpie.NET.Sdk.Tools
 
                 stopwatch.Stop();
 
-                if (ExperimentalOptimization.Contains(Pchp.CodeAnalysis.ExperimentalOptimization.RecordCompilationTime.ToString()))
+                string recordTimeFlag = Pchp.CodeAnalysis.ExperimentalOptimization.RecordCompilationTime.ToString();
+                if (ExperimentalOptimization?.Contains(recordTimeFlag) == true)
                 {
                     RecordCompilationTime(stopwatch.ElapsedMilliseconds);
                 }
