@@ -184,7 +184,7 @@ namespace Pchp.CodeAnalysis
             {
                 RoutineSpecializer = new UsageSpecializer(this);
             }
-            else if (_options.ExperimentalOptimization == ExperimentalOptimization.TargetedOverloadsStatic)
+            else if ((_options.ExperimentalOptimization & ExperimentalOptimization.TargetedOverloads) != 0)
             {
                 RoutineSpecializer = new TargetedSpecializer(this);
             }

@@ -177,6 +177,7 @@ namespace Pchp.CodeAnalysis
         UsageOverloadsBranch = UsageOverloads | SpecializeAll | BranchedCallSites,
 
         TargetedOverloadsStatic = TargetedOverloads | SpecializeAll,
+        TargetedOverloadsBranch = TargetedOverloads | SpecializeAll | BranchedCallSites,
 
         #endregion
     }
