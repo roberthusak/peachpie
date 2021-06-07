@@ -23,7 +23,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
         {
             var parameters = function.SourceParameters;
 
-            foreach (var call in callGraph.GetCallerEdges(function))
+            foreach (var call in GetAllCallerEdges())
             {
                 var args = call.CallSite.CallExpression.ArgumentsInSourceOrder;
                 var argSpecs = new SpecializedParam[parameters.Length];
@@ -56,6 +56,18 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                 {
                     specializations.Set.Add(argSpecs.ToImmutableArray());
                 }
+            }
+
+            IEnumerable<CallGraph.Edge> GetAllCallerEdges()
+            {
+                var edges = callGraph.GetCallerEdges(function);
+
+                foreach (var overload in function.SpecializedOverloads)
+                {
+                    edges = edges.Concat(callGraph.GetCallerEdges(overload));
+                }
+
+                return edges;
             }
         }
 
