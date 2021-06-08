@@ -154,7 +154,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
             if (x.AsType.Type is TypeSymbol type && !type.IsErrorType() 
                 && x.Operand is BoundVariableRef { Variable: ParameterReference paramRef })
             {
-                _paramInfos[paramRef.Parameter].TypeChecks.Add(GeneralizeParameterType(type));
+                _paramInfos[paramRef.Parameter].TypeChecks.Add(type);
             }
 
             return base.VisitInstanceOf(x);
@@ -218,7 +218,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                 if (paramOperand is BoundVariableRef { Variable: ParameterReference param }
                     && TryGetSpecificType(valueOperand, out var type))
                 {
-                    _paramInfos[param.Parameter].TypeChecks.Add(GeneralizeParameterType(type));
+                    _paramInfos[param.Parameter].TypeChecks.Add(type);
 
                     if (valueOperand.ConstantValue.IsNull())
                     {
@@ -242,20 +242,6 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
         {
             type = SpecializationUtils.EstimateExpressionType(_routine.DeclaringCompilation, _routine.TypeRefContext, expr);
             return !type.Is_PhpValue() && !type.Is_PhpAlias() && !type.IsVoid() && !type.IsErrorType();
-        }
-
-        private TypeSymbol GeneralizeParameterType(TypeSymbol type)
-        {
-            // TODO: Maybe unify with CallSiteSpecializer.GeneralizeParameterType
-            // TODO: Handle other types as well if useful (e.g. PhpNumber)
-            if (type.SpecialType == SpecialType.System_String)
-            {
-                return _routine.DeclaringCompilation.CoreTypes.PhpString;
-            }
-            else
-            {
-                return type;
-            }
         }
     }
 }

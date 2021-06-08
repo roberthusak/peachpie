@@ -29,6 +29,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                 var parameter = parameters[i];
                 if (parameter.Type.Is_PhpValue() && TryGetParameterTypeVariants(parameter, paramInfos[i], out var types))
                 {
+                    types.Add(parameter.Type);
                     specializations.AddParameterTypeVariants(types);
                 }
                 else
@@ -84,7 +85,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
 
             if ((paramInfo.Flags & ParameterUsageFlags.PassedToConcat) != 0)
             {
-                types.Add(Compilation.CoreTypes.PhpString);
+                types.Add(Compilation.CoreTypes.String);
             }
 
             if ((paramInfo.Flags & ParameterUsageFlags.NullCheck) != 0 &&
