@@ -34,12 +34,12 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                 }
                 else
                 {
-                    specializations.AddParameterTypeVariants(new[] { parameter.Type });
+                    specializations.AddParameterTypeVariants(new[] { (SpecializedParam)parameter.Type });
                 }
             }
         }
 
-        private bool TryGetParameterTypeVariants(SourceParameterSymbol parameter, ParameterUsageInfo paramInfo, out HashSet<TypeSymbol> types)
+        private bool TryGetParameterTypeVariants(SourceParameterSymbol parameter, ParameterUsageInfo paramInfo, out HashSet<SpecializedParam> types)
         {
             if (parameter.IsParams)
             {
@@ -47,25 +47,27 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                 return false;
             }
 
-            types = new HashSet<TypeSymbol>(paramInfo.TypeChecks);
+            types = new HashSet<SpecializedParam>(paramInfo.TypeChecks.Select(type => (SpecializedParam)type));
 
             if (paramInfo.AccessedFields.Count > 0 || paramInfo.CalledMethods.Count > 0)
             {
                 // TODO: Consider checking imported types as well
-                var candidateTypes = new HashSet<SourceTypeSymbol>(Compilation.SourceSymbolCollection.GetTypes());
+                var candidateTypes = new HashSet<SpecializedParam>(
+                    Compilation.SourceSymbolCollection.GetTypes()
+                        .Select(type => (SpecializedParam)type));
 
                 if (paramInfo.CalledMethods.Count > 0)
                 {
                     candidateTypes.RemoveWhere(type =>
                         !paramInfo.CalledMethods.All(methodName =>
-                            type.GetMembers(methodName).FirstOrDefault() is MethodSymbol));
+                            type.Type.GetMembers(methodName).FirstOrDefault() is MethodSymbol));
                 }
 
                 if (paramInfo.AccessedFields.Count > 0)
                 {
                     candidateTypes.RemoveWhere(type =>
                         !paramInfo.AccessedFields.All(fieldName =>
-                            type.GetMembers(fieldName).FirstOrDefault() is FieldSymbol));
+                            type.Type.GetMembers(fieldName).FirstOrDefault() is FieldSymbol));
                 }
 
                 if (candidateTypes.Count > 0 && candidateTypes.Count <= 4)
@@ -74,24 +76,24 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                 }
                 else
                 {
-                    types.Add(Compilation.CoreTypes.Object);
+                    types.Add(Compilation.CoreTypes.Object.Symbol);
                 }
             }
 
             if ((paramInfo.Flags & ParameterUsageFlags.ArrayItemAccess) != 0)
             {
-                types.Add(Compilation.CoreTypes.PhpArray);
+                types.Add(Compilation.CoreTypes.PhpArray.Symbol);
             }
 
             if ((paramInfo.Flags & ParameterUsageFlags.PassedToConcat) != 0)
             {
-                types.Add(Compilation.CoreTypes.String);
+                types.Add(Compilation.CoreTypes.String.Symbol);
             }
 
             if ((paramInfo.Flags & ParameterUsageFlags.NullCheck) != 0 &&
-                !types.Any(type => type.IsReferenceType))
+                !types.Any(type => type.Type.IsReferenceType))
             {
-                types.Add(Compilation.CoreTypes.Object);
+                types.Add(new SpecializedParam(Compilation.CoreTypes.Object, SpecializationFlags.IsNull));
             }
 
             types.RemoveWhere(type =>
