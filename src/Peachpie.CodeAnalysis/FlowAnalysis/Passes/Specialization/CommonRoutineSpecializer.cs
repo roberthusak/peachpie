@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Pchp.CodeAnalysis;
 using Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization;
@@ -34,6 +35,10 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                     continue;
 
                 GatherSpecializations(callGraph, function, functionSpecializations);
+
+                // Remove the variant with no specializations if it exists
+                functionSpecializations.Set.RemoveWhere(types =>
+                    types.SequenceEqual(from parameter in function.SourceParameters select new SpecializedParam(parameter.Type)));
 
                 if (!existing && functionSpecializations.Set.Count > 0)
                     _specializations[function] = functionSpecializations;

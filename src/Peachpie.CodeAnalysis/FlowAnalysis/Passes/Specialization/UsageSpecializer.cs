@@ -12,49 +12,28 @@ using Peachpie.CodeAnalysis.Utilities;
 
 namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
 {
-    internal class UsageSpecializer : IRoutineSpecializer
+    internal class UsageSpecializer : CommonRoutineSpecializer
     {
-        private readonly PhpCompilation _compilation;
+        public UsageSpecializer(PhpCompilation compilation) : base(compilation)
+        {}
 
-        private readonly Dictionary<SourceRoutineSymbol, SpecializationSet> _specializations =
-            new Dictionary<SourceRoutineSymbol, SpecializationSet>();
-
-        public UsageSpecializer(PhpCompilation compilation)
+        protected override void GatherSpecializations(CallGraph callGraph, SourceFunctionSymbol function, SpecializationSet specializations)
         {
-            _compilation = compilation;
-        }
+            var parameters = function.SourceParameters;
 
-        public void OnAfterAnalysis(CallGraph callGraph)
-        {
-            foreach (var function in _compilation.SourceSymbolCollection.GetFunctions())
+            var paramInfos = ParameterUsageAnalyzer.AnalyseParameterUsages(function);
+            Debug.Assert(parameters.Length == paramInfos.Length);
+
+            for (int i = 0; i < parameters.Length; i++)
             {
-                var parameters = function.SourceParameters;
-                if (parameters.Length > 0 && !_specializations.ContainsKey(function))
+                var parameter = parameters[i];
+                if (parameter.Type.Is_PhpValue() && TryGetParameterTypeVariants(parameter, paramInfos[i], out var types))
                 {
-                    var specializations = SpecializationSet.CreateEmpty();
-
-                    var paramInfos = ParameterUsageAnalyzer.AnalyseParameterUsages(function);
-                    Debug.Assert(parameters.Length == paramInfos.Length);
-
-                    bool isSpecialized = false;
-                    for (int i = 0; i < parameters.Length; i++)
-                    {
-                        var parameter = parameters[i];
-                        if (parameter.Type.Is_PhpValue() && TryGetParameterTypeVariants(parameter, paramInfos[i], out var types))
-                        {
-                            isSpecialized = true;
-                            specializations.AddParameterTypeVariants(types);
-                        }
-                        else
-                        {
-                            specializations.AddParameterTypeVariants(new[] { parameter.Type });
-                        }
-                    }
-
-                    if (isSpecialized)
-                    {
-                        _specializations[function] = specializations;
-                    }
+                    specializations.AddParameterTypeVariants(types);
+                }
+                else
+                {
+                    specializations.AddParameterTypeVariants(new[] { parameter.Type });
                 }
             }
         }
@@ -72,7 +51,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
             if (paramInfo.AccessedFields.Count > 0 || paramInfo.CalledMethods.Count > 0)
             {
                 // TODO: Consider checking imported types as well
-                var candidateTypes = new HashSet<SourceTypeSymbol>(_compilation.SourceSymbolCollection.GetTypes());
+                var candidateTypes = new HashSet<SourceTypeSymbol>(Compilation.SourceSymbolCollection.GetTypes());
 
                 if (paramInfo.CalledMethods.Count > 0)
                 {
@@ -94,33 +73,30 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
                 }
                 else
                 {
-                    types.Add(_compilation.CoreTypes.Object);
+                    types.Add(Compilation.CoreTypes.Object);
                 }
             }
 
             if ((paramInfo.Flags & ParameterUsageFlags.ArrayItemAccess) != 0)
             {
-                types.Add(_compilation.CoreTypes.PhpArray);
+                types.Add(Compilation.CoreTypes.PhpArray);
             }
 
             if ((paramInfo.Flags & ParameterUsageFlags.PassedToConcat) != 0)
             {
-                types.Add(_compilation.CoreTypes.PhpString);
+                types.Add(Compilation.CoreTypes.PhpString);
             }
 
             if ((paramInfo.Flags & ParameterUsageFlags.NullCheck) != 0 &&
                 !types.Any(type => type.IsReferenceType))
             {
-                types.Add(_compilation.CoreTypes.Object);
+                types.Add(Compilation.CoreTypes.Object);
             }
 
             types.RemoveWhere(type =>
-                !SpecializationUtils.IsSpecializationEnabled(_compilation.Options.ExperimentalOptimization, type));
+                !SpecializationUtils.IsSpecializationEnabled(Compilation.Options.ExperimentalOptimization, type));
 
             return types.Count > 0;
         }
-
-        public bool TryGetRoutineSpecializedParameters(SourceRoutineSymbol routine, out SpecializationSet specializations) =>
-            _specializations.TryGetValue(routine, out specializations);
     }
 }
