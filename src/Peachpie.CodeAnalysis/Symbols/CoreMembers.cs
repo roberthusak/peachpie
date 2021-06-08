@@ -593,6 +593,9 @@ namespace Pchp.CodeAnalysis.Symbols
         {
             public PhpNumberHolder(CoreTypes ct)
             {
+                IsLong = ct.PhpNumber.Property("IsLong");
+                IsDouble = ct.PhpNumber.Property("IsDouble");
+
                 ToLong = ct.PhpNumber.Method("ToLong");
                 ToDouble = ct.PhpNumber.Method("ToDouble");
                 ToString_Context = ct.PhpNumber.Method("ToString", ct.Context);
@@ -699,6 +702,9 @@ namespace Pchp.CodeAnalysis.Symbols
                 lt_number_double = ct.PhpNumber.Operator(WellKnownMemberNames.LessThanOperatorName, ct.PhpNumber, ct.Double);
                 lt_long_number = ct.PhpNumber.Operator(WellKnownMemberNames.LessThanOperatorName, ct.Long, ct.PhpNumber);
             }
+
+            public readonly CoreProperty
+                IsLong, IsDouble;
 
             public readonly CoreMethod
                 ToLong, ToDouble, ToString_Context, ToClass,

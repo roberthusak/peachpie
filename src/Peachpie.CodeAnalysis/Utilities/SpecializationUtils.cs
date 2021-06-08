@@ -69,12 +69,14 @@ namespace Peachpie.CodeAnalysis.Utilities
             {
                 // arg.Method()
 
+                var method = methodSelector(cg);
+
                 var place = expr.BindPlace(cg);
-                Debug.Assert(place.Type.Is_PhpValue());
+                Debug.Assert(method.ContainingType.Equals(place.Type));
 
                 LhsStack lhs = default;
                 place.EmitLoadAddress(cg, ref lhs);
-                cg.EmitCall(ILOpCode.Call, methodSelector(cg));
+                cg.EmitCall(ILOpCode.Call, method);
                 lhs.Dispose();
 
                 return maskSelector(cg.TypeRefContext, expr.TypeRefMask);
@@ -146,6 +148,14 @@ namespace Peachpie.CodeAnalysis.Utilities
         private static readonly TypeCheckEmitter PhpValuePhpNumberCheckEmitter = CreateMethodEmitter(
             cg => cg.CoreMethods.PhpValue.IsNumberNoAlias,
             (c, _) => c.GetNumberTypeMask());
+
+        private static readonly TypeCheckEmitter PhpNumberLongCheckEmitter = CreateMethodEmitter(
+            cg => cg.CoreMethods.PhpNumber.IsLong.Getter,
+            (c, _) => c.GetLongTypeMask());
+
+        private static readonly TypeCheckEmitter PhpNumberDoubleCheckEmitter = CreateMethodEmitter(
+            cg => cg.CoreMethods.PhpNumber.IsDouble.Getter,
+            (c, _) => c.GetDoubleTypeMask());
 
         private static readonly TypeCheckEmitter ClassCheckEmitter = CreateClassCheckEmitter();
 
@@ -222,6 +232,17 @@ namespace Peachpie.CodeAnalysis.Utilities
                 else if (paramType.IsReferenceType)
                 {
                     return new SpecializationInfo(SpecializationKind.RuntimeDependent, ClassCheckEmitter);
+                }
+            }
+            else if (exprTypeEst.Is_PhpNumber())
+            {
+                if (paramType.SpecialType == SpecialType.System_Int64)
+                {
+                    return new SpecializationInfo(SpecializationKind.RuntimeDependent, PhpNumberLongCheckEmitter);
+                }
+                else if (paramType.SpecialType == SpecialType.System_Double)
+                {
+                    return new SpecializationInfo(SpecializationKind.RuntimeDependent, PhpNumberDoubleCheckEmitter);
                 }
             }
             else if (exprTypeEst.Is_PhpString() || exprTypeEst.SpecialType == SpecialType.System_String)
