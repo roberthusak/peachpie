@@ -13,6 +13,8 @@ namespace Peachpie.CodeAnalysis.Utilities
     {
         public static IComparer<TypeSymbol> ParameterTypeComparer { get; } = new ParameterTypeComparerImpl();
 
+        public static IComparer<SpecializedParam> SpecializedParameterComparer { get; } = new SpecializedParameterComparerImpl();
+
         public static IComparer<ImmutableArray<SpecializedParam>> SpecializationComparer { get; } = new SpecializationComparerImpl();
 
         private class ParameterTypeComparerImpl : IComparer<TypeSymbol>
@@ -85,6 +87,17 @@ namespace Peachpie.CodeAnalysis.Utilities
             }
         }
 
+        private class SpecializedParameterComparerImpl : IComparer<SpecializedParam>
+        {
+            public int Compare(SpecializedParam x, SpecializedParam y)
+            {
+                if (x.Flags != y.Flags)
+                    return y.Flags - x.Flags;   // NULL is the simplest type
+
+                return ParameterTypeComparer.Compare(x, y);
+            }
+        }
+
         private class SpecializationComparerImpl : IComparer<ImmutableArray<SpecializedParam>>
         {
             public int Compare(ImmutableArray<SpecializedParam> x, ImmutableArray<SpecializedParam> y)
@@ -93,13 +106,7 @@ namespace Peachpie.CodeAnalysis.Utilities
                 Debug.Assert(x.Length == y.Length);
                 for (int i = 0; i < x.Length; i++)
                 {
-                    int flagResult = x[i].Flags - y[i].Flags;
-                    if (flagResult != 0)
-                    {
-                        return flagResult;
-                    }
-
-                    int typeResult = ParameterTypeComparer.Compare(x[i], y[i]);
+                    int typeResult = SpecializedParameterComparer.Compare(x[i], y[i]);
                     if (typeResult != 0)
                     {
                         return typeResult;
