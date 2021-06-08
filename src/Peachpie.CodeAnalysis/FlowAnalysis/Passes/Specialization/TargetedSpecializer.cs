@@ -10,84 +10,28 @@ using Peachpie.CodeAnalysis.Utilities;
 
 namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
 {
-    class TargetedSpecializer : IRoutineSpecializer
+    class TargetedSpecializer : CommonRoutineSpecializer
     {
-        private readonly PhpCompilation _compilation;
+        private readonly CallSiteSpecializer _callSiteSpecializer;
+        private readonly UsageSpecializer _usageSpecializer;
 
-        private readonly Dictionary<SourceRoutineSymbol, SpecializationSet> _specializations =
-            new Dictionary<SourceRoutineSymbol, SpecializationSet>();
-
-        public TargetedSpecializer(PhpCompilation compilation)
+        public TargetedSpecializer(PhpCompilation compilation) : base(compilation)
         {
-            _compilation = compilation;
+            _callSiteSpecializer = new CallSiteSpecializer(compilation);
+            _usageSpecializer = new UsageSpecializer(compilation);
         }
 
-        public void OnAfterAnalysis(CallGraph callGraph)
+        public override void GatherSpecializations(CallGraph callGraph, SourceFunctionSymbol function, SpecializationSet specializations)
         {
-            foreach (var function in _compilation.SourceSymbolCollection.GetFunctions())
-            {
-                var parameters = function.SourceParameters;
-                if (parameters.Length > 0 && !_specializations.ContainsKey(function))
-                {
-                    var paramInfos = ParameterUsageAnalyzer.AnalyseParameterUsages(function);
-                    Debug.Assert(parameters.Length == paramInfos.Length);
+            var callSiteSpecs = SpecializationSet.CreateEmpty();
+            _callSiteSpecializer.GatherSpecializations(callGraph, function, callSiteSpecs);
 
-                    var specializations = SpecializationSet.CreateEmpty();
+            var usageSpecs = SpecializationSet.CreateEmpty();
+            _usageSpecializer.GatherSpecializations(callGraph, function, usageSpecs);
 
-                    bool isSpecialized = false;
-                    for (int i = 0; i < parameters.Length; i++)
-                    {
-                        var parameter = parameters[i];
-                        var paramInfo = paramInfos[i];
+            callSiteSpecs.Set.IntersectWith(usageSpecs.Set);
 
-                        if (parameter.Type.Is_PhpValue()
-                            && ((paramInfo.Flags & ParameterUsageFlags.PassedToConcat) != 0
-                                || paramInfo.TypeChecks.Contains(_compilation.CoreTypes.String))
-                            && (_compilation.Options.ExperimentalOptimization & ExperimentalOptimization.SpecializeString) != 0
-                            && IsArgumentTypePassed(_compilation.CoreTypes.String))
-                        {
-                            isSpecialized = true;
-                            specializations.AddParameterTypeVariants(new [] { parameter.Type, _compilation.CoreTypes.String });
-                        }
-                        else
-                        {
-                            specializations.AddParameterTypeVariants(new [] { parameter.Type });
-                        }
-
-                        bool IsArgumentTypePassed(TypeSymbol type)
-                        {
-                            foreach (var call in callGraph.GetCallerEdges(function))
-                            {
-                                var args = call.CallSite.CallExpression.ArgumentsInSourceOrder;
-                                var (typeCtx, argExpr) =
-                                    (i < args.Length)
-                                        ? (call.Caller.TypeRefContext, args[i].Value)               // Existing parameter
-                                        : (function.TypeRefContext, parameter.Initializer);         // Default value
-
-                                if (argExpr != null &&
-                                    SpecializationUtils.EstimateExpressionType(_compilation, typeCtx, argExpr).Equals(type))
-                                {
-                                    return true;
-                                }
-                            }
-
-                            return false;
-                        }
-                    }
-
-                    if (isSpecialized)
-                    {
-                        // Remove the variant with no specializations
-                        specializations.Set.RemoveWhere(types =>
-                            types.SequenceEqual(from parameter in parameters select new SpecializedParam(parameter.Type)));
-
-                        _specializations[function] = specializations;
-                    }
-                }
-            }
+            specializations.Set.UnionWith(callSiteSpecs.Set);
         }
-
-        public bool TryGetRoutineSpecializedParameters(SourceRoutineSymbol routine, out SpecializationSet specializations) =>
-            _specializations.TryGetValue(routine, out specializations);
     }
 }

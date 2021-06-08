@@ -45,7 +45,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
             }
         }
 
-        protected abstract void GatherSpecializations(CallGraph callGraph, SourceFunctionSymbol function, SpecializationSet specializations);
+        public abstract void GatherSpecializations(CallGraph callGraph, SourceFunctionSymbol function, SpecializationSet specializations);
 
         public bool TryGetRoutineSpecializedParameters(SourceRoutineSymbol routine, out SpecializationSet specializations) =>
             _specializations.TryGetValue(routine, out specializations);

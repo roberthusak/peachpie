@@ -19,7 +19,7 @@ namespace Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization
         public CallSiteSpecializer(PhpCompilation compilation) : base(compilation)
         {}
 
-        protected override void GatherSpecializations(CallGraph callGraph, SourceFunctionSymbol function, SpecializationSet specializations)
+        public override void GatherSpecializations(CallGraph callGraph, SourceFunctionSymbol function, SpecializationSet specializations)
         {
             var parameters = function.SourceParameters;
 
