@@ -43,7 +43,7 @@ namespace Pchp.CodeAnalysis
     /// Options for enabling experimental optimization methods.
     /// </summary>
     [Flags]
-    public enum ExperimentalOptimization
+    public enum ExperimentalOptimization : ulong
     {
         None = 0,
 
@@ -161,7 +161,12 @@ namespace Pchp.CodeAnalysis
         /// <summary>
         /// Use <c>RuntimeCounters</c> to count invocations of various routine types.
         /// </summary>
-        RoutineCallCounting = 1 << 31,
+        RoutineCallCounting = 1ul << 31,
+
+        /// <summary>
+        /// Simplify number of specialization of each function to a reasonable amount.
+        /// </summary>
+        SimplifySpecializationSets = 1ul << 32,
 
         // TODO: These are for backward compatibility with wpdotnet-sdk fork, remove them when not needed anymore
         #region Common combinations

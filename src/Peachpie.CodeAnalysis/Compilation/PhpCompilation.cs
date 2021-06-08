@@ -20,6 +20,7 @@ using Pchp.CodeAnalysis.Emit;
 using Pchp.CodeAnalysis.FlowAnalysis.Passes.Specialization;
 using Pchp.CodeAnalysis.Symbols;
 using Pchp.CodeAnalysis.Utilities;
+using Peachpie.CodeAnalysis.FlowAnalysis.Passes.Specialization;
 using Roslyn.Utilities;
 
 namespace Pchp.CodeAnalysis
@@ -187,6 +188,11 @@ namespace Pchp.CodeAnalysis
             else if ((_options.ExperimentalOptimization & ExperimentalOptimization.TargetedOverloads) != 0)
             {
                 RoutineSpecializer = new TargetedSpecializer(this);
+            }
+
+            if ((_options.ExperimentalOptimization & ExperimentalOptimization.SimplifySpecializationSets) != 0)
+            {
+                RoutineSpecializer = new SpecializationSetSimplifier(this, (CommonRoutineSpecializer)RoutineSpecializer);
             }
         }
 
